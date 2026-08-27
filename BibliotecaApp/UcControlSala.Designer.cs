@@ -2,6 +2,8 @@
 
 namespace BibliotecaApp
 {
+
+    // clase de control de salas
     partial class UcControlSala
     {
         private System.ComponentModel.IContainer components = null;

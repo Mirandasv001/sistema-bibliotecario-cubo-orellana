@@ -16,6 +16,7 @@
             {
                 ConexionDB.Inicializar();
             }
+             // Manejo de excepciones
             catch (Exception ex)
             {
                 MessageBox.Show(

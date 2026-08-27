@@ -79,6 +79,8 @@
             panelContenedor.Controls.Add(apartado);
         }
 
+        //Botones importantes
+
         private void ResaltarBoton(Button botonActivo)
         {
             foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos })

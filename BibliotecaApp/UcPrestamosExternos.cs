@@ -7,7 +7,7 @@ namespace BibliotecaApp
     /// El ComboBox muestra solo Títulos (con autocompletado). El Codigo único del
     /// ejemplar físico se resuelve en la BD al momento de cada operación.
     /// </summary>
-    public partial class UcPrestamosExternos : UserControl
+    public partial class UcPrestamosExternos : UserControl // HERNCIA
     {
         private int? _prstamoEditandoId = null;
 

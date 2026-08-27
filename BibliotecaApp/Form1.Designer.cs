@@ -138,7 +138,7 @@ namespace BibliotecaApp
             panelNav.ResumeLayout(false);
             ResumeLayout(false);
         }
-
+             // Apartado importante
         private static void ConfigurarBotonMenu(Button boton, string texto)
         {
             boton.Dock = DockStyle.Top;

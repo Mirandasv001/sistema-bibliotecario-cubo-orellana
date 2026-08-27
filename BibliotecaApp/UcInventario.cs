@@ -7,6 +7,8 @@ namespace BibliotecaApp
     /// <summary>
     /// Apartado C: inventario general de libros con búsqueda en tiempo real.
     /// </summary>
+    /// 
+    /// USO DE HERENCIA
     public partial class UcInventario : UserControl
     {
         public UcInventario()

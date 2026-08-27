@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel;
 
+
+ //  Apartado importante 
 namespace BibliotecaApp
 {
     partial class UcPrestamosExternos
