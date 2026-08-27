@@ -98,5 +98,36 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        // ====================================================================
+        //  DOBLE CLIC → iniciar préstamo externo
+        // ====================================================================
+
+        /// <summary>
+        /// Al hacer doble clic en una fila disponible, captura Codigo y Título y
+        /// pide al Form1 que cambie a Préstamos Externos con esos datos precargados.
+        /// </summary>
+        private void dgvInventario_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var fila = dgvInventario.Rows[e.RowIndex];
+
+            string disponibilidad = fila.Cells["Disponibilidad"].Value?.ToString() ?? "";
+            if (!string.Equals(disponibilidad, "Disponible", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Este ejemplar ya está prestado y no puede iniciarse un préstamo.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string codigo = fila.Cells["Código"].Value?.ToString() ?? "";
+            string titulo = fila.Cells["Título"].Value?.ToString() ?? "";
+
+            if (codigo.Length == 0) return;
+
+            if (FindForm() is Form1 principal)
+                principal.CargarPrestamoDesdeInventario(codigo, titulo);
+        }
     }
 }

@@ -39,6 +39,9 @@ namespace BibliotecaApp
             lblDireccion = EstiloUI.CrearEtiqueta("Dirección:");
             txtDireccion = new TextBox();
             lblSeccionPrestamo = CrearSeccion("DATOS DEL PRÉSTAMO");
+            lblCodigoLibro = EstiloUI.CrearEtiqueta("Código del Ejemplar:");
+            txtCodigoLibro = new TextBox();
+            lblAvisoCodigo = new Label();
             lblLibro = EstiloUI.CrearEtiqueta("Título del Libro:");
             cboLibro = new ComboBox();
             lblFechaPrestamo = EstiloUI.CrearEtiqueta("Fecha de Préstamo:");
@@ -60,7 +63,6 @@ namespace BibliotecaApp
             btnRegistrar = new Button();
             btnDevolver = new Button();
             btnModificar = new Button();
-            btnEliminar = new Button();
             dgvPrestamos = new DataGridView();
 
             ((ISupportInitialize)splitContainer).BeginInit();
@@ -152,8 +154,8 @@ namespace BibliotecaApp
             tlpCampos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
             tlpCampos.Dock = DockStyle.Fill;
             tlpCampos.Name = "tlpCampos";
-            tlpCampos.RowCount = 10;
-            for (int i = 0; i < 10; i++)
+            tlpCampos.RowCount = 11;
+            for (int i = 0; i < 11; i++)
                 tlpCampos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             int f = 0;
@@ -165,6 +167,8 @@ namespace BibliotecaApp
             tlpCampos.Controls.Add(lblDireccion, 2, f); tlpCampos.Controls.Add(txtDireccion, 3, f);
             tlpCampos.SetColumnSpan(txtDireccion, 3); f++;
             tlpCampos.Controls.Add(lblSeccionPrestamo, 0, f); tlpCampos.SetColumnSpan(lblSeccionPrestamo, 6); f++;
+            tlpCampos.Controls.Add(lblCodigoLibro, 0, f); tlpCampos.Controls.Add(txtCodigoLibro, 1, f);
+            tlpCampos.Controls.Add(lblAvisoCodigo, 2, f); tlpCampos.SetColumnSpan(lblAvisoCodigo, 4); f++;
             tlpCampos.Controls.Add(lblLibro, 0, f); tlpCampos.Controls.Add(cboLibro, 1, f);
             tlpCampos.SetColumnSpan(cboLibro, 5); f++;
             tlpCampos.Controls.Add(lblFechaPrestamo, 0, f); tlpCampos.Controls.Add(dtpFechaPrestamo, 1, f);
@@ -179,12 +183,21 @@ namespace BibliotecaApp
             foreach (Control c in new Control[] { txtNombre, txtCorreo, txtDui, txtTelefono,
                      txtDireccion, cboLibro, dtpFechaPrestamo, txtPersonalPresto,
                      cboEstado, dtpFechaEntrega, txtPersonalRecibio,
-                     dtpFechaRenovacion, txtPersonalRenovo })
+                     dtpFechaRenovacion, txtPersonalRenovo, txtCodigoLibro })
             {
                 EstiloUI.EstilizarEntrada(c);
                 c.Dock = DockStyle.Fill;
                 c.Margin = new Padding(3, 0, 15, 6);
             }
+
+            txtCodigoLibro.PlaceholderText = "Código del ejemplar — presione Enter";
+            txtCodigoLibro.KeyPress += txtCodigoLibro_KeyPress;
+            lblAvisoCodigo.AutoSize = true;
+            lblAvisoCodigo.Font = EstiloUI.Etiqueta();
+            lblAvisoCodigo.Margin = new Padding(3, 8, 3, 2);
+            lblAvisoCodigo.Dock = DockStyle.Fill;
+            lblAvisoCodigo.TextAlign = ContentAlignment.MiddleLeft;
+            lblAvisoCodigo.Text = "";
 
             cboLibro.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cboLibro.AutoCompleteSource = AutoCompleteSource.ListItems;
@@ -199,7 +212,6 @@ namespace BibliotecaApp
             panelBotones.Controls.Add(btnRegistrar);
             panelBotones.Controls.Add(btnDevolver);
             panelBotones.Controls.Add(btnModificar);
-            panelBotones.Controls.Add(btnEliminar);
             panelBotones.Dock = DockStyle.Top;
             panelBotones.Name = "panelBotones";
             panelBotones.Padding = new Padding(14, 6, 14, 6);
@@ -207,7 +219,7 @@ namespace BibliotecaApp
             // 
             // btnRegistrar
             // 
-            btnRegistrar.Location = new Point(14, 8);
+            btnRegistrar.Location = new Point(196, 8);
             btnRegistrar.Name = "btnRegistrar";
             btnRegistrar.Size = new Size(190, 38);
             btnRegistrar.Text = "Registrar Préstamo";
@@ -217,7 +229,7 @@ namespace BibliotecaApp
             // 
             // btnDevolver
             // 
-            btnDevolver.Location = new Point(220, 8);
+            btnDevolver.Location = new Point(410, 8);
             btnDevolver.Name = "btnDevolver";
             btnDevolver.Size = new Size(230, 38);
             btnDevolver.Text = "Registrar Devolución (fila)";
@@ -226,21 +238,12 @@ namespace BibliotecaApp
             // 
             // btnModificar
             // 
-            btnModificar.Location = new Point(466, 8);
+            btnModificar.Location = new Point(664, 8);
             btnModificar.Name = "btnModificar";
             btnModificar.Size = new Size(120, 38);
             btnModificar.Text = "Modificar";
             EstiloUI.EstilizarBotonSecundario(btnModificar);
             btnModificar.Click += btnModificar_Click;
-            // 
-            // btnEliminar
-            // 
-            btnEliminar.Location = new Point(602, 8);
-            btnEliminar.Name = "btnEliminar";
-            btnEliminar.Size = new Size(120, 38);
-            btnEliminar.Text = "Eliminar";
-            EstiloUI.EstilizarBotonSecundario(btnEliminar);
-            btnEliminar.Click += btnEliminar_Click;
             // 
             // dgvPrestamos
             // 
@@ -314,6 +317,9 @@ namespace BibliotecaApp
         private Label lblDireccion;
         private TextBox txtDireccion;
         private Label lblSeccionPrestamo;
+        private Label lblCodigoLibro;
+        private TextBox txtCodigoLibro;
+        private Label lblAvisoCodigo;
         private Label lblLibro;
         private ComboBox cboLibro;
         private Label lblFechaPrestamo;
@@ -335,7 +341,6 @@ namespace BibliotecaApp
         private Button btnRegistrar;
         private Button btnDevolver;
         private Button btnModificar;
-        private Button btnEliminar;
         private DataGridView dgvPrestamos;
     }
 }

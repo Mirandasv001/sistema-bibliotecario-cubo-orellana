@@ -32,6 +32,129 @@ namespace BibliotecaApp
             CargarPrestamosActivos();
         }
 
+        // ====================================================================
+        //  FLUJO ÁGIL — carga directa desde Inventario
+        // ====================================================================
+
+        /// <summary>
+        /// Método público invocado por Form1.CargarPrestamoDesdeInventario.
+        /// Precarga el Código y el Título del ejemplar y bloquea ambos campos
+        /// para que el operador solo complete los datos del usuario.
+        /// </summary>
+        public void CargarDesdeInventario(string codigo, string titulo)
+        {
+            txtCodigoLibro.Text = codigo;
+            cboLibro.Text = titulo;
+            BloquearPorCodigo();
+            MostrarAviso($"Ejemplar \"{codigo}\" disponible. Campos de libro bloqueados.", EstiloUI.Acento);
+            txtNombre.Focus();
+        }
+
+        // ====================================================================
+        //  BÚSQUEDA RÁPIDA POR CÓDIGO DEL EJEMPLAR
+        // ====================================================================
+
+        private void txtCodigoLibro_KeyPress(object? sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar != (char)Keys.Enter) return;
+            e.Handled = true;
+            BuscarLibroPorCodigo();
+        }
+
+        /// <summary>
+        /// Busca el ejemplar por su Código único. Si existe y está 'Disponible'
+        /// autocompleta el Título y bloquea ambos campos; en caso contrario
+        /// limpia el campo y muestra una alerta visual en lblAvisoCodigo.
+        /// </summary>
+        private void BuscarLibroPorCodigo()
+        {
+            string codigo = txtCodigoLibro.Text.Trim();
+            if (codigo.Length == 0)
+            {
+                LimpiarEstadoCodigo();
+                return;
+            }
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var comando = conexion.CreateCommand();
+                comando.CommandText = @"
+                    SELECT Titulo, Disponibilidad
+                    FROM Libros
+                    WHERE Codigo = $codigo
+                    LIMIT 1;";
+                comando.Parameters.AddWithValue("$codigo", codigo);
+
+                using var lector = comando.ExecuteReader();
+                if (lector.Read())
+                {
+                    string titulo = lector.GetString(0);
+                    string disponibilidad = lector.GetString(1);
+
+                    if (string.Equals(disponibilidad, "Disponible", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cboLibro.Text = titulo;
+                        BloquearPorCodigo();
+                        MostrarAviso($"Ejemplar \"{codigo}\" disponible. Campos de libro bloqueados.",
+                            EstiloUI.Acento);
+                    }
+                    else
+                    {
+                        txtCodigoLibro.Clear();
+                        cboLibro.Text = string.Empty;
+                        DesbloquearPorCodigo();
+                        MostrarAviso("El ejemplar ya está prestado.", EstiloUI.AlertaRojo);
+                    }
+                }
+                else
+                {
+                    txtCodigoLibro.Clear();
+                    cboLibro.Text = string.Empty;
+                    DesbloquearPorCodigo();
+                    MostrarAviso("No existe un ejemplar con ese código.", EstiloUI.AlertaRojo);
+                }
+            }
+            catch (SqliteException ex)
+            {
+                LimpiarEstadoCodigo();
+                MostrarAviso("No se pudo consultar la base de datos.", EstiloUI.AlertaRojo);
+                MessageBox.Show("Error de base de datos al buscar el código: " + ex.Message,
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                LimpiarEstadoCodigo();
+                MessageBox.Show("Error al buscar el código: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BloquearPorCodigo()
+        {
+            txtCodigoLibro.ReadOnly = true;
+            cboLibro.Enabled = false;
+        }
+
+        private void DesbloquearPorCodigo()
+        {
+            txtCodigoLibro.ReadOnly = false;
+            cboLibro.Enabled = true;
+        }
+
+        private void MostrarAviso(string mensaje, Color color)
+        {
+            lblAvisoCodigo.Text = mensaje;
+            lblAvisoCodigo.ForeColor = color;
+        }
+
+        private void LimpiarEstadoCodigo()
+        {
+            DesbloquearPorCodigo();
+            txtCodigoLibro.Clear();
+            lblAvisoCodigo.Text = "";
+        }
+
         // ------------------------------------------------------------------
         //  Placeholders nativos (Win32 EM_SETCUEBANNER)
         // ------------------------------------------------------------------
@@ -192,22 +315,43 @@ namespace BibliotecaApp
         /// <summary>
         /// Inserta un nuevo préstamo y marca como "Prestado" el primer ejemplar
         /// disponible del título seleccionado. El Codigo se resuelve en tiempo real.
+        /// Duplica la validación de la UI por seguridad y nunca lanza una excepción
+        /// sin controlar: captura SqliteException y cualquier otra Exception.
         /// </summary>
         private void RegistrarPrestamo()
         {
             string titulo = cboLibro.Text.Trim();
+
+            // Validación preventiva extra (aunque ValidarFormulario ya corrió).
+            if (string.IsNullOrWhiteSpace(titulo))
+            {
+                MessageBox.Show("Seleccione o escriba el título del libro.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
 
                 // Obtener el primer Codigo disponible de ese título.
-                string? codigo = ObtenerCodigoDisponible(conexion, titulo);
-                if (codigo == null)
+                string? codigo;
+                try
+                {
+                    codigo = ObtenerCodigoDisponible(conexion, titulo);
+                }
+                catch (SqliteException ex)
+                {
+                    MessageBox.Show("Error de base de datos al consultar el ejemplar: " + ex.Message,
+                        "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(codigo))
                 {
                     MessageBox.Show(
                         $"No hay ejemplares disponibles del título \"{titulo}\".",
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -256,10 +400,19 @@ namespace BibliotecaApp
 
                     transaccion.Commit();
                 }
-                catch
+                catch (SqliteException ex)
                 {
                     transaccion.Rollback();
-                    throw;
+                    MessageBox.Show("Error de base de datos al registrar el préstamo: " + ex.Message,
+                        "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    transaccion.Rollback();
+                    MessageBox.Show("Error inesperado al registrar el préstamo: " + ex.Message,
+                        "Validación", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
                 MessageBox.Show("Préstamo registrado correctamente.",
@@ -267,6 +420,11 @@ namespace BibliotecaApp
                 LimpiarParaNuevo();
                 CargarLibrosDisponibles();
                 CargarPrestamosActivos();
+            }
+            catch (SqliteException ex)
+            {
+                MessageBox.Show("Error de conexión con la base de datos: " + ex.Message,
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
             {
@@ -596,95 +754,36 @@ namespace BibliotecaApp
         }
 
         // ====================================================================
-        //  ELIMINAR
-        // ====================================================================
-
-        private void btnEliminar_Click(object sender, EventArgs e)
-        {
-            if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
-            {
-                MessageBox.Show("Seleccione un préstamo de la lista para eliminar.",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            int id = Convert.ToInt32(dgvPrestamos.CurrentRow.Cells["ID"].Value);
-            string? titulo = dgvPrestamos.CurrentRow.Cells["Título del Libro"].Value?.ToString();
-
-            if (MessageBox.Show("¿Está seguro de eliminar este préstamo permanentemente?",
-                    "Eliminar Préstamo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                return;
-
-            try
-            {
-                using var conexion = ConexionDB.ObtenerConexion();
-
-                string? codigoLibro = ObtenerCodigoPrestado(conexion, titulo ?? "");
-
-                using var transaccion = conexion.BeginTransaction();
-                try
-                {
-                    using (var eliminar = conexion.CreateCommand())
-                    {
-                        eliminar.Transaction = transaccion;
-                        eliminar.CommandText = "DELETE FROM PrestamosExternos WHERE ID = $id;";
-                        eliminar.Parameters.AddWithValue("$id", id);
-                        eliminar.ExecuteNonQuery();
-                    }
-
-                    if (!string.IsNullOrEmpty(codigoLibro))
-                    {
-                        using var liberar = conexion.CreateCommand();
-                        liberar.Transaction = transaccion;
-                        liberar.CommandText = "UPDATE Libros SET Disponibilidad = 'Disponible' WHERE Codigo = $codigo;";
-                        liberar.Parameters.AddWithValue("$codigo", codigoLibro);
-                        liberar.ExecuteNonQuery();
-                    }
-
-                    transaccion.Commit();
-                }
-                catch
-                {
-                    transaccion.Rollback();
-                    throw;
-                }
-
-                if (_prstamoEditandoId == id)
-                    LimpiarParaNuevo();
-
-                MessageBox.Show("Préstamo eliminado correctamente.",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                CargarLibrosDisponibles();
-                CargarPrestamosActivos();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al eliminar el préstamo: " + ex.Message,
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        // ====================================================================
         //  VALIDACIÓN Y LIMPIEZA
         // ====================================================================
 
+        /// <summary>
+        /// Valida los campos obligatorios del formulario usando
+        /// string.IsNullOrWhiteSpace. Si algo falta, muestra una advertencia
+        /// amigable y detiene el flujo devolviendo false (nunca rompe el programa).
+        /// </summary>
         private bool ValidarFormulario()
         {
-            if (txtNombre.Text.Trim().Length == 0)
+            if (string.IsNullOrWhiteSpace(txtNombre.Text))
                 return Notificar("Escriba el nombre del usuario.", txtNombre);
 
-            if (cboLibro.Text.Trim().Length == 0)
+            if (string.IsNullOrWhiteSpace(cboLibro.Text))
                 return Notificar("Seleccione o escriba el título del libro.", cboLibro);
 
-            if (txtPersonalPresto.Text.Trim().Length == 0)
+            if (string.IsNullOrWhiteSpace(txtPersonalPresto.Text))
                 return Notificar("Escriba el personal que realiza el préstamo.", txtPersonalPresto);
+
+            // Fechas: los DateTimePicker siempre tienen una fecha válida, pero
+            // reforzamos que el rango tenga coherencia.
+            if (dtpFechaEntrega.Value.Date < dtpFechaPrestamo.Value.Date)
+                return Notificar("La fecha de entrega no puede ser anterior a la de préstamo.", dtpFechaEntrega);
 
             return true;
         }
 
         private static bool Notificar(string mensaje, Control control)
         {
-            MessageBox.Show(mensaje, "Datos incompletos",
+            MessageBox.Show(mensaje, "Validación",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             control.Focus();
             return false;
@@ -703,6 +802,7 @@ namespace BibliotecaApp
             dtpFechaEntrega.Value = DateTime.Today.AddDays(15);
             dtpFechaRenovacion.Value = DateTime.Today;
             dtpFechaRenovacion.Checked = false;
+            LimpiarEstadoCodigo();
         }
 
         private void LimpiarParaNuevo()
