@@ -265,41 +265,6 @@ namespace BibliotecaApp
         }
 
         // ------------------------------------------------------------------
-        //  Eliminar (DELETE)
-        // ------------------------------------------------------------------
-        private void btnEliminar_Click(object sender, EventArgs e)
-        {
-            if (!HayFilaSeleccionada()) return;
-
-            var respuesta = MessageBox.Show(
-                "¿Está seguro de eliminar permanentemente este registro?",
-                "Confirmar eliminación",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (respuesta != DialogResult.Yes) return;
-
-            try
-            {
-                using var conexion = ConexionDB.ObtenerConexion();
-                using var comando = conexion.CreateCommand();
-                comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
-                comando.Parameters.AddWithValue("$id", idSeleccionado);
-                comando.ExecuteNonQuery();
-
-                MessageBox.Show("Registro eliminado.",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                LimpiarCampos();
-                CargarRegistros();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al eliminar el registro: " + ex.Message,
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        // ------------------------------------------------------------------
         //  Validación y limpieza
         // ------------------------------------------------------------------
         private bool HayFilaSeleccionada()
@@ -335,11 +300,6 @@ namespace BibliotecaApp
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             control.Focus();
             return false;
-        }
-
-        private void btnLimpiar_Click(object sender, EventArgs e)
-        {
-            LimpiarCampos();
         }
 
         private void LimpiarCampos()

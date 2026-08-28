@@ -115,6 +115,7 @@ namespace BibliotecaApp
             dgvInventario.ReadOnly = true;
             dgvInventario.RowHeadersVisible = false;
             dgvInventario.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvInventario.CellDoubleClick += dgvInventario_CellDoubleClick;
             // 
             // UcInventario
             // 

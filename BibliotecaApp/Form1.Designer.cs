@@ -27,6 +27,8 @@ namespace BibliotecaApp
             btnSala = new Button();
             btnPrestamos = new Button();
             btnInventario = new Button();
+            btnAlertas = new Button();
+            btnGuiaUso = new Button();
             lblVersion = new Label();
             panelContenedor = new Panel();
             panelMenu.SuspendLayout();
@@ -85,6 +87,8 @@ namespace BibliotecaApp
             panelNav.Padding = new Padding(0, 20, 0, 0);
             panelNav.Size = new Size(220, 484);
             // Los botones se agregan en orden inverso para que queden apilados hacia abajo.
+            panelNav.Controls.Add(btnGuiaUso);
+            panelNav.Controls.Add(btnAlertas);
             panelNav.Controls.Add(btnPrestamos);
             panelNav.Controls.Add(btnInventario);
             panelNav.Controls.Add(btnSala);
@@ -94,9 +98,14 @@ namespace BibliotecaApp
             ConfigurarBotonMenu(btnSala, "Control de Sala");
             ConfigurarBotonMenu(btnInventario, "Inventario");
             ConfigurarBotonMenu(btnPrestamos, "Préstamos Externos");
+            ConfigurarBotonMenu(btnAlertas, "Alertas de Vencidos");
+            ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
             btnSala.Click += (_, _) => MostrarApartadoSala();
             btnPrestamos.Click += (_, _) => MostrarApartadoPrestamos();
             btnInventario.Click += (_, _) => MostrarApartadoInventario();
+            btnAlertas.Click += (_, _) => MostrarApartadoAlertas();
+            btnAlertas.Paint += btnAlertas_Paint;
+            btnGuiaUso.Click += (_, _) => btnGuiaUso_Click();
             // 
             // lblVersion
             // 
@@ -166,6 +175,8 @@ namespace BibliotecaApp
         private Button btnSala;
         private Button btnPrestamos;
         private Button btnInventario;
+        private Button btnAlertas;
+        private Button btnGuiaUso;
         private Label lblVersion;
         private Panel panelContenedor;
     }

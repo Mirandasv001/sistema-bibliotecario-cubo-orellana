@@ -42,8 +42,6 @@ namespace BibliotecaApp
             btnRegistrar = new Button();
             btnMarcarDevolucion = new Button();
             btnModificar = new Button();
-            btnEliminar = new Button();
-            btnLimpiar = new Button();
             dgvRegistros = new DataGridView();
             colId = new DataGridViewTextBoxColumn();
             colFecha = new DataGridViewTextBoxColumn();
@@ -156,8 +154,6 @@ namespace BibliotecaApp
             panelBotones.Controls.Add(btnRegistrar);
             panelBotones.Controls.Add(btnMarcarDevolucion);
             panelBotones.Controls.Add(btnModificar);
-            panelBotones.Controls.Add(btnEliminar);
-            panelBotones.Controls.Add(btnLimpiar);
             panelBotones.Dock = DockStyle.Top;
             panelBotones.Location = new Point(0, 230);
             panelBotones.Name = "panelBotones";
@@ -166,7 +162,7 @@ namespace BibliotecaApp
             // 
             // btnRegistrar (Check-in)
             // 
-            btnRegistrar.Location = new Point(14, 8);
+            btnRegistrar.Location = new Point(233, 8);
             btnRegistrar.Name = "btnRegistrar";
             btnRegistrar.Size = new Size(170, 38);
             btnRegistrar.Text = "Registrar Lectura";
@@ -176,7 +172,7 @@ namespace BibliotecaApp
             // 
             // btnMarcarDevolucion (Check-out)
             // 
-            btnMarcarDevolucion.Location = new Point(196, 8);
+            btnMarcarDevolucion.Location = new Point(427, 8);
             btnMarcarDevolucion.Name = "btnMarcarDevolucion";
             btnMarcarDevolucion.Size = new Size(175, 38);
             btnMarcarDevolucion.Text = "Marcar Devolución";
@@ -186,34 +182,13 @@ namespace BibliotecaApp
             // 
             // btnModificar
             // 
-            btnModificar.Location = new Point(383, 8);
+            btnModificar.Location = new Point(626, 8);
             btnModificar.Name = "btnModificar";
             btnModificar.Size = new Size(120, 38);
             btnModificar.Text = "Modificar";
             btnModificar.UseVisualStyleBackColor = false;
             EstiloUI.EstilizarBotonSecundario(btnModificar);
             btnModificar.Click += btnModificar_Click;
-            // 
-            // btnEliminar
-            // 
-            btnEliminar.Location = new Point(515, 8);
-            btnEliminar.Name = "btnEliminar";
-            btnEliminar.Size = new Size(115, 38);
-            btnEliminar.Text = "Eliminar";
-            btnEliminar.UseVisualStyleBackColor = false;
-            btnEliminar.FlatAppearance.BorderColor = Color.FromArgb(200, 90, 90);
-            btnEliminar.ForeColor = Color.FromArgb(170, 60, 60);
-            EstiloUI.EstilizarBotonSecundario(btnEliminar);
-            btnEliminar.Click += btnEliminar_Click;
-            // 
-            // btnLimpiar
-            // 
-            btnLimpiar.Location = new Point(642, 8);
-            btnLimpiar.Name = "btnLimpiar";
-            btnLimpiar.Size = new Size(110, 38);
-            btnLimpiar.Text = "Limpiar";
-            EstiloUI.EstilizarBotonSecundario(btnLimpiar);
-            btnLimpiar.Click += btnLimpiar_Click;
             // 
             // dgvRegistros
             // 
@@ -309,8 +284,6 @@ namespace BibliotecaApp
         private Button btnRegistrar;
         private Button btnMarcarDevolucion;
         private Button btnModificar;
-        private Button btnEliminar;
-        private Button btnLimpiar;
         private DataGridView dgvRegistros;
         private DataGridViewTextBoxColumn colId;
         private DataGridViewTextBoxColumn colFecha;

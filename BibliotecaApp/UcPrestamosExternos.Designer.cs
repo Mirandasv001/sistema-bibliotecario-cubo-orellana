@@ -21,12 +21,9 @@ namespace BibliotecaApp
 
         private void InitializeComponent()
         {
-            splitContainer = new SplitContainer();
             panelEncabezado = new Panel();
             lblTitulo = new Label();
             lblSubtitulo = new Label();
-            grpDatos = new GroupBox();
-            tlpCampos = new TableLayoutPanel();
             lblSeccionUsuario = CrearSeccion("DATOS DEL USUARIO");
             lblNombre = EstiloUI.CrearEtiqueta("Nombre del Usuario:");
             txtNombre = new TextBox();
@@ -39,8 +36,11 @@ namespace BibliotecaApp
             lblDireccion = EstiloUI.CrearEtiqueta("Dirección:");
             txtDireccion = new TextBox();
             lblSeccionPrestamo = CrearSeccion("DATOS DEL PRÉSTAMO");
+            lblCodigoLibro = EstiloUI.CrearEtiqueta("Código del Ejemplar:");
+            txtCodigoLibro = new TextBox();
+            lblAvisoCodigo = new Label();
             lblLibro = EstiloUI.CrearEtiqueta("Título del Libro:");
-            cboLibro = new ComboBox();
+            txtTituloLibro = new TextBox();
             lblFechaPrestamo = EstiloUI.CrearEtiqueta("Fecha de Préstamo:");
             dtpFechaPrestamo = new DateTimePicker();
             lblPersonalPresto = EstiloUI.CrearEtiqueta("Personal que Prestó:");
@@ -56,52 +56,33 @@ namespace BibliotecaApp
             dtpFechaRenovacion = new DateTimePicker();
             lblPersonalRenovo = EstiloUI.CrearEtiqueta("Personal que Renovó:");
             txtPersonalRenovo = new TextBox();
-            panelBotones = new Panel();
+            pnlDatos = new Panel();
+            grpDatos = new GroupBox();
+            tlpCampos = new TableLayoutPanel();
+            pnlBotonesAccion = new Panel();
+            flpBotones = new FlowLayoutPanel();
             btnRegistrar = new Button();
             btnDevolver = new Button();
             btnModificar = new Button();
-            btnEliminar = new Button();
+            pnlContenedorGrid = new Panel();
             dgvPrestamos = new DataGridView();
+            splitPrestamos = new SplitContainer();
 
-            ((ISupportInitialize)splitContainer).BeginInit();
-            splitContainer.Panel1.SuspendLayout();
-            splitContainer.Panel2.SuspendLayout();
             SuspendLayout();
-            panelEncabezado.SuspendLayout();
+            pnlDatos.SuspendLayout();
             grpDatos.SuspendLayout();
             tlpCampos.SuspendLayout();
-            panelBotones.SuspendLayout();
+            panelEncabezado.SuspendLayout();
+            pnlBotonesAccion.SuspendLayout();
+            flpBotones.SuspendLayout();
+            pnlContenedorGrid.SuspendLayout();
             ((ISupportInitialize)dgvPrestamos).BeginInit();
-            // 
-            // splitContainer
-            // 
-            splitContainer.BackColor = EstiloUI.GrisBorde;
-            splitContainer.Dock = DockStyle.Fill;
-            splitContainer.FixedPanel = FixedPanel.None;
-            splitContainer.Location = new Point(0, 0);
-            splitContainer.Name = "splitContainer";
-            splitContainer.Orientation = Orientation.Horizontal;
-            splitContainer.Panel1MinSize = 250;
-            splitContainer.SplitterDistance = 420;
-            splitContainer.SplitterWidth = 6;
-            splitContainer.Size = new Size(980, 650);
-            splitContainer.SplitterIncrement = 1;
-            // 
-            // splitContainer.Panel1
-            // 
-            splitContainer.Panel1.AutoScroll = true;
-            splitContainer.Panel1.BackColor = EstiloUI.FondoPergamino;
-            splitContainer.Panel1.Controls.Add(panelBotones);
-            splitContainer.Panel1.Controls.Add(grpDatos);
-            splitContainer.Panel1.Controls.Add(panelEncabezado);
-            // 
-            // splitContainer.Panel2
-            // 
-            splitContainer.Panel2.BackColor = EstiloUI.FondoPergamino;
-            splitContainer.Panel2.Controls.Add(dgvPrestamos);
-            // 
+            ((ISupportInitialize)splitPrestamos).BeginInit();
+            splitPrestamos.Panel1.SuspendLayout();
+            splitPrestamos.Panel2.SuspendLayout();
+            //
             // panelEncabezado
-            // 
+            //
             panelEncabezado.BackColor = EstiloUI.FondoPergamino;
             panelEncabezado.Controls.Add(lblTitulo);
             panelEncabezado.Controls.Add(lblSubtitulo);
@@ -126,6 +107,16 @@ namespace BibliotecaApp
             lblSubtitulo.Location = new Point(19, 36);
             lblSubtitulo.Name = "lblSubtitulo";
             lblSubtitulo.Text = "Gestión de préstamos externos, renovaciones y devoluciones";
+            //
+            // pnlDatos
+            //
+            pnlDatos.AutoSize = true;
+            pnlDatos.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlDatos.BackColor = EstiloUI.FondoPergamino;
+            pnlDatos.Controls.Add(grpDatos);
+            pnlDatos.Dock = DockStyle.Top;
+            pnlDatos.Name = "pnlDatos";
+            pnlDatos.Padding = new Padding(12, 8, 12, 8);
             // 
             // grpDatos
             // 
@@ -152,8 +143,8 @@ namespace BibliotecaApp
             tlpCampos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
             tlpCampos.Dock = DockStyle.Fill;
             tlpCampos.Name = "tlpCampos";
-            tlpCampos.RowCount = 10;
-            for (int i = 0; i < 10; i++)
+            tlpCampos.RowCount = 11;
+            for (int i = 0; i < 11; i++)
                 tlpCampos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             int f = 0;
@@ -165,8 +156,10 @@ namespace BibliotecaApp
             tlpCampos.Controls.Add(lblDireccion, 2, f); tlpCampos.Controls.Add(txtDireccion, 3, f);
             tlpCampos.SetColumnSpan(txtDireccion, 3); f++;
             tlpCampos.Controls.Add(lblSeccionPrestamo, 0, f); tlpCampos.SetColumnSpan(lblSeccionPrestamo, 6); f++;
-            tlpCampos.Controls.Add(lblLibro, 0, f); tlpCampos.Controls.Add(cboLibro, 1, f);
-            tlpCampos.SetColumnSpan(cboLibro, 5); f++;
+            tlpCampos.Controls.Add(lblCodigoLibro, 0, f); tlpCampos.Controls.Add(txtCodigoLibro, 1, f);
+            tlpCampos.Controls.Add(lblAvisoCodigo, 2, f); tlpCampos.SetColumnSpan(lblAvisoCodigo, 4); f++;
+            tlpCampos.Controls.Add(lblLibro, 0, f); tlpCampos.Controls.Add(txtTituloLibro, 1, f);
+            tlpCampos.SetColumnSpan(txtTituloLibro, 5); f++;
             tlpCampos.Controls.Add(lblFechaPrestamo, 0, f); tlpCampos.Controls.Add(dtpFechaPrestamo, 1, f);
             tlpCampos.Controls.Add(lblPersonalPresto, 2, f); tlpCampos.Controls.Add(txtPersonalPresto, 3, f);
             tlpCampos.Controls.Add(lblEstado, 4, f); tlpCampos.Controls.Add(cboEstado, 5, f); f++;
@@ -177,37 +170,56 @@ namespace BibliotecaApp
             tlpCampos.Controls.Add(lblPersonalRecibio, 0, f); tlpCampos.Controls.Add(txtPersonalRecibio, 1, f);
 
             foreach (Control c in new Control[] { txtNombre, txtCorreo, txtDui, txtTelefono,
-                     txtDireccion, cboLibro, dtpFechaPrestamo, txtPersonalPresto,
+                     txtDireccion, txtTituloLibro, dtpFechaPrestamo, txtPersonalPresto,
                      cboEstado, dtpFechaEntrega, txtPersonalRecibio,
-                     dtpFechaRenovacion, txtPersonalRenovo })
+                     dtpFechaRenovacion, txtPersonalRenovo, txtCodigoLibro })
             {
                 EstiloUI.EstilizarEntrada(c);
                 c.Dock = DockStyle.Fill;
                 c.Margin = new Padding(3, 0, 15, 6);
             }
 
-            cboLibro.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-            cboLibro.AutoCompleteSource = AutoCompleteSource.ListItems;
+            txtCodigoLibro.PlaceholderText = "Código del ejemplar — presione Enter";
+            txtCodigoLibro.KeyPress += txtCodigoLibro_KeyPress;
+            txtCodigoLibro.ReadOnly = true;
+            txtTituloLibro.ReadOnly = true;
+            lblAvisoCodigo.AutoSize = true;
+            lblAvisoCodigo.Font = EstiloUI.Etiqueta();
+            lblAvisoCodigo.Margin = new Padding(3, 8, 3, 2);
+            lblAvisoCodigo.Dock = DockStyle.Fill;
+            lblAvisoCodigo.TextAlign = ContentAlignment.MiddleLeft;
+            lblAvisoCodigo.Text = "";
+
             cboEstado.DropDownStyle = ComboBoxStyle.DropDownList;
             cboEstado.Items.AddRange(new object[] { "Pendiente", "Entregado", "Renovado" });
             cboEstado.SelectedIndex = 0;
             dtpFechaRenovacion.ShowCheckBox = true;
             dtpFechaRenovacion.Checked = false;
+            //
+            // pnlBotonesAccion
+            //
+            pnlBotonesAccion.BackColor = EstiloUI.FondoPergamino;
+            pnlBotonesAccion.Controls.Add(flpBotones);
+            pnlBotonesAccion.Dock = DockStyle.Top;
+            pnlBotonesAccion.Name = "pnlBotonesAccion";
+            pnlBotonesAccion.Padding = new Padding(14, 6, 14, 6);
+            pnlBotonesAccion.Size = new Size(980, 56);
             // 
-            // panelBotones
+            // flpBotones
             // 
-            panelBotones.Controls.Add(btnRegistrar);
-            panelBotones.Controls.Add(btnDevolver);
-            panelBotones.Controls.Add(btnModificar);
-            panelBotones.Controls.Add(btnEliminar);
-            panelBotones.Dock = DockStyle.Top;
-            panelBotones.Name = "panelBotones";
-            panelBotones.Padding = new Padding(14, 6, 14, 6);
-            panelBotones.Size = new Size(980, 56);
+            flpBotones.AutoSize = true;
+            flpBotones.Dock = DockStyle.Fill;
+            flpBotones.FlowDirection = FlowDirection.LeftToRight;
+            flpBotones.Name = "flpBotones";
+            flpBotones.WrapContents = false;
+            flpBotones.Controls.Add(btnRegistrar);
+            flpBotones.Controls.Add(btnDevolver);
+            flpBotones.Controls.Add(btnModificar);
             // 
             // btnRegistrar
             // 
-            btnRegistrar.Location = new Point(14, 8);
+            btnRegistrar.AutoSize = true;
+            btnRegistrar.Margin = new Padding(0, 0, 8, 0);
             btnRegistrar.Name = "btnRegistrar";
             btnRegistrar.Size = new Size(190, 38);
             btnRegistrar.Text = "Registrar Préstamo";
@@ -217,7 +229,8 @@ namespace BibliotecaApp
             // 
             // btnDevolver
             // 
-            btnDevolver.Location = new Point(220, 8);
+            btnDevolver.AutoSize = true;
+            btnDevolver.Margin = new Padding(0, 0, 8, 0);
             btnDevolver.Name = "btnDevolver";
             btnDevolver.Size = new Size(230, 38);
             btnDevolver.Text = "Registrar Devolución (fila)";
@@ -226,21 +239,45 @@ namespace BibliotecaApp
             // 
             // btnModificar
             // 
-            btnModificar.Location = new Point(466, 8);
+            btnModificar.AutoSize = true;
+            btnModificar.Margin = new Padding(0, 0, 0, 0);
             btnModificar.Name = "btnModificar";
             btnModificar.Size = new Size(120, 38);
             btnModificar.Text = "Modificar";
             EstiloUI.EstilizarBotonSecundario(btnModificar);
             btnModificar.Click += btnModificar_Click;
+            //
+            // pnlContenedorGrid
+            //
+            pnlContenedorGrid.BackColor = EstiloUI.FondoPergamino;
+            pnlContenedorGrid.Controls.Add(dgvPrestamos);
+            pnlContenedorGrid.Dock = DockStyle.Fill;
+            pnlContenedorGrid.Name = "pnlContenedorGrid";
             // 
-            // btnEliminar
+            // splitPrestamos
             // 
-            btnEliminar.Location = new Point(602, 8);
-            btnEliminar.Name = "btnEliminar";
-            btnEliminar.Size = new Size(120, 38);
-            btnEliminar.Text = "Eliminar";
-            EstiloUI.EstilizarBotonSecundario(btnEliminar);
-            btnEliminar.Click += btnEliminar_Click;
+            splitPrestamos.Dock = DockStyle.Fill;
+            splitPrestamos.FixedPanel = FixedPanel.Panel1;
+            splitPrestamos.Location = new Point(0, 0);
+            splitPrestamos.Name = "splitPrestamos";
+            splitPrestamos.Orientation = Orientation.Horizontal;
+            splitPrestamos.Size = new Size(980, 650);
+            splitPrestamos.SplitterDistance = 380;
+            splitPrestamos.SplitterWidth = 6;
+            // 
+            // splitPrestamos.Panel1
+            // 
+            splitPrestamos.Panel1.BackColor = EstiloUI.FondoPergamino;
+            splitPrestamos.Panel1.AutoScroll = true;
+            splitPrestamos.Panel1.Controls.Add(pnlBotonesAccion);
+            splitPrestamos.Panel1.Controls.Add(pnlDatos);
+            splitPrestamos.Panel1.Controls.Add(panelEncabezado);
+            // 
+            // splitPrestamos.Panel2
+            // 
+            splitPrestamos.Panel2.AutoScroll = false;
+            splitPrestamos.Panel2.BackColor = EstiloUI.FondoPergamino;
+            splitPrestamos.Panel2.Controls.Add(pnlContenedorGrid);
             // 
             // dgvPrestamos
             // 
@@ -257,28 +294,56 @@ namespace BibliotecaApp
             dgvPrestamos.ReadOnly = true;
             dgvPrestamos.RowHeadersVisible = false;
             dgvPrestamos.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvPrestamos.ScrollBars = ScrollBars.Both;
+            dgvPrestamos.AutoGenerateColumns = false;
             dgvPrestamos.CellFormatting += dgvPrestamos_CellFormatting;
-            // 
+            //
+            // Columnas del DataGridView (todas de tipo Texto)
+            //
+            var colId = new DataGridViewTextBoxColumn { Name = "ID", HeaderText = "ID", DataPropertyName = "ID", Visible = false };
+            var colUsuario = new DataGridViewTextBoxColumn { Name = "Usuario", HeaderText = "Usuario", DataPropertyName = "Usuario" };
+            var colDui = new DataGridViewTextBoxColumn { Name = "DUI", HeaderText = "DUI", DataPropertyName = "DUI" };
+            var colCorreo = new DataGridViewTextBoxColumn { Name = "Correo", HeaderText = "Correo", DataPropertyName = "Correo" };
+            var colTelefono = new DataGridViewTextBoxColumn { Name = "Telefono", HeaderText = "Teléfono", DataPropertyName = "Telefono" };
+            var colTitulo = new DataGridViewTextBoxColumn { Name = "TituloLibro", HeaderText = "Título del Libro", DataPropertyName = "TituloLibro" };
+            var colFechaPrestamo = new DataGridViewTextBoxColumn { Name = "FechaPrestamo", HeaderText = "Fecha Préstamo", DataPropertyName = "FechaPrestamo" };
+            var colFechaRenovacion = new DataGridViewTextBoxColumn { Name = "FechaRenovacion", HeaderText = "Fecha Renovación", DataPropertyName = "FechaRenovacion" };
+            var colEntregaEsperada = new DataGridViewTextBoxColumn { Name = "Entrega Esperada", HeaderText = "Entrega Esperada", DataPropertyName = "Entrega Esperada" };
+            var colPersonalPresto = new DataGridViewTextBoxColumn { Name = "PersonalPresto", HeaderText = "Personal que Prestó", DataPropertyName = "PersonalPresto" };
+            var colEstado = new DataGridViewTextBoxColumn { Name = "Estado", HeaderText = "Estado", DataPropertyName = "Estado" };
+
+            dgvPrestamos.Columns.AddRange(new DataGridViewColumn[] {
+                colId, colUsuario, colDui, colCorreo, colTelefono, colTitulo,
+                colFechaPrestamo, colFechaRenovacion, colEntregaEsperada,
+                colPersonalPresto, colEstado
+            });
+            //
             // UcPrestamosExternos
             // 
             BackColor = EstiloUI.FondoClaro;
-            Controls.Add(splitContainer);
+            Controls.Add(splitPrestamos);
             Name = "UcPrestamosExternos";
             Size = new Size(980, 650);
             Load += UcPrestamosExternos_Load;
 
             ((ISupportInitialize)dgvPrestamos).EndInit();
-            panelBotones.ResumeLayout(false);
+            splitPrestamos.Panel2.ResumeLayout(false);
+            splitPrestamos.Panel1.ResumeLayout(false);
+            splitPrestamos.Panel1.PerformLayout();
+            ((ISupportInitialize)splitPrestamos).EndInit();
+            pnlContenedorGrid.ResumeLayout(false);
+            flpBotones.ResumeLayout(false);
+            flpBotones.PerformLayout();
+            pnlBotonesAccion.ResumeLayout(false);
+            pnlBotonesAccion.PerformLayout();
+            panelEncabezado.ResumeLayout(false);
+            panelEncabezado.PerformLayout();
             tlpCampos.ResumeLayout(false);
             tlpCampos.PerformLayout();
             grpDatos.ResumeLayout(false);
             grpDatos.PerformLayout();
-            panelEncabezado.ResumeLayout(false);
-            panelEncabezado.PerformLayout();
-            splitContainer.Panel1.ResumeLayout(false);
-            splitContainer.Panel1.PerformLayout();
-            splitContainer.Panel2.ResumeLayout(false);
-            ((ISupportInitialize)splitContainer).EndInit();
+            pnlDatos.ResumeLayout(false);
+            pnlDatos.PerformLayout();
             ResumeLayout(false);
         }
 
@@ -296,10 +361,10 @@ namespace BibliotecaApp
 
         #endregion
 
-        private SplitContainer splitContainer;
         private Panel panelEncabezado;
         private Label lblTitulo;
         private Label lblSubtitulo;
+        private Panel pnlDatos;
         private GroupBox grpDatos;
         private TableLayoutPanel tlpCampos;
         private Label lblSeccionUsuario;
@@ -314,8 +379,11 @@ namespace BibliotecaApp
         private Label lblDireccion;
         private TextBox txtDireccion;
         private Label lblSeccionPrestamo;
+        private Label lblCodigoLibro;
+        private TextBox txtCodigoLibro;
+        private Label lblAvisoCodigo;
         private Label lblLibro;
-        private ComboBox cboLibro;
+        private TextBox txtTituloLibro;
         private Label lblFechaPrestamo;
         private DateTimePicker dtpFechaPrestamo;
         private Label lblPersonalPresto;
@@ -331,11 +399,13 @@ namespace BibliotecaApp
         private DateTimePicker dtpFechaRenovacion;
         private Label lblPersonalRenovo;
         private TextBox txtPersonalRenovo;
-        private Panel panelBotones;
+        private Panel pnlBotonesAccion;
+        private FlowLayoutPanel flpBotones;
         private Button btnRegistrar;
         private Button btnDevolver;
         private Button btnModificar;
-        private Button btnEliminar;
+        private Panel pnlContenedorGrid;
         private DataGridView dgvPrestamos;
+        private SplitContainer splitPrestamos;
     }
 }
