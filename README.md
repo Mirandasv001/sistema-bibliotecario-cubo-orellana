@@ -34,7 +34,9 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 
 | Módulo de Inventario | Módulo de Préstamos Externos |
 | :---: | :---: |
-| *(Agrega aquí tu captura: `screenshots/inventario.png`)* | *(Agrega aquí tu captura: `screenshots/prestamos.png`)* |
+| <img width="1354" height="695" alt="image" src="https://github.com/user-attachments/assets/da690040-9882-43f9-beff-e413463016f8" />
+* | *<img width="1362" height="541" alt="image" src="https://github.com/user-attachments/assets/5aa81144-af5c-4a9a-839c-6285c3a31d6e" />
+* |
 
 ---
 
