@@ -1,73 +1,61 @@
-# Sistema de Gestión Bibliotecaria — CUBO Orellana
+# Sistema de Gestión Bibliotecaria — CUBO Ing. Rigoberto Orellana
 
-Aplicación de escritorio desarrollada en **C# (.NET / Windows Forms)** diseñada para la administración integral del inventario bibliotecario, registro de usuarios y control de préstamos externos en el centro CUBO.
+Sistema de escritorio integral desarrollado en **C# (.NET WinForms)** para la digitalización, control de inventario y trazabilidad operativa de préstamos en el Centro Urbano de Bienestar y Oportunidades (CUBO).
+
+---
+
+## 📌 Resumen del Proyecto
+
+El sistema reemplaza el control manual en bitácoras físicas por una plataforma digital centralizada, optimizando los tiempos de atención, garantizando la consistencia de los datos y permitiendo la administración eficiente de más de **3,800 ejemplares**.
 
 ---
 
 ## 🚀 Características Principales
 
-* **Control de Inventario y Stock Físico:** Catálogo con más de 1,800 títulos indexados, diferenciación por ejemplar físico (códigos únicos) y actualización automática de disponibilidad en tiempo real.
-* **Módulo de Préstamos Externos:** Registro de salidas y devoluciones asociadas al DUI del usuario, con cálculo automático de fechas estimadas de entrega y estados de renovación.
-* **Búsqueda y Autocompletado Ágil:** Selector inteligente con filtrado predictivo (`SuggestAppend`) para localizar títulos sin redundancia visual.
-* **Interfaz Institucional (UI/UX):** Diseño plano (*Flat Design*), paleta de colores institucional, soporte de marcas de agua (*placeholders*) nativas y efectos visuales al pasar el cursor (*hover*).
+* **Inventario General en Tiempo Real:** Catálogo de más de 3,800 libros con búsqueda y filtrado instantáneo por título, código de ejemplar y disponibilidad.
+* **Flujo Seguro de Préstamos Externos:** Transferencia automática de datos desde el inventario hacia el módulo de préstamos mediante interacción directa (doble clic), previniendo errores humanos de digitación.
+* **Interfaz Dinámica (UI/UX Adaptativa):** Implementación de `SplitContainer` horizontal que permite expandir o contraer la vista de datos estilo terminal, con desplazamiento vertical nativo.
+* **Control de Devoluciones y Renovaciones:** Registro granular de fechas, personal a cargo y actualización automática del estado del ejemplar.
+* **Módulo de Alertas de Vencimiento:** Monitoreo y control de préstamos con fecha de entrega expirada.
+* **Guía de Uso Integrada:** Documentación de procesos accesible directamente desde la barra lateral del sistema.
 
 ---
 
-## Stack Tecnológico
+## 🛠️ Stack Tecnológico
 
-| Componente | Tecnología |
-| :--- | :--- |
-| **Lenguaje** | C# (.NET Framework / .NET Core) |
-| **Interfaz (GUI)** | Windows Forms (WinForms) |
-| **Arquitectura** | Modular basada en `UserControls` (`UcPrestamosExternos`, etc.) |
-| **Almacenamiento** | Base de datos relacional / Importación desde catálogos CSV |
-| **Control de Versiones** | Git / GitHub |
+* **Lenguaje:** C# (.NET)
+* **Interfaz Gráfica:** Windows Forms (WinForms) con diseño modular basado en `UserControls`
+* **Persistencia de Datos:** Base de datos relacional (SQLite / ADO.NET)
+* **Control de Versiones:** Git / GitHub
 
 ---
 
-## 📂 Estructura del Proyecto
+## 📸 Capturas del Sistema
 
-```text
-sistema-bibliotecario-cubo-orellana/
-│
-├── BibliotecaApp/
-│   ├── EstiloUI.cs                 # Estilos visuales globales y componentes Flat
-│   ├── FormPrincipal.cs            # Contenedor y navegación lateral
-│   ├── UcPrestamosExternos.cs      # Lógica de préstamos, stock y devoluciones
-│   └── UcInventario.cs             # Visualización y búsqueda del catálogo general
-│
-├── CATÁLOGO BIBLIOTECA CUBO...     # Archivo fuente de inventario
-├── BibliotecaApp.slnx              # Solución de Visual Studio
-└── README.md                       # Documentación del proyecto
+| Módulo de Inventario | Módulo de Préstamos Externos |
+| :---: | :---: |
+| *(Agrega aquí tu captura: `screenshots/inventario.png`)* | *(Agrega aquí tu captura: `screenshots/prestamos.png`)* |
 
-⚙️ Requisitos e Instalación
-Requisitos del Sistema:
+---
 
-Sistema Operativo: Windows 10 / 11
+## ⚙️ Instalación y Ejecución
 
-.NET SDK / Runtime correspondiente
+### Prerrequisitos
+* Sistema Operativo: Windows 10 / 11
+* [.NET Desktop Runtime](https://dotnet.microsoft.com/download) / Visual Studio 2022 con carga de trabajo de escritorio .NET
 
-Visual Studio 2022 o superior (con la carga de trabajo de Desarrollo de escritorio de .NET)
+### Pasos
+1. **Clonar el repositorio:**
+   ```bash
+   git clone [https://github.com/Mirandasv001/sistema-bibliotecario-cubo-orellana.git](https://github.com/Mirandasv001/sistema-bibliotecario-cubo-orellana.git)
 
-Clonar el repositorio:
+Abrir la solución:
+Abrir el archivo .sln en Visual Studio.
 
-Bash
-git clone [https://github.com/Mirandasv001/sistema-bibliotecario-cubo-orellana.git](https://github.com/Mirandasv001/sistema-bibliotecario-cubo-orellana.git)
-Ejecución:
-
-Abre el archivo de solución BibliotecaApp.slnx en Visual Studio.
-
-Compila el proyecto presionando Ctrl + Shift + B.
-
-Inicia la aplicación con F5.
+Compilar y Ejecutar:
+Presionar F5 o seleccionar Compilar > Compilar Solución.
 
 👤 Autor
-Erick Alexander Sánchez Miranda — @Mirandasv001
+Erick Miranda — @Mirandasv001
 
-
-**Para subirlo a GitHub desde tu terminal:**
-
-```bash
-git add README.md
-git commit -m "docs: actualizar README principal con documentacion completa"
-git push origin master
+Estudiante de Ingeniería en Desarrollo de Software
