@@ -46,7 +46,7 @@ namespace BibliotecaApp
             lblPersonalPresto = EstiloUI.CrearEtiqueta("Personal que Prestó:");
             txtPersonalPresto = new TextBox();
             lblEstado = EstiloUI.CrearEtiqueta("Estado:");
-            cboEstado = new ComboBox();
+            txtEstado = new TextBox();
             lblFechaEntrega = EstiloUI.CrearEtiqueta("Fecha de Entrega Esperada:");
             dtpFechaEntrega = new DateTimePicker();
             lblPersonalRecibio = EstiloUI.CrearEtiqueta("Personal que Recibió:");
@@ -162,7 +162,7 @@ namespace BibliotecaApp
             tlpCampos.SetColumnSpan(txtTituloLibro, 5); f++;
             tlpCampos.Controls.Add(lblFechaPrestamo, 0, f); tlpCampos.Controls.Add(dtpFechaPrestamo, 1, f);
             tlpCampos.Controls.Add(lblPersonalPresto, 2, f); tlpCampos.Controls.Add(txtPersonalPresto, 3, f);
-            tlpCampos.Controls.Add(lblEstado, 4, f); tlpCampos.Controls.Add(cboEstado, 5, f); f++;
+            tlpCampos.Controls.Add(lblEstado, 4, f); tlpCampos.Controls.Add(txtEstado, 5, f); f++;
             tlpCampos.Controls.Add(lblFechaEntrega, 0, f); tlpCampos.Controls.Add(dtpFechaEntrega, 1, f); f++;
             tlpCampos.Controls.Add(lblSeccionRenovacion, 0, f); tlpCampos.SetColumnSpan(lblSeccionRenovacion, 6); f++;
             tlpCampos.Controls.Add(lblFechaRenovacion, 0, f); tlpCampos.Controls.Add(dtpFechaRenovacion, 1, f);
@@ -171,7 +171,7 @@ namespace BibliotecaApp
 
             foreach (Control c in new Control[] { txtNombre, txtCorreo, txtDui, txtTelefono,
                      txtDireccion, txtTituloLibro, dtpFechaPrestamo, txtPersonalPresto,
-                     cboEstado, dtpFechaEntrega, txtPersonalRecibio,
+                     txtEstado, dtpFechaEntrega, txtPersonalRecibio,
                      dtpFechaRenovacion, txtPersonalRenovo, txtCodigoLibro })
             {
                 EstiloUI.EstilizarEntrada(c);
@@ -190,11 +190,14 @@ namespace BibliotecaApp
             lblAvisoCodigo.TextAlign = ContentAlignment.MiddleLeft;
             lblAvisoCodigo.Text = "";
 
-            cboEstado.DropDownStyle = ComboBoxStyle.DropDownList;
-            cboEstado.Items.AddRange(new object[] { "Pendiente", "Entregado", "Renovado" });
-            cboEstado.SelectedIndex = 0;
+            txtEstado.ReadOnly = true;
+            txtEstado.BackColor = SystemColors.Control;
+            txtEstado.TabStop = false;
+            txtEstado.Text = "Pendiente";
             dtpFechaRenovacion.ShowCheckBox = true;
             dtpFechaRenovacion.Checked = false;
+            dtpFechaRenovacion.ValueChanged += dtpFechaRenovacion_ValueChanged;
+            dtpFechaPrestamo.ValueChanged += dtpFechaPrestamo_ValueChanged;
             //
             // pnlBotonesAccion
             //
@@ -389,7 +392,7 @@ namespace BibliotecaApp
         private Label lblPersonalPresto;
         private TextBox txtPersonalPresto;
         private Label lblEstado;
-        private ComboBox cboEstado;
+        private TextBox txtEstado;
         private Label lblFechaEntrega;
         private DateTimePicker dtpFechaEntrega;
         private Label lblPersonalRecibio;

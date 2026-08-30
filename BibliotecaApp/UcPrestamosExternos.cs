@@ -34,7 +34,7 @@ namespace BibliotecaApp
         {
             AplicarPlaceholders();
             dtpFechaPrestamo.Value = DateTime.Today;
-            dtpFechaEntrega.Value = DateTime.Today.AddDays(15);
+            dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
             CargarPrestamosActivos();
         }
 
@@ -234,7 +234,7 @@ namespace BibliotecaApp
                            PersonalPresto,
                            EstadoLibro                          AS Estado
                     FROM PrestamosExternos
-                    WHERE EstadoLibro = 'Pendiente'
+                    WHERE EstadoLibro IN ('Pendiente', 'Renovado')
                     ORDER BY FechaEntrega ASC;";
 
                 var tabla = new System.Data.DataTable();
@@ -356,7 +356,8 @@ namespace BibliotecaApp
                             dtpFechaRenovacion.Checked ? txtPersonalRenovo.Text.Trim() : DBNull.Value);
                         insertar.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
                         insertar.Parameters.AddWithValue("$personalRecibio", DBNull.Value);
-                        insertar.Parameters.AddWithValue("$estado", cboEstado.SelectedItem?.ToString() ?? "Pendiente");
+                        insertar.Parameters.AddWithValue("$estado",
+                            string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
                         insertar.ExecuteNonQuery();
                     }
 
@@ -429,8 +430,23 @@ namespace BibliotecaApp
                     if (r != null) tituloViejo = r.ToString() ?? "";
                 }
 
-                // Si cambi\u00f3 el t\u00edtulo, necesitamos EjemplarViejo (Prestado) y EjemplarNuevo (Disponible).
-                if (string.Equals(tituloViejo, tituloNuevo, StringComparison.OrdinalIgnoreCase))
+                // Renovaci\u00f3n: SOLO se actualizan fecha/personal de renovaci\u00f3n y el
+                // estado a 'Renovado'. No se ejecuta devoluci\u00f3n ni se borra el registro.
+                if (string.Equals(txtEstado.Text, "Renovado", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var transaccion = conexion.BeginTransaction();
+                    try
+                    {
+                        RenovarPrestamo(conexion, transaccion, id);
+                        transaccion.Commit();
+                    }
+                    catch
+                    {
+                        transaccion.Rollback();
+                        throw;
+                    }
+                }
+                else if (string.Equals(tituloViejo, tituloNuevo, StringComparison.OrdinalIgnoreCase))
                 {
                     // Mismo t\u00edtulo: solo actualizar datos del pr\u00e9stamo, sin tocar inventario.
                     using var transaccion = conexion.BeginTransaction();
@@ -539,7 +555,34 @@ namespace BibliotecaApp
                 dtpFechaRenovacion.Checked ? txtPersonalRenovo.Text.Trim() : DBNull.Value);
             cmd.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("$personalRecibio", txtPersonalRecibio.Text.Trim());
-            cmd.Parameters.AddWithValue("$estado", cboEstado.SelectedItem?.ToString() ?? "Pendiente");
+            cmd.Parameters.AddWithValue("$estado",
+                string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Renovaci\u00f3n exclusiva: actualiza FechaRenovacion, PersonalRenovo,
+        /// la nueva Fecha de Entrega Esperada y EstadoLibro = 'Renovado'.
+        /// No toca inventario ni ejecuta l\u00f3gica de devoluci\u00f3n.
+        /// </summary>
+        private void RenovarPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id)
+        {
+            using var cmd = conexion.CreateCommand();
+            cmd.Transaction = transaccion;
+            cmd.CommandText = @"
+                UPDATE PrestamosExternos SET
+                    FechaRenovacion   = $fechaRenovacion,
+                    PersonalRenovo    = $personalRenovo,
+                    EstadoLibro       = 'Renovado',
+                    FechaEntrega      = $nuevaFechaEntrega
+                WHERE ID = $id;";
+            cmd.Parameters.AddWithValue("$fechaRenovacion",
+                dtpFechaRenovacion.Checked ? dtpFechaRenovacion.Value.ToString("yyyy-MM-dd") : DBNull.Value);
+            cmd.Parameters.AddWithValue("$personalRenovo",
+                dtpFechaRenovacion.Checked ? txtPersonalRenovo.Text.Trim() : DBNull.Value);
+            cmd.Parameters.AddWithValue("$nuevaFechaEntrega",
+                dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("$id", id);
             cmd.ExecuteNonQuery();
         }
@@ -684,9 +727,7 @@ namespace BibliotecaApp
 
                 txtPersonalPresto.Text = fila["PersonalPresto"]?.ToString() ?? "";
 
-                string estado = fila["EstadoLibro"]?.ToString() ?? "Pendiente";
-                if (cboEstado.Items.Contains(estado))
-                    cboEstado.SelectedItem = estado;
+                txtEstado.Text = fila["EstadoLibro"]?.ToString() ?? "Pendiente";
 
                 string fechaRenovacion = fila["FechaRenovacion"]?.ToString() ?? "";
                 if (!string.IsNullOrEmpty(fechaRenovacion) && DateTime.TryParse(fechaRenovacion, out var fr))
@@ -757,6 +798,30 @@ namespace BibliotecaApp
             return false;
         }
 
+        /// <summary>
+        /// Autocompletado inteligente: al elegir la fecha de pr\u00e9stamo, sugiere
+        /// la entrega esperada sumando exactamente 8 d\u00edas. El control
+        /// dtpFechaEntrega permanece habilitado para ajuste manual.
+        /// </summary>
+        private void dtpFechaPrestamo_ValueChanged(object? sender, EventArgs e)
+        {
+            dtpFechaEntrega.Value = dtpFechaPrestamo.Value.AddDays(8);
+        }
+
+        /// <summary>
+        /// Automatiza el campo Estado: el DateTimePicker con checkBox de renovaci\u00f3n
+        /// decide el valor. Marcado \u2192 "Renovado"; sin marcar \u2192 "Pendiente".
+        /// Adem\u00e1s, si hay renovaci\u00f3n vigente, sugiere la entrega esperada
+        /// sumando 8 d\u00edas a la fecha de renovaci\u00f3n.
+        /// </summary>
+        private void dtpFechaRenovacion_ValueChanged(object? sender, EventArgs e)
+        {
+            txtEstado.Text = dtpFechaRenovacion.Checked ? "Renovado" : "Pendiente";
+
+            if (dtpFechaRenovacion.Checked)
+                dtpFechaEntrega.Value = dtpFechaRenovacion.Value.AddDays(8);
+        }
+
         private void LimpiarCampos()
         {
             foreach (var caja in new[] { txtNombre, txtCorreo, txtDui, txtTelefono,
@@ -765,9 +830,9 @@ namespace BibliotecaApp
                 caja.Clear();
             }
             txtTituloLibro.Text = string.Empty;
-            cboEstado.SelectedIndex = 0;
+            txtEstado.Text = "Pendiente";
             dtpFechaPrestamo.Value = DateTime.Today;
-            dtpFechaEntrega.Value = DateTime.Today.AddDays(15);
+            dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
             dtpFechaRenovacion.Value = DateTime.Today;
             dtpFechaRenovacion.Checked = false;
             LimpiarEstadoCodigo();
