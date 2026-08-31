@@ -1,4 +1,6 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace BibliotecaApp
 {
@@ -116,6 +118,27 @@ namespace BibliotecaApp
                 NativeMethods.EM_SETCUEBANNER,
                 IntPtr.Zero,
                 texto);
+        }
+
+        /// <summary>
+        /// Elimina tildes y diacríticos de un texto usando NormalizationForm.FormD.
+        /// "PRÍNCIPE" → "PRINCIPE", "ñaño" → "nano".
+        /// </summary>
+        public static string RemoverTildes(string texto)
+        {
+            if (string.IsNullOrEmpty(texto)) return texto;
+
+            string normalized = texto.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder(normalized.Length);
+
+            foreach (char c in normalized)
+            {
+                UnicodeCategory category = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (category != UnicodeCategory.NonSpacingMark)
+                    sb.Append(c);
+            }
+
+            return sb.ToString().Normalize(NormalizationForm.FormC);
         }
     }
 

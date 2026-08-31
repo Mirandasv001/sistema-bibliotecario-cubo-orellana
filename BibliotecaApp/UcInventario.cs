@@ -5,21 +5,25 @@ using Microsoft.Data.Sqlite;
 namespace BibliotecaApp
 {
     /// <summary>
-    /// Apartado C: inventario general de libros con búsqueda en tiempo real.
+    /// Apartado C: inventario general de libros con búsqueda en tiempo real
+    /// sensible a tildes y mayúsculas (ignora ambas).
     /// </summary>
-    /// 
-    /// USO DE HERENCIA
     public partial class UcInventario : UserControl
     {
+        private const string ColBusqueda = "_BusquedaNormalizada";
+        private DataTable _datosInventario = new();
+        private DataView _vistaFiltrada;
+
         public UcInventario()
         {
             InitializeComponent();
 
-            // Doble búfer para un desplazamiento suave con ~4,000 filas.
             typeof(DataGridView)
                 .GetProperty("DoubleBuffered",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .SetValue(dgvInventario, true, null);
+
+            _vistaFiltrada = new DataView(_datosInventario);
         }
 
         private void UcInventario_Load(object sender, EventArgs e)
@@ -35,50 +39,29 @@ namespace BibliotecaApp
 
         private void txtBuscar_TextChanged(object sender, EventArgs e)
         {
-            CargarInventario(txtBuscar.Text.Trim());
+            AplicarFiltro(txtBuscar.Text.Trim());
         }
 
-        private void CargarInventario(string filtro = "")
+        /// <summary>
+        /// Carga todos los libros desde la BD una sola vez y agrega una columna
+        /// oculta con el texto normalizado (sin tildes, minúsculas) para búsquedas.
+        /// </summary>
+        private void CargarInventario()
         {
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var comando = conexion.CreateCommand();
-
-                if (filtro.Length == 0)
-                {
-                    comando.CommandText = @"
-                        SELECT Codigo   AS Código,
-                               Titulo   AS Título,
-                               Autor,
-                               Editorial,
-                               Estado,
-                               Ubicacion AS Ubicación,
-                               Disponibilidad
-                        FROM Libros ORDER BY Titulo;";
-                }
-                else
-                {
-                    // Se escapan los comodines LIKE para que la búsqueda sea literal.
-                    string patron = "%" + filtro
-                        .Replace("\\", "\\\\")
-                        .Replace("%", "\\%")
-                        .Replace("_", "\\_") + "%";
-
-                    comando.CommandText = @"
-                        SELECT Codigo   AS Código,
-                               Titulo   AS Título,
-                               Autor,
-                               Editorial,
-                               Estado,
-                               Ubicacion AS Ubicación,
-                               Disponibilidad
-                        FROM Libros
-                        WHERE Codigo LIKE $patron ESCAPE '\'
-                           OR Titulo LIKE $patron ESCAPE '\'
-                        ORDER BY Titulo;";
-                    comando.Parameters.AddWithValue("$patron", patron);
-                }
+                comando.CommandText = @"
+                    SELECT Codigo   AS Código,
+                           Titulo   AS Título,
+                           Autor,
+                           Editorial,
+                           Estado,
+                           Ubicacion AS Ubicación,
+                           Disponibilidad
+                    FROM Libros
+                    ORDER BY Titulo;";
 
                 var tabla = new DataTable();
                 using (var lector = comando.ExecuteReader())
@@ -86,11 +69,27 @@ namespace BibliotecaApp
                     tabla.Load(lector);
                 }
 
-                dgvInventario.DataSource = tabla;
-                lblContador.Text = $"{tabla.Rows.Count:N0} libro(s)";
+                // Columna oculta para búsqueda normalizada (sin acentos, minúsculas).
+                tabla.Columns.Add(ColBusqueda, typeof(string));
+                foreach (DataRow fila in tabla.Rows)
+                {
+                    string codigo = fila["Código"]?.ToString() ?? "";
+                    string titulo = fila["Título"]?.ToString() ?? "";
+                    fila[ColBusqueda] = EstiloUI.RemoverTildes(
+                        codigo + " " + titulo).ToLowerInvariant();
+                }
 
-                if (dgvInventario.Columns["Título"] != null)
-                    dgvInventario.Columns["Título"]!.FillWeight = 55;
+                _datosInventario = tabla;
+                _vistaFiltrada = new DataView(_datosInventario);
+
+                dgvInventario.DataSource = _vistaFiltrada;
+                OcultarColumnaBusqueda();
+                AjustarColumnas();
+                lblContador.Text = $"{_vistaFiltrada.Count:N0} libro(s)";
+
+                // Reaplicar filtro activo si se recarga la BD.
+                if (txtBuscar.Text.Length > 0)
+                    AplicarFiltro(txtBuscar.Text.Trim());
             }
             catch (Exception ex)
             {
@@ -99,14 +98,50 @@ namespace BibliotecaApp
             }
         }
 
+        /// <summary>
+        /// Filtra el DataView usando la columna normalizada.
+        /// La búsqueda es insensible a tildes y mayúsculas/minúsculas.
+        /// </summary>
+        private void AplicarFiltro(string texto)
+        {
+            if (texto.Length == 0)
+            {
+                _vistaFiltrada.RowFilter = string.Empty;
+            }
+            else
+            {
+                string termino = EstiloUI.RemoverTildes(texto).ToLowerInvariant();
+
+                // Escapar caracteres especiales de DataView RowFilter (LIKE).
+                termino = termino
+                    .Replace("[", "[[]")
+                    .Replace("*", "[*]")
+                    .Replace("%", "[%]")
+                    .Replace("'", "''");
+
+                _vistaFiltrada.RowFilter =
+                    $"[{ColBusqueda}] LIKE '%{termino}%'";
+            }
+
+            lblContador.Text = $"{_vistaFiltrada.Count:N0} libro(s)";
+        }
+
+        private void OcultarColumnaBusqueda()
+        {
+            if (dgvInventario.Columns.Contains(ColBusqueda))
+                dgvInventario.Columns[ColBusqueda]!.Visible = false;
+        }
+
+        private void AjustarColumnas()
+        {
+            if (dgvInventario.Columns["Título"] != null)
+                dgvInventario.Columns["Título"]!.FillWeight = 55;
+        }
+
         // ====================================================================
         //  DOBLE CLIC → iniciar préstamo externo
         // ====================================================================
 
-        /// <summary>
-        /// Al hacer doble clic en una fila disponible, captura Codigo y Título y
-        /// pide al Form1 que cambie a Préstamos Externos con esos datos precargados.
-        /// </summary>
         private void dgvInventario_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
