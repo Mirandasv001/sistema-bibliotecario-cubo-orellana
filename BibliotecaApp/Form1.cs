@@ -206,5 +206,23 @@
             e.Graphics.DrawString(texto, fuente, pincelTexto,
                 new RectangleF(x, y, badgeSize, badgeSize), formato);
         }
+
+        // ====================================================================
+        //  CERRAR SESIÓN
+        // ====================================================================
+
+        private void btnCerrarSesion_Click(object? sender, EventArgs e)
+        {
+            DialogResult resultado = MessageBox.Show(
+                "¿Estás seguro que deseas cerrar la sesión actual?",
+                "Cerrar Sesión",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (resultado == DialogResult.Yes)
+            {
+                Application.Restart();
+            }
+        }
     }
 }
