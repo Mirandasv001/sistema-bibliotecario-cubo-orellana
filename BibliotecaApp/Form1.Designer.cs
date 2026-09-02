@@ -29,6 +29,7 @@ namespace BibliotecaApp
             btnInventario = new Button();
             btnAlertas = new Button();
             btnGuiaUso = new Button();
+            btnCerrarSesion = new Button();
             lblVersion = new Label();
             panelContenedor = new Panel();
             panelMenu.SuspendLayout();
@@ -43,6 +44,7 @@ namespace BibliotecaApp
             // Orden de la colección: el último agregado se acopla primero,
             // por eso panelLogo queda al inicio visual y panelNav rellena el resto.
             panelMenu.Controls.Add(panelNav);
+            panelMenu.Controls.Add(btnCerrarSesion);
             panelMenu.Controls.Add(lblVersion);
             panelMenu.Controls.Add(lblNombreApp);
             panelMenu.Controls.Add(panelLogo);
@@ -118,6 +120,24 @@ namespace BibliotecaApp
             lblVersion.Text = "Sitio del Niño © 2026";
             lblVersion.TextAlign = ContentAlignment.MiddleLeft;
             // 
+            // btnCerrarSesion
+            // 
+            btnCerrarSesion.Dock = DockStyle.Bottom;
+            btnCerrarSesion.FlatStyle = FlatStyle.Flat;
+            btnCerrarSesion.FlatAppearance.BorderSize = 0;
+            btnCerrarSesion.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 30, 30);
+            btnCerrarSesion.BackColor = EstiloUI.FondoOscuro;
+            btnCerrarSesion.ForeColor = Color.FromArgb(220, 180, 180);
+            btnCerrarSesion.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnCerrarSesion.Height = 48;
+            btnCerrarSesion.Name = "btnCerrarSesion";
+            btnCerrarSesion.Padding = new Padding(15, 0, 0, 0);
+            btnCerrarSesion.Text = "Cerrar Sesión";
+            btnCerrarSesion.TextAlign = ContentAlignment.MiddleLeft;
+            btnCerrarSesion.Cursor = Cursors.Hand;
+            btnCerrarSesion.UseVisualStyleBackColor = false;
+            btnCerrarSesion.Click += btnCerrarSesion_Click;
+            // 
             // panelContenedor
             // 
             panelContenedor.BackColor = EstiloUI.FondoClaro;
@@ -178,6 +198,7 @@ namespace BibliotecaApp
         private Button btnAlertas;
         private Button btnGuiaUso;
         private Label lblVersion;
+        private Button btnCerrarSesion;
         private Panel panelContenedor;
     }
 }
