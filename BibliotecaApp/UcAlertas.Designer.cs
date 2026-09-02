@@ -123,6 +123,8 @@ namespace BibliotecaApp
 
         #endregion
 
+        // En este apartado se crea las alertas.
+
         private Panel panelEncabezado;
         private Label lblTitulo;
         private Label lblSubtitulo;
