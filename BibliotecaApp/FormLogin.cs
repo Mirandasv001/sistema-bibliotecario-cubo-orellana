@@ -44,6 +44,28 @@ namespace BibliotecaApp
                 btnCerrar.ForeColor = Color.FromArgb(59, 111, 216);
             btnCerrar.MouseLeave += (_, _) =>
                 btnCerrar.ForeColor = Color.FromArgb(130, 140, 155);
+
+            // Controles de ventana: hover effects
+            btnMinimizar.MouseEnter += (_, _) =>
+                btnMinimizar.BackColor = Color.FromArgb(50, 60, 80);
+            btnMinimizar.MouseLeave += (_, _) =>
+                btnMinimizar.BackColor = Color.Transparent;
+
+            btnMaximizar.MouseEnter += (_, _) =>
+                btnMaximizar.BackColor = Color.FromArgb(50, 60, 80);
+            btnMaximizar.MouseLeave += (_, _) =>
+                btnMaximizar.BackColor = Color.Transparent;
+
+            btnCerrarVentana.MouseEnter += (_, _) =>
+            {
+                btnCerrarVentana.BackColor = Color.FromArgb(180, 40, 40);
+                btnCerrarVentana.ForeColor = Color.White;
+            };
+            btnCerrarVentana.MouseLeave += (_, _) =>
+            {
+                btnCerrarVentana.BackColor = Color.Transparent;
+                btnCerrarVentana.ForeColor = Color.FromArgb(204, 204, 204);
+            };
         }
 
         private void CargarLogo()
@@ -119,6 +141,25 @@ namespace BibliotecaApp
                 txtPassword.Clear();
                 txtPassword.Focus();
             }
+        }
+
+        // ── Controles de ventana personalizados ──
+
+        private void btnMinimizar_Click(object? sender, EventArgs e)
+        {
+            this.WindowState = FormWindowState.Minimized;
+        }
+
+        private void btnMaximizar_Click(object? sender, EventArgs e)
+        {
+            this.WindowState = this.WindowState == FormWindowState.Maximized
+                ? FormWindowState.Normal
+                : FormWindowState.Maximized;
+        }
+
+        private void btnCerrarVentana_Click(object? sender, EventArgs e)
+        {
+            Application.Exit();
         }
     }
 }
