@@ -28,6 +28,9 @@ namespace BibliotecaApp
             txtPassword = new TextBox();
             btnIngresar = new Button();
             btnCerrar = new Button();
+            btnMinimizar = new Button();
+            btnMaximizar = new Button();
+            btnCerrarVentana = new Button();
             SuspendLayout();
             panelFondo.SuspendLayout();
             panelCard.SuspendLayout();
@@ -37,6 +40,9 @@ namespace BibliotecaApp
             panelFondo.Dock = DockStyle.Fill;
             panelFondo.BackColor = Color.FromArgb(22, 32, 50);
             panelFondo.Controls.Add(panelCard);
+            panelFondo.Controls.Add(btnCerrarVentana);
+            panelFondo.Controls.Add(btnMaximizar);
+            panelFondo.Controls.Add(btnMinimizar);
 
             // ── panelCard (tarjeta centrada) ──
             panelCard.BackColor = Color.White;
@@ -136,7 +142,7 @@ namespace BibliotecaApp
             btnIngresar.Cursor = Cursors.Hand;
             btnIngresar.Click += btnIngresar_Click;
 
-            // ── btnCerrar ──
+            // ── btnCerrar (enlace "Cerrar sistema" dentro de la tarjeta) ──
             btnCerrar.FlatStyle = FlatStyle.Flat;
             btnCerrar.FlatAppearance.BorderSize = 0;
             btnCerrar.BackColor = Color.Transparent;
@@ -147,6 +153,45 @@ namespace BibliotecaApp
             btnCerrar.Location = new Point(55, 475);
             btnCerrar.Text = "Cerrar sistema";
             btnCerrar.Click += (_, _) => Application.Exit();
+
+            // ── btnMinimizar (control de ventana) ──
+            btnMinimizar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnMinimizar.FlatStyle = FlatStyle.Flat;
+            btnMinimizar.FlatAppearance.BorderSize = 0;
+            btnMinimizar.BackColor = Color.Transparent;
+            btnMinimizar.ForeColor = Color.FromArgb(204, 204, 204);
+            btnMinimizar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            btnMinimizar.Size = new Size(40, 30);
+            btnMinimizar.Location = new Point(1120, 0);
+            btnMinimizar.Text = "─";
+            btnMinimizar.Cursor = Cursors.Hand;
+            btnMinimizar.Click += btnMinimizar_Click;
+
+            // ── btnMaximizar (control de ventana) ──
+            btnMaximizar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnMaximizar.FlatStyle = FlatStyle.Flat;
+            btnMaximizar.FlatAppearance.BorderSize = 0;
+            btnMaximizar.BackColor = Color.Transparent;
+            btnMaximizar.ForeColor = Color.FromArgb(204, 204, 204);
+            btnMaximizar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            btnMaximizar.Size = new Size(40, 30);
+            btnMaximizar.Location = new Point(1160, 0);
+            btnMaximizar.Text = "◻";
+            btnMaximizar.Cursor = Cursors.Hand;
+            btnMaximizar.Click += btnMaximizar_Click;
+
+            // ── btnCerrarVentana (control de ventana) ──
+            btnCerrarVentana.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCerrarVentana.FlatStyle = FlatStyle.Flat;
+            btnCerrarVentana.FlatAppearance.BorderSize = 0;
+            btnCerrarVentana.BackColor = Color.Transparent;
+            btnCerrarVentana.ForeColor = Color.FromArgb(204, 204, 204);
+            btnCerrarVentana.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            btnCerrarVentana.Size = new Size(40, 30);
+            btnCerrarVentana.Location = new Point(1200, 0);
+            btnCerrarVentana.Text = "X";
+            btnCerrarVentana.Cursor = Cursors.Hand;
+            btnCerrarVentana.Click += btnCerrarVentana_Click;
 
             // ── FormLogin ──
             AcceptButton = btnIngresar;
@@ -179,6 +224,9 @@ namespace BibliotecaApp
         private TextBox txtPassword;
         private Button btnIngresar;
         private Button btnCerrar;
+        private Button btnMinimizar;
+        private Button btnMaximizar;
+        private Button btnCerrarVentana;
         private Panel lineSeparador;
     }
 }

@@ -44,6 +44,28 @@ namespace BibliotecaApp
                 btnCerrar.ForeColor = Color.FromArgb(59, 111, 216);
             btnCerrar.MouseLeave += (_, _) =>
                 btnCerrar.ForeColor = Color.FromArgb(130, 140, 155);
+
+            // Controles de ventana: hover effects
+            btnMinimizar.MouseEnter += (_, _) =>
+                btnMinimizar.BackColor = Color.FromArgb(50, 60, 80);
+            btnMinimizar.MouseLeave += (_, _) =>
+                btnMinimizar.BackColor = Color.Transparent;
+
+            btnMaximizar.MouseEnter += (_, _) =>
+                btnMaximizar.BackColor = Color.FromArgb(50, 60, 80);
+            btnMaximizar.MouseLeave += (_, _) =>
+                btnMaximizar.BackColor = Color.Transparent;
+
+            btnCerrarVentana.MouseEnter += (_, _) =>
+            {
+                btnCerrarVentana.BackColor = Color.FromArgb(180, 40, 40);
+                btnCerrarVentana.ForeColor = Color.White;
+            };
+            btnCerrarVentana.MouseLeave += (_, _) =>
+            {
+                btnCerrarVentana.BackColor = Color.Transparent;
+                btnCerrarVentana.ForeColor = Color.FromArgb(204, 204, 204);
+            };
         }
 
         private void CargarLogo()
@@ -69,17 +91,27 @@ namespace BibliotecaApp
 
         private static string? BuscarArchivoLogo(string[] nombresArchivos)
         {
-            // 1. Buscar en Application.StartupPath (bin\Debug o publicación)
-            string? ruta = BuscarEnDirectorio(AppDomain.CurrentDomain.BaseDirectory, nombresArchivos);
+            // 1. Buscar en la carpeta Recursos (nueva ubicación)
+            string rutaRecursos = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Recursos");
+            string? ruta = BuscarEnDirectorio(rutaRecursos, nombresArchivos);
             if (ruta != null) return ruta;
 
-            // 2. Subir en el árbol de directorios hasta 5 niveles hacia la raíz del proyecto
+            // 2. Buscar en Application.StartupPath (bin\Debug o publicación)
+            ruta = BuscarEnDirectorio(AppDomain.CurrentDomain.BaseDirectory, nombresArchivos);
+            if (ruta != null) return ruta;
+
+            // 3. Subir en el árbol de directorios hasta 5 niveles hacia la raíz del proyecto
             DirectoryInfo? dir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory);
             int niveles = 0;
 
             while (dir != null && niveles < 5)
             {
                 ruta = BuscarEnDirectorio(dir.FullName, nombresArchivos);
+                if (ruta != null) return ruta;
+
+                // También buscar en Recursos de cada nivel
+                string rutaRecursosNivel = Path.Combine(dir.FullName, "Recursos");
+                ruta = BuscarEnDirectorio(rutaRecursosNivel, nombresArchivos);
                 if (ruta != null) return ruta;
 
                 dir = Directory.GetParent(dir.FullName);
@@ -91,6 +123,8 @@ namespace BibliotecaApp
 
         private static string? BuscarEnDirectorio(string directorio, string[] nombresArchivos)
         {
+            if (!Directory.Exists(directorio)) return null;
+
             foreach (string nombre in nombresArchivos)
             {
                 string rutaCompleta = Path.Combine(directorio, nombre);
@@ -119,6 +153,25 @@ namespace BibliotecaApp
                 txtPassword.Clear();
                 txtPassword.Focus();
             }
+        }
+
+        // ── Controles de ventana personalizados ──
+
+        private void btnMinimizar_Click(object? sender, EventArgs e)
+        {
+            this.WindowState = FormWindowState.Minimized;
+        }
+
+        private void btnMaximizar_Click(object? sender, EventArgs e)
+        {
+            this.WindowState = this.WindowState == FormWindowState.Maximized
+                ? FormWindowState.Normal
+                : FormWindowState.Maximized;
+        }
+
+        private void btnCerrarVentana_Click(object? sender, EventArgs e)
+        {
+            Application.Exit();
         }
     }
 }
