@@ -91,17 +91,27 @@ namespace BibliotecaApp
 
         private static string? BuscarArchivoLogo(string[] nombresArchivos)
         {
-            // 1. Buscar en Application.StartupPath (bin\Debug o publicación)
-            string? ruta = BuscarEnDirectorio(AppDomain.CurrentDomain.BaseDirectory, nombresArchivos);
+            // 1. Buscar en la carpeta Recursos (nueva ubicación)
+            string rutaRecursos = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Recursos");
+            string? ruta = BuscarEnDirectorio(rutaRecursos, nombresArchivos);
             if (ruta != null) return ruta;
 
-            // 2. Subir en el árbol de directorios hasta 5 niveles hacia la raíz del proyecto
+            // 2. Buscar en Application.StartupPath (bin\Debug o publicación)
+            ruta = BuscarEnDirectorio(AppDomain.CurrentDomain.BaseDirectory, nombresArchivos);
+            if (ruta != null) return ruta;
+
+            // 3. Subir en el árbol de directorios hasta 5 niveles hacia la raíz del proyecto
             DirectoryInfo? dir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory);
             int niveles = 0;
 
             while (dir != null && niveles < 5)
             {
                 ruta = BuscarEnDirectorio(dir.FullName, nombresArchivos);
+                if (ruta != null) return ruta;
+
+                // También buscar en Recursos de cada nivel
+                string rutaRecursosNivel = Path.Combine(dir.FullName, "Recursos");
+                ruta = BuscarEnDirectorio(rutaRecursosNivel, nombresArchivos);
                 if (ruta != null) return ruta;
 
                 dir = Directory.GetParent(dir.FullName);
@@ -113,6 +123,8 @@ namespace BibliotecaApp
 
         private static string? BuscarEnDirectorio(string directorio, string[] nombresArchivos)
         {
+            if (!Directory.Exists(directorio)) return null;
+
             foreach (string nombre in nombresArchivos)
             {
                 string rutaCompleta = Path.Combine(directorio, nombre);
