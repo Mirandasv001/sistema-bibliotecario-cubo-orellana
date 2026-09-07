@@ -15,218 +15,166 @@ namespace BibliotecaApp
 
         private void InitializeComponent()
         {
-            panelFondo = new Panel();
-            panelCard = new Panel();
             pictureBoxLogo = new PictureBox();
             lblTitulo = new Label();
-            lblSubtitulo = new Label();
-            lineSeparador = new Panel();
-            lblSeguridad = new Label();
             lblUsuario = new Label();
             txtUsuario = new TextBox();
             lblPassword = new Label();
             txtPassword = new TextBox();
+            btnTogglePassword = new Button();
             btnIngresar = new Button();
-            btnCerrar = new Button();
-            btnMinimizar = new Button();
-            btnMaximizar = new Button();
-            btnCerrarVentana = new Button();
-            SuspendLayout();
-            panelFondo.SuspendLayout();
-            panelCard.SuspendLayout();
+            lnkCerrarSistema = new LinkLabel();
             ((System.ComponentModel.ISupportInitialize)pictureBoxLogo).BeginInit();
-
-            // ── panelFondo (fondo pantalla completa) ──
-            panelFondo.Dock = DockStyle.Fill;
-            panelFondo.BackColor = Color.FromArgb(22, 32, 50);
-            panelFondo.Controls.Add(panelCard);
-            panelFondo.Controls.Add(btnCerrarVentana);
-            panelFondo.Controls.Add(btnMaximizar);
-            panelFondo.Controls.Add(btnMinimizar);
-
-            // ── panelCard (tarjeta centrada) ──
-            panelCard.BackColor = Color.White;
-            panelCard.Size = new Size(440, 560);
-            panelCard.Anchor = AnchorStyles.None;
-            panelCard.Controls.Add(pictureBoxLogo);
-            panelCard.Controls.Add(lblTitulo);
-            panelCard.Controls.Add(lblSubtitulo);
-            panelCard.Controls.Add(lineSeparador);
-            panelCard.Controls.Add(lblSeguridad);
-            panelCard.Controls.Add(lblUsuario);
-            panelCard.Controls.Add(txtUsuario);
-            panelCard.Controls.Add(lblPassword);
-            panelCard.Controls.Add(txtPassword);
-            panelCard.Controls.Add(btnIngresar);
-            panelCard.Controls.Add(btnCerrar);
-
-            // ── pictureBoxLogo ──
-            pictureBoxLogo.Size = new Size(140, 100);
-            pictureBoxLogo.Location = new Point(150, 30);
-            pictureBoxLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            SuspendLayout();
+            // 
+            // pictureBoxLogo
+            // 
             pictureBoxLogo.BackColor = Color.Transparent;
-            pictureBoxLogo.BorderStyle = BorderStyle.None;
-
-            // ── lblTitulo ──
-            lblTitulo.AutoSize = false;
-            lblTitulo.Size = new Size(380, 32);
-            lblTitulo.Location = new Point(30, 145);
-            lblTitulo.Text = "Sistema de Gestión Bibliotecaria";
-            lblTitulo.Font = new Font(EstiloUI.FuenteBase, 17F, FontStyle.Bold);
-            lblTitulo.ForeColor = Color.FromArgb(22, 32, 50);
+            pictureBoxLogo.Location = new Point(50, 30);
+            pictureBoxLogo.Name = "pictureBoxLogo";
+            pictureBoxLogo.Size = new Size(300, 120);
+            pictureBoxLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxLogo.TabIndex = 0;
+            pictureBoxLogo.TabStop = false;
+            // 
+            // lblTitulo
+            // 
+            lblTitulo.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            lblTitulo.ForeColor = Color.FromArgb(50, 58, 72);
+            lblTitulo.Location = new Point(40, 160);
+            lblTitulo.Name = "lblTitulo";
+            lblTitulo.Size = new Size(320, 30);
+            lblTitulo.TabIndex = 1;
+            lblTitulo.Text = "Sistema Bibliotecario CUBO";
             lblTitulo.TextAlign = ContentAlignment.MiddleCenter;
-
-            // ── lblSubtitulo ──
-            lblSubtitulo.AutoSize = false;
-            lblSubtitulo.Size = new Size(380, 20);
-            lblSubtitulo.Location = new Point(30, 178);
-            lblSubtitulo.Text = "Centros Urbanos de Bienestar y Oportunidades";
-            lblSubtitulo.Font = new Font(EstiloUI.FuenteBase, 9.5F, FontStyle.Regular);
-            lblSubtitulo.ForeColor = Color.FromArgb(100, 110, 130);
-            lblSubtitulo.TextAlign = ContentAlignment.MiddleCenter;
-
-            // ── lineSeparador ──
-            lineSeparador.BackColor = Color.FromArgb(220, 225, 235);
-            lineSeparador.Size = new Size(320, 1);
-            lineSeparador.Location = new Point(60, 212);
-
-            // ── lblSeguridad ──
-            lblSeguridad.AutoSize = false;
-            lblSeguridad.Size = new Size(380, 20);
-            lblSeguridad.Location = new Point(30, 224);
-            lblSeguridad.Text = "Acceso exclusivo para personal autorizado";
-            lblSeguridad.Font = new Font(EstiloUI.FuenteBase, 8.5F, FontStyle.Italic);
-            lblSeguridad.ForeColor = Color.FromArgb(85, 85, 85);
-            lblSeguridad.TextAlign = ContentAlignment.MiddleCenter;
-
-            // ── lblUsuario ──
+            // 
+            // lblUsuario
+            // 
             lblUsuario.AutoSize = true;
-            lblUsuario.Location = new Point(55, 262);
-            lblUsuario.Text = "Usuario";
-            lblUsuario.Font = new Font(EstiloUI.FuenteBase, 9F, FontStyle.Bold);
+            lblUsuario.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             lblUsuario.ForeColor = Color.FromArgb(50, 58, 72);
-
-            // ── txtUsuario ──
-            txtUsuario.Location = new Point(55, 286);
-            txtUsuario.Size = new Size(330, 36);
-            txtUsuario.Font = new Font(EstiloUI.FuenteBase, 11F);
-            txtUsuario.BackColor = Color.FromArgb(248, 249, 252);
-            txtUsuario.ForeColor = Color.FromArgb(40, 46, 58);
+            lblUsuario.Location = new Point(70, 210);
+            lblUsuario.Name = "lblUsuario";
+            lblUsuario.Size = new Size(49, 15);
+            lblUsuario.TabIndex = 2;
+            lblUsuario.Text = "Usuario";
+            // 
+            // txtUsuario
+            // 
+            txtUsuario.BackColor = Color.White;
             txtUsuario.BorderStyle = BorderStyle.FixedSingle;
-
-            // ── lblPassword ──
+            txtUsuario.Font = new Font("Segoe UI", 10F);
+            txtUsuario.ForeColor = Color.FromArgb(40, 46, 58);
+            txtUsuario.Location = new Point(70, 235);
+            txtUsuario.Name = "txtUsuario";
+            txtUsuario.Size = new Size(260, 25);
+            txtUsuario.TabIndex = 3;
+            // 
+            // lblPassword
+            // 
             lblPassword.AutoSize = true;
-            lblPassword.Location = new Point(55, 334);
-            lblPassword.Text = "Contraseña";
-            lblPassword.Font = new Font(EstiloUI.FuenteBase, 9F, FontStyle.Bold);
+            lblPassword.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             lblPassword.ForeColor = Color.FromArgb(50, 58, 72);
-
-            // ── txtPassword ──
-            txtPassword.Location = new Point(55, 358);
-            txtPassword.Size = new Size(330, 36);
-            txtPassword.Font = new Font(EstiloUI.FuenteBase, 11F);
-            txtPassword.BackColor = Color.FromArgb(248, 249, 252);
-            txtPassword.ForeColor = Color.FromArgb(40, 46, 58);
+            lblPassword.Location = new Point(70, 280);
+            lblPassword.Name = "lblPassword";
+            lblPassword.Size = new Size(69, 15);
+            lblPassword.TabIndex = 4;
+            lblPassword.Text = "Contraseña";
+            // 
+            // txtPassword
+            // 
+            txtPassword.BackColor = Color.White;
             txtPassword.BorderStyle = BorderStyle.FixedSingle;
+            txtPassword.Font = new Font("Segoe UI", 10F);
+            txtPassword.ForeColor = Color.FromArgb(40, 46, 58);
+            txtPassword.Location = new Point(70, 305);
+            txtPassword.Name = "txtPassword";
+            txtPassword.Size = new Size(260, 25);
+            txtPassword.TabIndex = 5;
             txtPassword.UseSystemPasswordChar = true;
-
-            // ── btnIngresar ──
-            btnIngresar.Location = new Point(55, 414);
-            btnIngresar.Size = new Size(330, 46);
-            btnIngresar.Text = "INGRESAR";
-            btnIngresar.FlatStyle = FlatStyle.Flat;
-            btnIngresar.FlatAppearance.BorderSize = 0;
-            btnIngresar.BackColor = Color.FromArgb(59, 111, 216);
-            btnIngresar.ForeColor = Color.White;
-            btnIngresar.Font = new Font(EstiloUI.FuenteBase, 11F, FontStyle.Bold);
+            // 
+            // btnTogglePassword
+            // 
+            btnTogglePassword.BackColor = Color.White;
+            btnTogglePassword.Cursor = Cursors.Hand;
+            btnTogglePassword.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+            btnTogglePassword.FlatStyle = FlatStyle.Flat;
+            btnTogglePassword.Font = new Font("Segoe UI", 10F);
+            btnTogglePassword.ForeColor = Color.FromArgb(100, 100, 100);
+            btnTogglePassword.Location = new Point(336, 305);
+            btnTogglePassword.Name = "btnTogglePassword";
+            btnTogglePassword.Size = new Size(40, 27);
+            btnTogglePassword.TabIndex = 6;
+            btnTogglePassword.Text = "👁";
+            btnTogglePassword.UseVisualStyleBackColor = false;
+            btnTogglePassword.Click += btnTogglePassword_Click;
+            // 
+            // btnIngresar
+            // 
+            btnIngresar.BackColor = Color.FromArgb(41, 128, 185);
             btnIngresar.Cursor = Cursors.Hand;
+            btnIngresar.FlatAppearance.BorderSize = 0;
+            btnIngresar.FlatStyle = FlatStyle.Flat;
+            btnIngresar.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnIngresar.ForeColor = Color.White;
+            btnIngresar.Location = new Point(70, 370);
+            btnIngresar.Name = "btnIngresar";
+            btnIngresar.Size = new Size(260, 40);
+            btnIngresar.TabIndex = 7;
+            btnIngresar.Text = "INICIAR SESIÓN";
+            btnIngresar.UseVisualStyleBackColor = false;
             btnIngresar.Click += btnIngresar_Click;
-
-            // ── btnCerrar (enlace "Cerrar sistema" dentro de la tarjeta) ──
-            btnCerrar.FlatStyle = FlatStyle.Flat;
-            btnCerrar.FlatAppearance.BorderSize = 0;
-            btnCerrar.BackColor = Color.Transparent;
-            btnCerrar.ForeColor = Color.FromArgb(130, 140, 155);
-            btnCerrar.Font = new Font(EstiloUI.FuenteBase, 8.5F, FontStyle.Underline);
-            btnCerrar.Cursor = Cursors.Hand;
-            btnCerrar.Size = new Size(330, 28);
-            btnCerrar.Location = new Point(55, 475);
-            btnCerrar.Text = "Cerrar sistema";
-            btnCerrar.Click += (_, _) => Application.Exit();
-
-            // ── btnMinimizar (control de ventana) ──
-            btnMinimizar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnMinimizar.FlatStyle = FlatStyle.Flat;
-            btnMinimizar.FlatAppearance.BorderSize = 0;
-            btnMinimizar.BackColor = Color.Transparent;
-            btnMinimizar.ForeColor = Color.FromArgb(204, 204, 204);
-            btnMinimizar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            btnMinimizar.Size = new Size(40, 30);
-            btnMinimizar.Location = new Point(1120, 0);
-            btnMinimizar.Text = "─";
-            btnMinimizar.Cursor = Cursors.Hand;
-            btnMinimizar.Click += btnMinimizar_Click;
-
-            // ── btnMaximizar (control de ventana) ──
-            btnMaximizar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnMaximizar.FlatStyle = FlatStyle.Flat;
-            btnMaximizar.FlatAppearance.BorderSize = 0;
-            btnMaximizar.BackColor = Color.Transparent;
-            btnMaximizar.ForeColor = Color.FromArgb(204, 204, 204);
-            btnMaximizar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            btnMaximizar.Size = new Size(40, 30);
-            btnMaximizar.Location = new Point(1160, 0);
-            btnMaximizar.Text = "◻";
-            btnMaximizar.Cursor = Cursors.Hand;
-            btnMaximizar.Click += btnMaximizar_Click;
-
-            // ── btnCerrarVentana (control de ventana) ──
-            btnCerrarVentana.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnCerrarVentana.FlatStyle = FlatStyle.Flat;
-            btnCerrarVentana.FlatAppearance.BorderSize = 0;
-            btnCerrarVentana.BackColor = Color.Transparent;
-            btnCerrarVentana.ForeColor = Color.FromArgb(204, 204, 204);
-            btnCerrarVentana.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            btnCerrarVentana.Size = new Size(40, 30);
-            btnCerrarVentana.Location = new Point(1200, 0);
-            btnCerrarVentana.Text = "X";
-            btnCerrarVentana.Cursor = Cursors.Hand;
-            btnCerrarVentana.Click += btnCerrarVentana_Click;
-
-            // ── FormLogin ──
+            // 
+            // lnkCerrarSistema
+            // 
+            lnkCerrarSistema.ActiveLinkColor = Color.FromArgb(41, 128, 185);
+            lnkCerrarSistema.Font = new Font("Segoe UI", 9F);
+            lnkCerrarSistema.LinkColor = Color.FromArgb(100, 110, 130);
+            lnkCerrarSistema.Location = new Point(40, 425);
+            lnkCerrarSistema.Name = "lnkCerrarSistema";
+            lnkCerrarSistema.Size = new Size(320, 25);
+            lnkCerrarSistema.TabIndex = 8;
+            lnkCerrarSistema.TabStop = true;
+            lnkCerrarSistema.Text = "Cerrar sistema";
+            lnkCerrarSistema.TextAlign = ContentAlignment.MiddleCenter;
+            lnkCerrarSistema.VisitedLinkColor = Color.FromArgb(100, 110, 130);
+            lnkCerrarSistema.LinkClicked += lnkCerrarSistema_LinkClicked;
+            // 
+            // FormLogin
+            // 
             AcceptButton = btnIngresar;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1200, 750);
-            Controls.Add(panelFondo);
-            BackColor = Color.FromArgb(22, 32, 50);
-            FormBorderStyle = FormBorderStyle.None;
-            WindowState = FormWindowState.Maximized;
-            StartPosition = FormStartPosition.Manual;
-            Location = new Point(0, 0);
+            BackColor = Color.White;
+            ClientSize = new Size(400, 540);
+            Controls.Add(pictureBoxLogo);
+            Controls.Add(lblTitulo);
+            Controls.Add(lblUsuario);
+            Controls.Add(txtUsuario);
+            Controls.Add(lblPassword);
+            Controls.Add(txtPassword);
+            Controls.Add(btnTogglePassword);
+            Controls.Add(btnIngresar);
+            Controls.Add(lnkCerrarSistema);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            Name = "FormLogin";
+            StartPosition = FormStartPosition.CenterScreen;
             Text = "Biblioteca CUBO - Acceso";
-
-            panelCard.ResumeLayout(false);
-            panelCard.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)pictureBoxLogo).EndInit();
             ResumeLayout(false);
+            PerformLayout();
         }
 
-        private Panel panelFondo;
-        private Panel panelCard;
         private PictureBox pictureBoxLogo;
         private Label lblTitulo;
-        private Label lblSubtitulo;
-        private Label lblSeguridad;
         private Label lblUsuario;
-        private Label lblPassword;
         private TextBox txtUsuario;
+        private Label lblPassword;
         private TextBox txtPassword;
+        private Button btnTogglePassword;
         private Button btnIngresar;
-        private Button btnCerrar;
-        private Button btnMinimizar;
-        private Button btnMaximizar;
-        private Button btnCerrarVentana;
-        private Panel lineSeparador;
+        private LinkLabel lnkCerrarSistema;
     }
 }

@@ -18,6 +18,21 @@
 
             InitializeComponent();
 
+            // Configuración de UI dinámica
+            ConfigurarBotonMenu(btnSala, "Control de Sala");
+            ConfigurarBotonMenu(btnInventario, "Inventario");
+            ConfigurarBotonMenu(btnPrestamos, "Préstamos Externos");
+            ConfigurarBotonMenu(btnAlertas, "Alertas de Vencidos");
+            ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
+
+            // Suscripción de eventos de navegación
+            btnSala.Click += (_, _) => MostrarApartadoSala();
+            btnPrestamos.Click += (_, _) => MostrarApartadoPrestamos();
+            btnInventario.Click += (_, _) => MostrarApartadoInventario();
+            btnAlertas.Click += (_, _) => MostrarApartadoAlertas();
+            btnAlertas.Paint += btnAlertas_Paint;
+            btnGuiaUso.Click += (_, _) => btnGuiaUso_Click();
+
             // Timer de notificaciones: consulta los morosos al arrancar y cada intervalo.
             _timerAlertas = new System.Windows.Forms.Timer { Interval = 30000 };
             _timerAlertas.Tick += (_, _) => ActualizarContadorAlertas();
@@ -36,25 +51,20 @@
             _timerAlertas.Start();
         }
 
-        /// <summary>Carga el logo CUBO desde el directorio de la aplicación sin bloquear el archivo.</summary>
+        /// <summary>Carga el logo CUBO desde la carpeta Recursos sin bloquear el archivo.</summary>
         private void CargarLogo()
         {
             try
             {
-                string[] candidatos = { "images (2).jpg", "logo.png", "logo.jpg", "logo.jpeg" };
-
-                string? ruta = candidatos
-                    .Select(n => Path.Combine(AppContext.BaseDirectory, n))
-                    .FirstOrDefault(File.Exists);
-
-                if (ruta == null) return;
-
-                byte[] bytes = File.ReadAllBytes(ruta);
-                pictureBoxLogo.Image = Image.FromStream(new MemoryStream(bytes));
+                string rutaLogo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Recursos", "Logo de inicio.jpg");
+                if (File.Exists(rutaLogo))
+                {
+                    pictureBoxLogo.Image = Image.FromFile(rutaLogo);
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Si no hay imagen disponible, el menú funciona igualmente.
+                System.Diagnostics.Debug.WriteLine($"Error de UI - Logo no encontrado: {ex.Message}");
             }
         }
 
@@ -130,6 +140,23 @@
         }
 
         //Botones importantes
+
+        private void ConfigurarBotonMenu(Button boton, string texto)
+        {
+            boton.Dock = DockStyle.Top;
+            boton.FlatStyle = FlatStyle.Flat;
+            boton.FlatAppearance.BorderSize = 0;
+            boton.FlatAppearance.MouseOverBackColor = EstiloUI.HoverOscuro;
+            boton.BackColor = EstiloUI.FondoOscuro;
+            boton.ForeColor = Color.White;
+            boton.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            boton.Height = 50;
+            boton.TextAlign = ContentAlignment.MiddleLeft;
+            boton.Padding = new Padding(15, 0, 0, 0);
+            boton.Cursor = Cursors.Hand;
+            boton.Text = texto;
+            boton.UseVisualStyleBackColor = false;
+        }
 
         private void ResaltarBoton(Button botonActivo)
         {
@@ -223,6 +250,16 @@
             {
                 Application.Restart();
             }
+        }
+
+        private void lblNombreApp_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void pictureBoxLogo_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
