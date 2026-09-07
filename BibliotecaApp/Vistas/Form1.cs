@@ -9,6 +9,11 @@
         private readonly System.Windows.Forms.Timer _timerAlertas;
         private int _conteoMorosos = 0;
 
+        private UcControlSala? _vistaSala;
+        private UcInventario? _vistaInventario;
+        private UcPrestamosExternos? _vistaPrestamos;
+        private UcAlertas? _vistaAlertas;
+
         public Form1()
         {
             // Refuerzo de codificación para cualquier salida de diagnóstico por consola.
@@ -71,38 +76,68 @@
         // ------------------------------------------------------------------
         //  Navegación entre apartados
         // ------------------------------------------------------------------
-        private void MostrarApartadoSala() =>
-            MostrarApartado(() => new UcControlSala(), btnSala);
-
-        private void MostrarApartadoInventario() =>
-            MostrarApartado(() => new UcInventario(), btnInventario);
-
-        private void MostrarApartadoPrestamos() =>
-            MostrarApartado(() => new UcPrestamosExternos(), btnPrestamos);
-
-        private void MostrarApartadoAlertas() =>
-            MostrarApartado(() => new UcAlertas(), btnAlertas);
-
-        /// <summary>
-        /// Limpia el panel central y carga el UserControl correspondiente.
-        /// Se libera (Dispose) el apartado anterior en lugar de solo Controls.Clear()
-        /// para no dejar controles huérfanos retenidos por sus event handlers.
-        /// Devuelve el control creado para poder inyectarle datos a continuación.
-        /// </summary>
-        private UserControl MostrarApartado(Func<UserControl> crearApartado, Button botonActivo)
+        private void MostrarApartadoSala()
         {
-            ResaltarBoton(botonActivo);
-
-            foreach (var anterior in panelContenedor.Controls.Cast<Control>().ToArray())
+            if (_vistaSala == null)
             {
-                panelContenedor.Controls.Remove(anterior);
-                anterior.Dispose();
+                _vistaSala = new UcControlSala();
+                _vistaSala.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaSala);
             }
+            OcultarVistas();
+            _vistaSala.BringToFront();
+            _vistaSala.Show();
+            ResaltarBoton(btnSala);
+        }
 
-            UserControl apartado = crearApartado();
-            apartado.Dock = DockStyle.Fill;
-            panelContenedor.Controls.Add(apartado);
-            return apartado;
+        private void MostrarApartadoInventario()
+        {
+            if (_vistaInventario == null)
+            {
+                _vistaInventario = new UcInventario();
+                _vistaInventario.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaInventario);
+            }
+            OcultarVistas();
+            _vistaInventario.BringToFront();
+            _vistaInventario.Show();
+            ResaltarBoton(btnInventario);
+        }
+
+        private void MostrarApartadoPrestamos()
+        {
+            if (_vistaPrestamos == null)
+            {
+                _vistaPrestamos = new UcPrestamosExternos();
+                _vistaPrestamos.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaPrestamos);
+            }
+            OcultarVistas();
+            _vistaPrestamos.BringToFront();
+            _vistaPrestamos.Show();
+            ResaltarBoton(btnPrestamos);
+        }
+
+        private void MostrarApartadoAlertas()
+        {
+            if (_vistaAlertas == null)
+            {
+                _vistaAlertas = new UcAlertas();
+                _vistaAlertas.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaAlertas);
+            }
+            OcultarVistas();
+            _vistaAlertas.BringToFront();
+            _vistaAlertas.Show();
+            ResaltarBoton(btnAlertas);
+        }
+
+        private void OcultarVistas()
+        {
+            _vistaSala?.Hide();
+            _vistaInventario?.Hide();
+            _vistaPrestamos?.Hide();
+            _vistaAlertas?.Hide();
         }
 
         // ------------------------------------------------------------------
@@ -116,9 +151,9 @@
         /// </summary>
         public void CargarPrestamoDesdeInventario(string codigo, string titulo)
         {
-            UserControl apartado = MostrarApartado(() => new UcPrestamosExternos(), btnPrestamos);
-            if (apartado is UcPrestamosExternos prestamos)
-                prestamos.CargarDesdeInventario(codigo, titulo);
+            MostrarApartadoPrestamos();
+            if (_vistaPrestamos != null)
+                _vistaPrestamos.CargarDesdeInventario(codigo, titulo);
         }
 
         /// <summary>Muestra el manual rápido de uso de la aplicación.</summary>
