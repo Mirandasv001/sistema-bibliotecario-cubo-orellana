@@ -19,132 +19,166 @@ namespace BibliotecaApp
 
         private void InitializeComponent()
         {
+            ComponentResourceManager resources = new ComponentResourceManager(typeof(Form1));
             panelMenu = new Panel();
+            panelNav = new Panel();
+            btnGuiaUso = new Button();
+            btnAlertas = new Button();
+            btnPrestamos = new Button();
+            btnInventario = new Button();
+            btnSala = new Button();
+            btnCerrarSesion = new Button();
+            lblVersion = new Label();
             panelLogo = new Panel();
             pictureBoxLogo = new PictureBox();
             lblNombreApp = new Label();
-            panelNav = new Panel();
-            btnSala = new Button();
-            btnPrestamos = new Button();
-            btnInventario = new Button();
-            btnAlertas = new Button();
-            btnGuiaUso = new Button();
-            btnCerrarSesion = new Button();
-            lblVersion = new Label();
             panelContenedor = new Panel();
             panelMenu.SuspendLayout();
+            panelNav.SuspendLayout();
             panelLogo.SuspendLayout();
             ((ISupportInitialize)pictureBoxLogo).BeginInit();
-            panelNav.SuspendLayout();
             SuspendLayout();
             // 
             // panelMenu
             // 
-            panelMenu.BackColor = EstiloUI.FondoOscuro;
-            // Orden de la colección: el último agregado se acopla primero,
-            // por eso panelLogo queda al inicio visual y panelNav rellena el resto.
+            panelMenu.BackColor = Color.FromArgb(27, 36, 55);
             panelMenu.Controls.Add(panelNav);
             panelMenu.Controls.Add(btnCerrarSesion);
             panelMenu.Controls.Add(lblVersion);
-            panelMenu.Controls.Add(lblNombreApp);
             panelMenu.Controls.Add(panelLogo);
             panelMenu.Dock = DockStyle.Left;
             panelMenu.Location = new Point(0, 0);
             panelMenu.Name = "panelMenu";
             panelMenu.Size = new Size(220, 720);
-            // 
-            // panelLogo
-            // 
-            panelLogo.BackColor = EstiloUI.FondoOscuro;
-            panelLogo.Controls.Add(pictureBoxLogo);
-            panelLogo.Dock = DockStyle.Top;
-            panelLogo.Name = "panelLogo";
-            panelLogo.Size = new Size(220, 150);
-            // 
-            // pictureBoxLogo
-            // 
-            pictureBoxLogo.BackColor = EstiloUI.FondoOscuro;
-            pictureBoxLogo.Dock = DockStyle.Fill;
-            pictureBoxLogo.Name = "pictureBoxLogo";
-            pictureBoxLogo.Padding = new Padding(14, 12, 14, 4);
-            pictureBoxLogo.SizeMode = PictureBoxSizeMode.Zoom;
-            // 
-            // lblNombreApp
-            // 
-            lblNombreApp.Dock = DockStyle.Top;
-            lblNombreApp.Font = new Font(EstiloUI.FuenteBase, 13F, FontStyle.Bold);
-            lblNombreApp.ForeColor = EstiloUI.Blanco;
-            lblNombreApp.Name = "lblNombreApp";
-            lblNombreApp.Padding = new Padding(0, 2, 0, 10);
-            lblNombreApp.Size = new Size(220, 46);
-            lblNombreApp.Text = "BIBLIOTECA CUBO";
-            lblNombreApp.TextAlign = ContentAlignment.MiddleCenter;
+            panelMenu.TabIndex = 1;
             // 
             // panelNav
             // 
-            panelNav.AutoScroll = false;
-            panelNav.BackColor = EstiloUI.FondoOscuro;
-            panelNav.Dock = DockStyle.Fill;
-            panelNav.Name = "panelNav";
-            panelNav.Padding = new Padding(0, 20, 0, 0);
-            panelNav.Size = new Size(220, 484);
-            // Los botones se agregan en orden inverso para que queden apilados hacia abajo.
+            panelNav.BackColor = Color.FromArgb(27, 36, 55);
             panelNav.Controls.Add(btnGuiaUso);
             panelNav.Controls.Add(btnAlertas);
             panelNav.Controls.Add(btnPrestamos);
             panelNav.Controls.Add(btnInventario);
             panelNav.Controls.Add(btnSala);
+            panelNav.Dock = DockStyle.Fill;
+            panelNav.Location = new Point(0, 180);
+            panelNav.Name = "panelNav";
+            panelNav.Padding = new Padding(0, 20, 0, 0);
+            panelNav.Size = new Size(220, 452);
+            panelNav.TabIndex = 0;
             // 
-            // Configuración estricta de cada botón de navegación
+            // btnGuiaUso
             // 
-            ConfigurarBotonMenu(btnSala, "Control de Sala");
-            ConfigurarBotonMenu(btnInventario, "Inventario");
-            ConfigurarBotonMenu(btnPrestamos, "Préstamos Externos");
-            ConfigurarBotonMenu(btnAlertas, "Alertas de Vencidos");
-            ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
-            btnSala.Click += (_, _) => MostrarApartadoSala();
-            btnPrestamos.Click += (_, _) => MostrarApartadoPrestamos();
-            btnInventario.Click += (_, _) => MostrarApartadoInventario();
-            btnAlertas.Click += (_, _) => MostrarApartadoAlertas();
-            btnAlertas.Paint += btnAlertas_Paint;
-            btnGuiaUso.Click += (_, _) => btnGuiaUso_Click();
+            btnGuiaUso.Location = new Point(0, 0);
+            btnGuiaUso.Name = "btnGuiaUso";
+            btnGuiaUso.Size = new Size(75, 23);
+            btnGuiaUso.TabIndex = 0;
+            // 
+            // btnAlertas
+            // 
+            btnAlertas.Location = new Point(0, 0);
+            btnAlertas.Name = "btnAlertas";
+            btnAlertas.Size = new Size(75, 23);
+            btnAlertas.TabIndex = 1;
+            // 
+            // btnPrestamos
+            // 
+            btnPrestamos.Location = new Point(0, 0);
+            btnPrestamos.Name = "btnPrestamos";
+            btnPrestamos.Size = new Size(75, 23);
+            btnPrestamos.TabIndex = 2;
+            // 
+            // btnInventario
+            // 
+            btnInventario.Location = new Point(0, 0);
+            btnInventario.Name = "btnInventario";
+            btnInventario.Size = new Size(75, 23);
+            btnInventario.TabIndex = 3;
+            // 
+            // btnSala
+            // 
+            btnSala.Location = new Point(0, 0);
+            btnSala.Name = "btnSala";
+            btnSala.Size = new Size(75, 23);
+            btnSala.TabIndex = 4;
+            // 
+            // btnCerrarSesion
+            // 
+            btnCerrarSesion.BackColor = Color.FromArgb(27, 36, 55);
+            btnCerrarSesion.Cursor = Cursors.Hand;
+            btnCerrarSesion.Dock = DockStyle.Bottom;
+            btnCerrarSesion.FlatAppearance.BorderSize = 0;
+            btnCerrarSesion.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 30, 30);
+            btnCerrarSesion.FlatStyle = FlatStyle.Flat;
+            btnCerrarSesion.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnCerrarSesion.ForeColor = Color.White;
+            btnCerrarSesion.Location = new Point(0, 632);
+            btnCerrarSesion.Name = "btnCerrarSesion";
+            btnCerrarSesion.Padding = new Padding(15, 0, 0, 0);
+            btnCerrarSesion.Size = new Size(220, 48);
+            btnCerrarSesion.TabIndex = 1;
+            btnCerrarSesion.Text = "Cerrar Sesión";
+            btnCerrarSesion.TextAlign = ContentAlignment.MiddleLeft;
+            btnCerrarSesion.UseVisualStyleBackColor = false;
+            btnCerrarSesion.Click += btnCerrarSesion_Click;
             // 
             // lblVersion
             // 
             lblVersion.Dock = DockStyle.Bottom;
-            lblVersion.Font = EstiloUI.Subtitulo();
+            lblVersion.Font = new Font("Segoe UI", 8.5F);
             lblVersion.ForeColor = Color.FromArgb(140, 150, 170);
+            lblVersion.Location = new Point(0, 680);
             lblVersion.Name = "lblVersion";
             lblVersion.Padding = new Padding(16, 8, 8, 12);
             lblVersion.Size = new Size(220, 40);
+            lblVersion.TabIndex = 2;
             lblVersion.Text = "Sitio del Niño © 2026";
             lblVersion.TextAlign = ContentAlignment.MiddleLeft;
             // 
-            // btnCerrarSesion
+            // panelLogo
             // 
-            btnCerrarSesion.Dock = DockStyle.Bottom;
-            btnCerrarSesion.FlatStyle = FlatStyle.Flat;
-            btnCerrarSesion.FlatAppearance.BorderSize = 0;
-            btnCerrarSesion.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 30, 30);
-            btnCerrarSesion.BackColor = EstiloUI.FondoOscuro;
-            btnCerrarSesion.ForeColor = Color.FromArgb(220, 180, 180);
-            btnCerrarSesion.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            btnCerrarSesion.Height = 48;
-            btnCerrarSesion.Name = "btnCerrarSesion";
-            btnCerrarSesion.Padding = new Padding(15, 0, 0, 0);
-            btnCerrarSesion.Text = "Cerrar Sesión";
-            btnCerrarSesion.TextAlign = ContentAlignment.MiddleLeft;
-            btnCerrarSesion.Cursor = Cursors.Hand;
-            btnCerrarSesion.UseVisualStyleBackColor = false;
-            btnCerrarSesion.Click += btnCerrarSesion_Click;
+            panelLogo.BackColor = Color.FromArgb(27, 36, 55);
+            panelLogo.Controls.Add(pictureBoxLogo);
+            panelLogo.Controls.Add(lblNombreApp);
+            panelLogo.Dock = DockStyle.Top;
+            panelLogo.Location = new Point(0, 0);
+            panelLogo.Name = "panelLogo";
+            panelLogo.Size = new Size(220, 180);
+            panelLogo.TabIndex = 3;
+            // 
+            // pictureBoxLogo
+            // 
+            pictureBoxLogo.BackColor = Color.White;
+            pictureBoxLogo.Image = (Image)resources.GetObject("pictureBoxLogo.Image");
+            pictureBoxLogo.Location = new Point(6, 3);
+            pictureBoxLogo.Name = "pictureBoxLogo";
+            pictureBoxLogo.Size = new Size(211, 132);
+            pictureBoxLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxLogo.TabIndex = 0;
+            pictureBoxLogo.TabStop = false;
+            pictureBoxLogo.Click += pictureBoxLogo_Click;
+            // 
+            // lblNombreApp
+            // 
+            lblNombreApp.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
+            lblNombreApp.ForeColor = Color.White;
+            lblNombreApp.Location = new Point(12, 131);
+            lblNombreApp.Name = "lblNombreApp";
+            lblNombreApp.Size = new Size(180, 46);
+            lblNombreApp.TabIndex = 3;
+            lblNombreApp.Text = "BIBLIOTECA ";
+            lblNombreApp.TextAlign = ContentAlignment.MiddleCenter;
+            lblNombreApp.Click += lblNombreApp_Click;
             // 
             // panelContenedor
             // 
-            panelContenedor.BackColor = EstiloUI.FondoClaro;
+            panelContenedor.BackColor = Color.FromArgb(244, 246, 250);
             panelContenedor.Dock = DockStyle.Fill;
+            panelContenedor.Location = new Point(220, 0);
             panelContenedor.Name = "panelContenedor";
             panelContenedor.Padding = new Padding(10, 8, 10, 10);
             panelContenedor.Size = new Size(1060, 720);
+            panelContenedor.TabIndex = 0;
             // 
             // Form1
             // 
@@ -153,36 +187,18 @@ namespace BibliotecaApp
             ClientSize = new Size(1280, 720);
             Controls.Add(panelContenedor);
             Controls.Add(panelMenu);
-            Font = new Font(EstiloUI.FuenteBase, 9F);
+            Font = new Font("Segoe UI", 9F);
             MinimumSize = new Size(1150, 660);
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "Biblioteca CUBO — Sistema de Gestión";
             WindowState = FormWindowState.Maximized;
             Load += Form1_Load;
-            panelContenedor.BringToFront();
             panelMenu.ResumeLayout(false);
+            panelNav.ResumeLayout(false);
             panelLogo.ResumeLayout(false);
             ((ISupportInitialize)pictureBoxLogo).EndInit();
-            panelNav.ResumeLayout(false);
             ResumeLayout(false);
-        }
-             // Apartado importante
-        private static void ConfigurarBotonMenu(Button boton, string texto)
-        {
-            boton.Dock = DockStyle.Top;
-            boton.FlatStyle = FlatStyle.Flat;
-            boton.FlatAppearance.BorderSize = 0;
-            boton.FlatAppearance.MouseOverBackColor = EstiloUI.HoverOscuro;
-            boton.BackColor = EstiloUI.FondoOscuro;
-            boton.ForeColor = Color.White;
-            boton.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            boton.Height = 50;
-            boton.TextAlign = ContentAlignment.MiddleLeft;
-            boton.Padding = new Padding(15, 0, 0, 0);
-            boton.Cursor = Cursors.Hand;
-            boton.Text = texto;
-            boton.UseVisualStyleBackColor = false;
         }
 
         #endregion
