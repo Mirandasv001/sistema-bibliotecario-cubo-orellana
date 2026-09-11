@@ -306,10 +306,12 @@ namespace BibliotecaApp
                 using var conexion = ConexionDB.ObtenerConexion();
 
                 // Obtener el primer Codigo disponible de ese t\u00edtulo.
-                string? codigo;
+                string? codigo = string.IsNullOrWhiteSpace(txtCodigoLibro.Text)
+                    ? null
+                    : txtCodigoLibro.Text.Trim();
                 try
                 {
-                    codigo = ObtenerCodigoDisponible(conexion, titulo);
+                    codigo ??= ObtenerCodigoDisponible(conexion, titulo);
                 }
                 catch (SqliteException ex)
                 {
@@ -336,11 +338,11 @@ namespace BibliotecaApp
                             INSERT INTO PrestamosExternos
                                 (NombreUsuario, Correo, DUI, Telefono, Direccion, TituloLibro,
                                  FechaPrestamo, PersonalPresto, FechaRenovacion, PersonalRenovo,
-                                 FechaEntrega, PersonalRecibio, EstadoLibro)
+                                 FechaEntrega, PersonalRecibio, EstadoLibro, CodigoLibro, FechaDevolucion)
                             VALUES
                                 ($nombre, $correo, $dui, $telefono, $direccion, $titulo,
                                  $fechaPrestamo, $personalPresto, $fechaRenovacion, $personalRenovo,
-                                 $fechaEntrega, $personalRecibio, $estado);";
+                                 $fechaEntrega, $personalRecibio, $estado, $codigo, NULL);";
 
                         insertar.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
                         insertar.Parameters.AddWithValue("$correo", txtCorreo.Text.Trim());
@@ -358,6 +360,7 @@ namespace BibliotecaApp
                         insertar.Parameters.AddWithValue("$personalRecibio", DBNull.Value);
                         insertar.Parameters.AddWithValue("$estado",
                             string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
+                        insertar.Parameters.AddWithValue("$codigo", codigo);
                         insertar.ExecuteNonQuery();
                     }
 
@@ -365,9 +368,15 @@ namespace BibliotecaApp
                     using (var marcar = conexion.CreateCommand())
                     {
                         marcar.Transaction = transaccion;
-                        marcar.CommandText = "UPDATE Libros SET Disponibilidad = 'Prestado' WHERE Codigo = $codigo;";
+                        marcar.CommandText = @"
+                            UPDATE Libros SET Disponibilidad = 'Prestado'
+                            WHERE Codigo = $codigo
+                              AND Titulo = $titulo
+                              AND Disponibilidad = 'Disponible';";
                         marcar.Parameters.AddWithValue("$codigo", codigo);
-                        marcar.ExecuteNonQuery();
+                        marcar.Parameters.AddWithValue("$titulo", titulo);
+                        if (marcar.ExecuteNonQuery() != 1)
+                            throw new InvalidOperationException("El ejemplar ya no está disponible o no coincide con el título seleccionado.");
                     }
 
                     transaccion.Commit();
@@ -391,6 +400,7 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LimpiarParaNuevo();
                 CargarPrestamosActivos();
+                NotificarCambioPrestamos();
             }
             catch (SqliteException ex)
             {
@@ -508,6 +518,7 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LimpiarParaNuevo();
                 CargarPrestamosActivos();
+                NotificarCambioPrestamos();
             }
             catch (Exception ex)
             {
@@ -621,7 +632,16 @@ namespace BibliotecaApp
                 using var conexion = ConexionDB.ObtenerConexion();
 
                 // Localizar el ejemplar f\u00edsico por t\u00edtulo + estado Prestado.
-                string? codigoLibro = ObtenerCodigoPrestado(conexion, titulo ?? "");
+                string? codigoLibro;
+                using (var obtenerCodigo = conexion.CreateCommand())
+                {
+                    obtenerCodigo.CommandText = "SELECT CodigoLibro FROM PrestamosExternos WHERE ID = $id;";
+                    obtenerCodigo.Parameters.AddWithValue("$id", id);
+                    codigoLibro = obtenerCodigo.ExecuteScalar()?.ToString();
+                }
+
+                // Compatibilidad con préstamos registrados antes de CodigoLibro.
+                codigoLibro ??= ObtenerCodigoPrestado(conexion, titulo ?? "");
 
                 using var transaccion = conexion.BeginTransaction();
                 try
@@ -632,13 +652,15 @@ namespace BibliotecaApp
                         actualizar.CommandText = @"
                             UPDATE PrestamosExternos
                             SET EstadoLibro    = 'Entregado',
-                                FechaEntrega   = $hoy,
+                                FechaDevolucion = $hoy,
                                 PersonalRecibio = $personal
-                            WHERE ID = $id;";
+                            WHERE ID = $id
+                              AND EstadoLibro IN ('Pendiente', 'Renovado');";
                         actualizar.Parameters.AddWithValue("$hoy", DateTime.Today.ToString("yyyy-MM-dd"));
                         actualizar.Parameters.AddWithValue("$personal", txtPersonalRecibio.Text.Trim());
                         actualizar.Parameters.AddWithValue("$id", id);
-                        actualizar.ExecuteNonQuery();
+                        if (actualizar.ExecuteNonQuery() != 1)
+                            throw new InvalidOperationException("El préstamo ya fue devuelto o ya no existe.");
                     }
 
                     if (!string.IsNullOrEmpty(codigoLibro))
@@ -661,6 +683,7 @@ namespace BibliotecaApp
                 MessageBox.Show("Devoluci\u00f3n registrada. El libro vuelve a estar disponible.",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 CargarPrestamosActivos();
+                NotificarCambioPrestamos();
             }
             catch (Exception ex)
             {
@@ -721,6 +744,7 @@ namespace BibliotecaApp
                 txtDireccion.Text = fila["Direccion"]?.ToString() ?? "";
 
                 string tituloLibro = fila["TituloLibro"]?.ToString() ?? "";
+                string codigoLibro = fila["CodigoLibro"]?.ToString() ?? "";
 
                 if (DateTime.TryParse(fila["FechaPrestamo"]?.ToString(), out var fp))
                     dtpFechaPrestamo.Value = fp;
@@ -749,6 +773,9 @@ namespace BibliotecaApp
 
                 // Seleccionar el t\u00edtulo en el ComboBox (por texto).
                 txtTituloLibro.Text = tituloLibro;
+                txtCodigoLibro.Text = codigoLibro;
+                if (!string.IsNullOrWhiteSpace(codigoLibro))
+                    BloquearPorCodigo();
 
                 _prstamoEditandoId = id;
                 btnRegistrar.Text = "Actualizar Pr\u00e9stamo";
@@ -845,6 +872,12 @@ namespace BibliotecaApp
             btnRegistrar.Text = "Registrar Pr\u00e9stamo";
             EstiloUI.EstilizarBotonPrimario(btnRegistrar);
             txtNombre.Focus();
+        }
+
+        private void NotificarCambioPrestamos()
+        {
+            if (FindForm() is Form1 principal)
+                principal.NotificarCambioPrestamos();
         }
     }
 }

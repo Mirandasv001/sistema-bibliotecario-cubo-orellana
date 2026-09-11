@@ -8,6 +8,7 @@
     {
         private readonly System.Windows.Forms.Timer _timerAlertas;
         private int _conteoMorosos = 0;
+        private System.Collections.Generic.Dictionary<string, UserControl> _vistasCacheadas = new System.Collections.Generic.Dictionary<string, UserControl>();
 
         private UcControlSala? _vistaSala;
         private UcInventario? _vistaInventario;
@@ -76,6 +77,31 @@
         // ------------------------------------------------------------------
         //  Navegación entre apartados
         // ------------------------------------------------------------------
+<<<<<<< HEAD
+        private void MostrarApartadoSala() =>
+            MostrarApartado(() => new UcControlSala(), btnSala);
+
+        private void MostrarApartadoInventario() =>
+            MostrarApartado(() => new UcInventario(), btnInventario);
+
+        private void MostrarApartadoPrestamos() =>
+            MostrarApartado(() => new UcPrestamosExternos(), btnPrestamos);
+
+        private void MostrarApartadoAlertas() =>
+            MostrarApartado(() => new UcAlertas(), btnAlertas);
+
+        private UserControl MostrarApartado(Func<UserControl> crearApartado, Button botonActivo)
+        {
+            ResaltarBoton(botonActivo);
+            string claveVista = botonActivo.Name;
+
+            if (!_vistasCacheadas.ContainsKey(claveVista))
+            {
+                UserControl nuevaVista = crearApartado();
+                nuevaVista.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(nuevaVista);
+                _vistasCacheadas[claveVista] = nuevaVista;
+=======
         private void MostrarApartadoSala()
         {
             if (_vistaSala == null)
@@ -83,6 +109,7 @@
                 _vistaSala = new UcControlSala();
                 _vistaSala.Dock = DockStyle.Fill;
                 panelContenedor.Controls.Add(_vistaSala);
+>>>>>>> abf6834d8d92c564587b6ab3ad8e614b672c9d42
             }
             OcultarVistas();
             _vistaSala.BringToFront();
@@ -90,6 +117,42 @@
             ResaltarBoton(btnSala);
         }
 
+<<<<<<< HEAD
+            _vistasCacheadas[claveVista].BringToFront();
+            ActualizarVista(_vistasCacheadas[claveVista]);
+            return _vistasCacheadas[claveVista];
+        }
+
+        private static void ActualizarVista(UserControl vista)
+        {
+            switch (vista)
+            {
+                case UcAlertas alertas:
+                    alertas.Actualizar();
+                    break;
+                case UcInventario inventario:
+                    inventario.Actualizar();
+                    break;
+                case UcPrestamosExternos prestamos:
+                    prestamos.Actualizar();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Sincroniza las vistas dependientes inmediatamente después de un
+        /// cambio de préstamo, sin esperar al siguiente tick del temporizador.
+        /// </summary>
+        public void NotificarCambioPrestamos()
+        {
+            ActualizarContadorAlertas();
+
+            if (_vistasCacheadas.TryGetValue(btnAlertas.Name, out var alertas))
+                ActualizarVista(alertas);
+
+            if (_vistasCacheadas.TryGetValue(btnInventario.Name, out var inventario))
+                ActualizarVista(inventario);
+=======
         private void MostrarApartadoInventario()
         {
             if (_vistaInventario == null)
@@ -138,6 +201,7 @@
             _vistaInventario?.Hide();
             _vistaPrestamos?.Hide();
             _vistaAlertas?.Hide();
+>>>>>>> abf6834d8d92c564587b6ab3ad8e614b672c9d42
         }
 
         // ------------------------------------------------------------------
@@ -220,8 +284,8 @@
                 comando.CommandText = @"
                     SELECT COUNT(*)
                     FROM PrestamosExternos
-                    WHERE EstadoLibro = 'Pendiente'
-                      AND julianday(FechaEntrega) < julianday('now');";
+                    WHERE EstadoLibro IN ('Pendiente', 'Renovado')
+                      AND date(FechaEntrega) < date('now', 'localtime');";
 
                 long total = (long)(comando.ExecuteScalar() ?? 0);
                 int nuevo = (int)Math.Min(total, 99);
