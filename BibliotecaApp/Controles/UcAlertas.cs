@@ -63,8 +63,8 @@ namespace BibliotecaApp
                            CAST(julianday('now') - julianday(FechaEntrega) AS INTEGER)
                                                                    AS [Días de Retraso]
                     FROM PrestamosExternos
-                    WHERE EstadoLibro = 'Pendiente'
-                      AND julianday(FechaEntrega) < julianday('now')
+                    WHERE EstadoLibro IN ('Pendiente', 'Renovado')
+                      AND date(FechaEntrega) < date('now', 'localtime')
                     ORDER BY julianday(FechaEntrega) ASC;";
 
                 var tabla = new DataTable();

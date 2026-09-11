@@ -34,6 +34,7 @@ namespace BibliotecaApp
             using var conexion = ObtenerConexion();
             CrearTablas(conexion);
             MigrarEsquemaControlSala(conexion);
+            MigrarEsquemaPrestamos(conexion);
             ImportarCatalogoDesdeCsv(conexion);
         }
 
@@ -132,6 +133,41 @@ namespace BibliotecaApp
             }
         }
 
+        /// <summary>
+        /// Agrega campos de versiones nuevas sin perder préstamos existentes.
+        /// Los préstamos antiguos permanecen sin código porque no hay forma
+        /// segura de deducir qué copia física les correspondía.
+        /// </summary>
+        private static void MigrarEsquemaPrestamos(SqliteConnection conexion)
+        {
+            var columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var info = conexion.CreateCommand())
+            {
+                info.CommandText = "PRAGMA table_info(PrestamosExternos);";
+                using var lector = info.ExecuteReader();
+                while (lector.Read())
+                    columnas.Add(lector.GetString(1));
+            }
+
+            if (!columnas.Contains("CodigoLibro"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN CodigoLibro TEXT;";
+                agregar.ExecuteNonQuery();
+            }
+
+            if (!columnas.Contains("FechaDevolucion"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN FechaDevolucion TEXT;";
+                agregar.ExecuteNonQuery();
+            }
+
+            using var indice = conexion.CreateCommand();
+            indice.CommandText = "CREATE INDEX IF NOT EXISTS IX_Prestamos_CodigoLibro ON PrestamosExternos(CodigoLibro);";
+            indice.ExecuteNonQuery();
+        }
+
         // ------------------------------------------------------------------
         //  Estructura
         // ------------------------------------------------------------------
@@ -176,7 +212,9 @@ namespace BibliotecaApp
                     PersonalRenovo   TEXT,
                     FechaEntrega     TEXT,
                     PersonalRecibio  TEXT,
-                    EstadoLibro      TEXT DEFAULT 'Pendiente'
+                    EstadoLibro      TEXT DEFAULT 'Pendiente',
+                    CodigoLibro      TEXT,
+                    FechaDevolucion  TEXT
                 );";
 
             using (var cmd = conexion.CreateCommand())
