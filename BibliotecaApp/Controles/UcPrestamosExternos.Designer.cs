@@ -181,7 +181,7 @@ namespace BibliotecaApp
 
             txtCodigoLibro.PlaceholderText = "Código del ejemplar — presione Enter";
             txtCodigoLibro.KeyPress += txtCodigoLibro_KeyPress;
-            txtCodigoLibro.ReadOnly = true;
+            txtCodigoLibro.ReadOnly = false;
             txtTituloLibro.ReadOnly = true;
             lblAvisoCodigo.AutoSize = true;
             lblAvisoCodigo.Font = EstiloUI.Etiqueta();

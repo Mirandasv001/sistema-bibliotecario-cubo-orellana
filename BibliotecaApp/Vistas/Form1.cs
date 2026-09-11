@@ -8,6 +8,7 @@
     {
         private readonly System.Windows.Forms.Timer _timerAlertas;
         private int _conteoMorosos = 0;
+        private System.Collections.Generic.Dictionary<string, UserControl> _vistasCacheadas = new System.Collections.Generic.Dictionary<string, UserControl>();
 
         public Form1()
         {
@@ -83,26 +84,53 @@
         private void MostrarApartadoAlertas() =>
             MostrarApartado(() => new UcAlertas(), btnAlertas);
 
-        /// <summary>
-        /// Limpia el panel central y carga el UserControl correspondiente.
-        /// Se libera (Dispose) el apartado anterior en lugar de solo Controls.Clear()
-        /// para no dejar controles huérfanos retenidos por sus event handlers.
-        /// Devuelve el control creado para poder inyectarle datos a continuación.
-        /// </summary>
         private UserControl MostrarApartado(Func<UserControl> crearApartado, Button botonActivo)
         {
             ResaltarBoton(botonActivo);
+            string claveVista = botonActivo.Name;
 
-            foreach (var anterior in panelContenedor.Controls.Cast<Control>().ToArray())
+            if (!_vistasCacheadas.ContainsKey(claveVista))
             {
-                panelContenedor.Controls.Remove(anterior);
-                anterior.Dispose();
+                UserControl nuevaVista = crearApartado();
+                nuevaVista.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(nuevaVista);
+                _vistasCacheadas[claveVista] = nuevaVista;
             }
 
-            UserControl apartado = crearApartado();
-            apartado.Dock = DockStyle.Fill;
-            panelContenedor.Controls.Add(apartado);
-            return apartado;
+            _vistasCacheadas[claveVista].BringToFront();
+            ActualizarVista(_vistasCacheadas[claveVista]);
+            return _vistasCacheadas[claveVista];
+        }
+
+        private static void ActualizarVista(UserControl vista)
+        {
+            switch (vista)
+            {
+                case UcAlertas alertas:
+                    alertas.Actualizar();
+                    break;
+                case UcInventario inventario:
+                    inventario.Actualizar();
+                    break;
+                case UcPrestamosExternos prestamos:
+                    prestamos.Actualizar();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Sincroniza las vistas dependientes inmediatamente después de un
+        /// cambio de préstamo, sin esperar al siguiente tick del temporizador.
+        /// </summary>
+        public void NotificarCambioPrestamos()
+        {
+            ActualizarContadorAlertas();
+
+            if (_vistasCacheadas.TryGetValue(btnAlertas.Name, out var alertas))
+                ActualizarVista(alertas);
+
+            if (_vistasCacheadas.TryGetValue(btnInventario.Name, out var inventario))
+                ActualizarVista(inventario);
         }
 
         // ------------------------------------------------------------------
@@ -185,8 +213,8 @@
                 comando.CommandText = @"
                     SELECT COUNT(*)
                     FROM PrestamosExternos
-                    WHERE EstadoLibro = 'Pendiente'
-                      AND julianday(FechaEntrega) < julianday('now');";
+                    WHERE EstadoLibro IN ('Pendiente', 'Renovado')
+                      AND date(FechaEntrega) < date('now', 'localtime');";
 
                 long total = (long)(comando.ExecuteScalar() ?? 0);
                 int nuevo = (int)Math.Min(total, 99);
