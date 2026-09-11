@@ -10,6 +10,11 @@
         private int _conteoMorosos = 0;
         private System.Collections.Generic.Dictionary<string, UserControl> _vistasCacheadas = new System.Collections.Generic.Dictionary<string, UserControl>();
 
+        private UcControlSala? _vistaSala;
+        private UcInventario? _vistaInventario;
+        private UcPrestamosExternos? _vistaPrestamos;
+        private UcAlertas? _vistaAlertas;
+
         public Form1()
         {
             // Refuerzo de codificación para cualquier salida de diagnóstico por consola.
@@ -72,6 +77,7 @@
         // ------------------------------------------------------------------
         //  Navegación entre apartados
         // ------------------------------------------------------------------
+<<<<<<< HEAD
         private void MostrarApartadoSala() =>
             MostrarApartado(() => new UcControlSala(), btnSala);
 
@@ -95,8 +101,23 @@
                 nuevaVista.Dock = DockStyle.Fill;
                 panelContenedor.Controls.Add(nuevaVista);
                 _vistasCacheadas[claveVista] = nuevaVista;
+=======
+        private void MostrarApartadoSala()
+        {
+            if (_vistaSala == null)
+            {
+                _vistaSala = new UcControlSala();
+                _vistaSala.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaSala);
+>>>>>>> abf6834d8d92c564587b6ab3ad8e614b672c9d42
             }
+            OcultarVistas();
+            _vistaSala.BringToFront();
+            _vistaSala.Show();
+            ResaltarBoton(btnSala);
+        }
 
+<<<<<<< HEAD
             _vistasCacheadas[claveVista].BringToFront();
             ActualizarVista(_vistasCacheadas[claveVista]);
             return _vistasCacheadas[claveVista];
@@ -131,6 +152,56 @@
 
             if (_vistasCacheadas.TryGetValue(btnInventario.Name, out var inventario))
                 ActualizarVista(inventario);
+=======
+        private void MostrarApartadoInventario()
+        {
+            if (_vistaInventario == null)
+            {
+                _vistaInventario = new UcInventario();
+                _vistaInventario.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaInventario);
+            }
+            OcultarVistas();
+            _vistaInventario.BringToFront();
+            _vistaInventario.Show();
+            ResaltarBoton(btnInventario);
+        }
+
+        private void MostrarApartadoPrestamos()
+        {
+            if (_vistaPrestamos == null)
+            {
+                _vistaPrestamos = new UcPrestamosExternos();
+                _vistaPrestamos.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaPrestamos);
+            }
+            OcultarVistas();
+            _vistaPrestamos.BringToFront();
+            _vistaPrestamos.Show();
+            ResaltarBoton(btnPrestamos);
+        }
+
+        private void MostrarApartadoAlertas()
+        {
+            if (_vistaAlertas == null)
+            {
+                _vistaAlertas = new UcAlertas();
+                _vistaAlertas.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaAlertas);
+            }
+            OcultarVistas();
+            _vistaAlertas.BringToFront();
+            _vistaAlertas.Show();
+            ResaltarBoton(btnAlertas);
+        }
+
+        private void OcultarVistas()
+        {
+            _vistaSala?.Hide();
+            _vistaInventario?.Hide();
+            _vistaPrestamos?.Hide();
+            _vistaAlertas?.Hide();
+>>>>>>> abf6834d8d92c564587b6ab3ad8e614b672c9d42
         }
 
         // ------------------------------------------------------------------
@@ -144,9 +215,9 @@
         /// </summary>
         public void CargarPrestamoDesdeInventario(string codigo, string titulo)
         {
-            UserControl apartado = MostrarApartado(() => new UcPrestamosExternos(), btnPrestamos);
-            if (apartado is UcPrestamosExternos prestamos)
-                prestamos.CargarDesdeInventario(codigo, titulo);
+            MostrarApartadoPrestamos();
+            if (_vistaPrestamos != null)
+                _vistaPrestamos.CargarDesdeInventario(codigo, titulo);
         }
 
         /// <summary>Muestra el manual rápido de uso de la aplicación.</summary>

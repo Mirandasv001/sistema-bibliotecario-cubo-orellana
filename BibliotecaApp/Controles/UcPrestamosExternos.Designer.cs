@@ -161,11 +161,14 @@ namespace BibliotecaApp
             tlpCampos.Controls.Add(lblLibro, 0, f); tlpCampos.Controls.Add(txtTituloLibro, 1, f);
             tlpCampos.SetColumnSpan(txtTituloLibro, 5); f++;
             tlpCampos.Controls.Add(lblFechaPrestamo, 0, f); tlpCampos.Controls.Add(dtpFechaPrestamo, 1, f);
+            dtpFechaPrestamo.Format = DateTimePickerFormat.Short;
             tlpCampos.Controls.Add(lblPersonalPresto, 2, f); tlpCampos.Controls.Add(txtPersonalPresto, 3, f);
             tlpCampos.Controls.Add(lblEstado, 4, f); tlpCampos.Controls.Add(txtEstado, 5, f); f++;
-            tlpCampos.Controls.Add(lblFechaEntrega, 0, f); tlpCampos.Controls.Add(dtpFechaEntrega, 1, f); f++;
+            tlpCampos.Controls.Add(lblFechaEntrega, 0, f); tlpCampos.Controls.Add(dtpFechaEntrega, 1, f);
+            dtpFechaEntrega.Format = DateTimePickerFormat.Short; f++;
             tlpCampos.Controls.Add(lblSeccionRenovacion, 0, f); tlpCampos.SetColumnSpan(lblSeccionRenovacion, 6); f++;
             tlpCampos.Controls.Add(lblFechaRenovacion, 0, f); tlpCampos.Controls.Add(dtpFechaRenovacion, 1, f);
+            dtpFechaRenovacion.Format = DateTimePickerFormat.Short;
             tlpCampos.Controls.Add(lblPersonalRenovo, 2, f); tlpCampos.Controls.Add(txtPersonalRenovo, 3, f); f++;
             tlpCampos.Controls.Add(lblPersonalRecibio, 0, f); tlpCampos.Controls.Add(txtPersonalRecibio, 1, f);
 
