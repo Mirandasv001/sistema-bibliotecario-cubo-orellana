@@ -1,7 +1,8 @@
 ﻿using System.ComponentModel;
+using System.Drawing;
+using System.Windows.Forms;
 
-
- //  Apartado importante 
+//  Apartado importante 
 namespace BibliotecaApp
 {
     partial class UcPrestamosExternos
@@ -80,6 +81,7 @@ namespace BibliotecaApp
             ((ISupportInitialize)splitPrestamos).BeginInit();
             splitPrestamos.Panel1.SuspendLayout();
             splitPrestamos.Panel2.SuspendLayout();
+
             //
             // panelEncabezado
             //
@@ -116,7 +118,7 @@ namespace BibliotecaApp
             pnlDatos.Controls.Add(grpDatos);
             pnlDatos.Dock = DockStyle.Top;
             pnlDatos.Name = "pnlDatos";
-            pnlDatos.Padding = new Padding(12, 8, 12, 8);
+            pnlDatos.Padding = new Padding(12, 4, 12, 4);
             // 
             // grpDatos
             // 
@@ -126,7 +128,7 @@ namespace BibliotecaApp
             grpDatos.Dock = DockStyle.Top;
             grpDatos.Font = EstiloUI.Etiqueta();
             grpDatos.Name = "grpDatos";
-            grpDatos.Padding = new Padding(12, 4, 12, 8);
+            grpDatos.Padding = new Padding(12, 2, 12, 4);
             grpDatos.TabStop = false;
             grpDatos.Text = "Registro de Préstamo Externo";
             // 
@@ -144,8 +146,6 @@ namespace BibliotecaApp
             tlpCampos.Dock = DockStyle.Fill;
             tlpCampos.Name = "tlpCampos";
             tlpCampos.RowCount = 11;
-            for (int i = 0; i < 11; i++)
-                tlpCampos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             int f = 0;
             tlpCampos.Controls.Add(lblSeccionUsuario, 0, f); tlpCampos.SetColumnSpan(lblSeccionUsuario, 6); f++;
@@ -179,7 +179,7 @@ namespace BibliotecaApp
             {
                 EstiloUI.EstilizarEntrada(c);
                 c.Dock = DockStyle.Fill;
-                c.Margin = new Padding(3, 0, 15, 6);
+                c.Margin = new Padding(3, 0, 15, 4);
             }
 
             txtCodigoLibro.PlaceholderText = "Código del ejemplar — presione Enter";
@@ -208,7 +208,7 @@ namespace BibliotecaApp
             pnlBotonesAccion.Controls.Add(flpBotones);
             pnlBotonesAccion.Dock = DockStyle.Top;
             pnlBotonesAccion.Name = "pnlBotonesAccion";
-            pnlBotonesAccion.Padding = new Padding(14, 6, 14, 6);
+            pnlBotonesAccion.Padding = new Padding(14, 6, 14, 0);
             pnlBotonesAccion.Size = new Size(980, 56);
             // 
             // flpBotones
@@ -259,6 +259,7 @@ namespace BibliotecaApp
             pnlContenedorGrid.Controls.Add(dgvPrestamos);
             pnlContenedorGrid.Dock = DockStyle.Fill;
             pnlContenedorGrid.Name = "pnlContenedorGrid";
+            pnlContenedorGrid.Padding = new Padding(0, 0, 0, 0);
             // 
             // splitPrestamos
             // 
@@ -268,7 +269,7 @@ namespace BibliotecaApp
             splitPrestamos.Name = "splitPrestamos";
             splitPrestamos.Orientation = Orientation.Horizontal;
             splitPrestamos.Size = new Size(980, 650);
-            splitPrestamos.SplitterDistance = 380;
+            splitPrestamos.SplitterDistance = 520; // <-- AQUI BAJAMOS LA TABLA
             splitPrestamos.SplitterWidth = 6;
             // 
             // splitPrestamos.Panel1
@@ -301,6 +302,7 @@ namespace BibliotecaApp
             dgvPrestamos.RowHeadersVisible = false;
             dgvPrestamos.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvPrestamos.ScrollBars = ScrollBars.Both;
+            dgvPrestamos.Margin = new Padding(0, 0, 0, 0);
             dgvPrestamos.AutoGenerateColumns = false;
             dgvPrestamos.CellFormatting += dgvPrestamos_CellFormatting;
             //
