@@ -41,94 +41,179 @@ namespace BibliotecaApp
         /// <summary>
         /// Migra bases creadas con el esquema anterior: si la tabla
         /// ControlUsuariosSala aún tiene la columna 'Taller', la elimina
-        /// preservando todas las filas.
+        /// preservando todas las filas. Además, añade la columna 'Estado' si no existe.
         /// </summary>
         private static void MigrarEsquemaControlSala(SqliteConnection conexion)
         {
-            bool existeTaller = false;
+            var columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using (var info = conexion.CreateCommand())
             {
                 info.CommandText = "PRAGMA table_info(ControlUsuariosSala);";
                 using var lector = info.ExecuteReader();
                 while (lector.Read())
                 {
-                    if (string.Equals(lector.GetString(1), "Taller", StringComparison.OrdinalIgnoreCase))
-                    {
-                        existeTaller = true;
-                        break;
-                    }
+                    columnas.Add(lector.GetString(1));
                 }
             }
 
-            if (!existeTaller) return;
-
-            try
+            // 1. Eliminar columna 'Taller' si existe (migración legacy)
+            if (columnas.Contains("Taller"))
             {
-                // SQLite 3.35+ admite DROP COLUMN directamente.
-                using var eliminar = conexion.CreateCommand();
-                eliminar.CommandText = "ALTER TABLE ControlUsuariosSala DROP COLUMN Taller;";
-                eliminar.ExecuteNonQuery();
-            }
-            catch (SqliteException)
-            {
-                // Plan B para versiones antiguas de SQLite: reconstruir la tabla.
-                using var transaccion = conexion.BeginTransaction();
                 try
                 {
-                    const string nuevaTabla = @"
-                        CREATE TABLE ControlUsuariosSala_Nueva (
-                            ID             INTEGER PRIMARY KEY AUTOINCREMENT,
-                            Fecha          TEXT,
-                            NombreUsuario  TEXT,
-                            Genero         TEXT,
-                            Edad           INTEGER,
-                            TituloLibro    TEXT,
-                            HoraEntrega    TEXT,
-                            HoraRecibido   TEXT,
-                            PersonalTurno  TEXT
-                        );";
-
-                    using (var crear = conexion.CreateCommand())
-                    {
-                        crear.Transaction = transaccion;
-                        crear.CommandText = nuevaTabla;
-                        crear.ExecuteNonQuery();
-                    }
-
-                    using (var copiar = conexion.CreateCommand())
-                    {
-                        copiar.Transaction = transaccion;
-                        copiar.CommandText = @"
-                            INSERT INTO ControlUsuariosSala_Nueva
-                                (ID, Fecha, NombreUsuario, Genero, Edad,
-                                 TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno)
-                            SELECT ID, Fecha, NombreUsuario, Genero, Edad,
-                                   TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno
-                            FROM ControlUsuariosSala;";
-                        copiar.ExecuteNonQuery();
-                    }
-
-                    using (var borrarVieja = conexion.CreateCommand())
-                    {
-                        borrarVieja.Transaction = transaccion;
-                        borrarVieja.CommandText = "DROP TABLE ControlUsuariosSala;";
-                        borrarVieja.ExecuteNonQuery();
-                    }
-
-                    using (var renombrar = conexion.CreateCommand())
-                    {
-                        renombrar.Transaction = transaccion;
-                        renombrar.CommandText =
-                            "ALTER TABLE ControlUsuariosSala_Nueva RENAME TO ControlUsuariosSala;";
-                        renombrar.ExecuteNonQuery();
-                    }
-
-                    transaccion.Commit();
+                    using var eliminar = conexion.CreateCommand();
+                    eliminar.CommandText = "ALTER TABLE ControlUsuariosSala DROP COLUMN Taller;";
+                    eliminar.ExecuteNonQuery();
                 }
-                catch
+                catch (SqliteException)
                 {
-                    transaccion.Rollback();
-                    throw;
+                    // Plan B para versiones antiguas de SQLite: reconstruir la tabla.
+                    using var transaccion = conexion.BeginTransaction();
+                    try
+                    {
+                        const string nuevaTabla = @"
+                            CREATE TABLE ControlUsuariosSala_Nueva (
+                                ID             INTEGER PRIMARY KEY AUTOINCREMENT,
+                                Fecha          TEXT,
+                                NombreUsuario  TEXT,
+                                Genero         TEXT,
+                                Edad           INTEGER,
+                                TituloLibro    TEXT,
+                                HoraEntrega    TEXT,
+                                HoraRecibido   TEXT,
+                                PersonalTurno  TEXT,
+                                Estado         TEXT DEFAULT 'Pendiente'
+                            );";
+
+                        using (var crear = conexion.CreateCommand())
+                        {
+                            crear.Transaction = transaccion;
+                            crear.CommandText = nuevaTabla;
+                            crear.ExecuteNonQuery();
+                        }
+
+                        using (var copiar = conexion.CreateCommand())
+                        {
+                            copiar.Transaction = transaccion;
+                            copiar.CommandText = @"
+                                INSERT INTO ControlUsuariosSala_Nueva
+                                    (ID, Fecha, NombreUsuario, Genero, Edad,
+                                     TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno, Estado)
+                                SELECT ID, Fecha, NombreUsuario, Genero, Edad,
+                                       TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno,
+                                       CASE WHEN HoraRecibido = 'En lectura' THEN 'Pendiente' ELSE 'Entregado' END
+                                FROM ControlUsuariosSala;";
+                            copiar.ExecuteNonQuery();
+                        }
+
+                        using (var borrarVieja = conexion.CreateCommand())
+                        {
+                            borrarVieja.Transaction = transaccion;
+                            borrarVieja.CommandText = "DROP TABLE ControlUsuariosSala;";
+                            borrarVieja.ExecuteNonQuery();
+                        }
+
+                        using (var renombrar = conexion.CreateCommand())
+                        {
+                            renombrar.Transaction = transaccion;
+                            renombrar.CommandText =
+                                "ALTER TABLE ControlUsuariosSala_Nueva RENAME TO ControlUsuariosSala;";
+                            renombrar.ExecuteNonQuery();
+                        }
+
+                        transaccion.Commit();
+                    }
+                    catch
+                    {
+                        transaccion.Rollback();
+                        throw;
+                    }
+                }
+            }
+
+            // 2. Añadir columna 'Estado' si no existe
+            if (!columnas.Contains("Estado"))
+            {
+                try
+                {
+                    using var agregar = conexion.CreateCommand();
+                    agregar.CommandText = "ALTER TABLE ControlUsuariosSala ADD COLUMN Estado TEXT DEFAULT 'Pendiente';";
+                    agregar.ExecuteNonQuery();
+
+                    // Actualizar registros existentes: 'En lectura' -> 'Pendiente', resto -> 'Entregado'
+                    using var actualizar = conexion.CreateCommand();
+                    actualizar.CommandText = @"
+                        UPDATE ControlUsuariosSala
+                        SET Estado = CASE
+                            WHEN HoraRecibido = 'En lectura' THEN 'Pendiente'
+                            ELSE 'Entregado'
+                        END
+                        WHERE Estado IS NULL OR Estado = '';";
+                    actualizar.ExecuteNonQuery();
+                }
+                catch (SqliteException)
+                {
+                    // Si falla ALTER TABLE (SQLite muy antiguo), reconstruir tabla completa
+                    using var transaccion = conexion.BeginTransaction();
+                    try
+                    {
+                        const string nuevaTabla = @"
+                            CREATE TABLE ControlUsuariosSala_Nueva (
+                                ID             INTEGER PRIMARY KEY AUTOINCREMENT,
+                                Fecha          TEXT,
+                                NombreUsuario  TEXT,
+                                Genero         TEXT,
+                                Edad           INTEGER,
+                                TituloLibro    TEXT,
+                                HoraEntrega    TEXT,
+                                HoraRecibido   TEXT,
+                                PersonalTurno  TEXT,
+                                Estado         TEXT DEFAULT 'Pendiente'
+                            );";
+
+                        using (var crear = conexion.CreateCommand())
+                        {
+                            crear.Transaction = transaccion;
+                            crear.CommandText = nuevaTabla;
+                            crear.ExecuteNonQuery();
+                        }
+
+                        using (var copiar = conexion.CreateCommand())
+                        {
+                            copiar.Transaction = transaccion;
+                            copiar.CommandText = @"
+                                INSERT INTO ControlUsuariosSala_Nueva
+                                    (ID, Fecha, NombreUsuario, Genero, Edad,
+                                     TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno, Estado)
+                                SELECT ID, Fecha, NombreUsuario, Genero, Edad,
+                                       TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno,
+                                       CASE WHEN HoraRecibido = 'En lectura' THEN 'Pendiente' ELSE 'Entregado' END
+                                FROM ControlUsuariosSala;";
+                            copiar.ExecuteNonQuery();
+                        }
+
+                        using (var borrarVieja = conexion.CreateCommand())
+                        {
+                            borrarVieja.Transaction = transaccion;
+                            borrarVieja.CommandText = "DROP TABLE ControlUsuariosSala;";
+                            borrarVieja.ExecuteNonQuery();
+                        }
+
+                        using (var renombrar = conexion.CreateCommand())
+                        {
+                            renombrar.Transaction = transaccion;
+                            renombrar.CommandText =
+                                "ALTER TABLE ControlUsuariosSala_Nueva RENAME TO ControlUsuariosSala;";
+                            renombrar.ExecuteNonQuery();
+                        }
+
+                        transaccion.Commit();
+                    }
+                    catch
+                    {
+                        transaccion.Rollback();
+                        throw;
+                    }
                 }
             }
         }
