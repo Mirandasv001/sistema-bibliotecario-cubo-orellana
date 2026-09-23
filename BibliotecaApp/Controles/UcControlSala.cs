@@ -13,6 +13,11 @@ namespace BibliotecaApp
         private int idSeleccionado;
 
         private const string EstadoEnLectura = "En lectura";
+        private const string EstadoPendiente = "Pendiente";
+        private const string EstadoEntregado = "Entregado";
+
+        /// <summary>Indica si estamos en modo edición (true) o visualización (false).</summary>
+        private bool modoEdicion = false;
 
         public UcControlSala()
         {
@@ -24,6 +29,18 @@ namespace BibliotecaApp
             dtpFecha.Value = DateTime.Today;
             CargarTitulosDeLibros();
             CargarRegistros();
+            ConfigurarEventosGrid();
+            // Los campos están habilitados por defecto para nueva inserción.
+            // El modo edición solo se activa al pulsar "Editar" con una fila seleccionada.
+            LimpiarCampos();
+        }
+
+        /// <summary>
+        /// Configura eventos adicionales del DataGridView (CellFormatting para colores).
+        /// </summary>
+        private void ConfigurarEventosGrid()
+        {
+            dgvRegistros.CellFormatting += DgvRegistros_CellFormatting;
         }
 
         // ------------------------------------------------------------------
@@ -60,6 +77,7 @@ namespace BibliotecaApp
         /// <summary>
         /// Muestra los registros del día actual más los que sigan 'En lectura'
         /// de días anteriores (para poder marcar su devolución).
+        /// Incluye la columna Estado para control visual.
         /// </summary>
         private void CargarRegistros()
         {
@@ -76,7 +94,8 @@ namespace BibliotecaApp
                            TituloLibro                 AS TituloLibro,
                            HoraEntrega                 AS HoraEntrega,
                            HoraRecibido                AS HoraRecibido,
-                           PersonalTurno               AS PersonalTurno
+                           PersonalTurno               AS PersonalTurno,
+                           Estado                      AS Estado
                     FROM ControlUsuariosSala
                     WHERE Fecha = $hoy OR HoraRecibido = $enLectura
                     ORDER BY ID DESC;";
@@ -90,12 +109,94 @@ namespace BibliotecaApp
                 }
 
                 dgvRegistros.DataSource = tabla;
+
+                // Añadir columna Estado programáticamente si no existe
+                if (!dgvRegistros.Columns.Contains("Estado"))
+                {
+                    var colEstado = new DataGridViewTextBoxColumn
+                    {
+                        Name = "Estado",
+                        DataPropertyName = "Estado",
+                        HeaderText = "Estado",
+                        MinimumWidth = 100,
+                        FillWeight = 9F,
+                        ReadOnly = true,
+                        SortMode = DataGridViewColumnSortMode.Automatic
+                    };
+                    dgvRegistros.Columns.Add(colEstado);
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error al cargar los registros: " + ex.Message,
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        /// <summary>
+        /// Evento CellFormatting: aplica colores a la columna Estado según su valor.
+        /// </summary>
+        private void DgvRegistros_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            // Solo formatear la columna Estado
+            if (dgvRegistros.Columns[e.ColumnIndex].Name != "Estado") return;
+
+            string? estado = e.Value?.ToString();
+            if (string.IsNullOrEmpty(estado)) return;
+
+            if (estado.Equals(EstadoPendiente, StringComparison.OrdinalIgnoreCase))
+            {
+                e.CellStyle.BackColor = Color.MistyRose;
+                e.CellStyle.ForeColor = Color.DarkRed;
+                e.CellStyle.SelectionBackColor = Color.LightCoral;
+                e.CellStyle.SelectionForeColor = Color.DarkRed;
+            }
+            else if (estado.Equals(EstadoEntregado, StringComparison.OrdinalIgnoreCase))
+            {
+                e.CellStyle.BackColor = Color.Honeydew;
+                e.CellStyle.ForeColor = Color.DarkGreen;
+                e.CellStyle.SelectionBackColor = Color.LightGreen;
+                e.CellStyle.SelectionForeColor = Color.DarkGreen;
+            }
+        }
+
+        /// <summary>
+        /// Alterna entre modo edición y modo solo lectura.
+        /// </summary>
+        /// <param name="modoEdicionActivo">True = habilitar edición (Guardar Cambios), False = solo lectura (Editar)</param>
+        private void EstablecerModoEdicion(bool modoEdicionActivo)
+        {
+            modoEdicion = modoEdicionActivo;
+
+            // Controles del formulario
+            txtNombre.ReadOnly = !modoEdicionActivo;
+            cboGenero.Enabled = modoEdicionActivo;
+            numEdad.Enabled = modoEdicionActivo;
+            dtpFecha.Enabled = modoEdicionActivo;
+            cboLibro.Enabled = modoEdicionActivo;
+            txtPersonal.ReadOnly = !modoEdicionActivo;
+
+            // Botón Modificar/Guardar
+            if (modoEdicionActivo)
+            {
+                btnModificar.Text = "Guardar Cambios";
+                EstiloUI.EstilizarBotonPrimario(btnModificar); // Color primario para guardar
+                btnModificar.Click -= btnModificar_Click;
+                btnModificar.Click += btnGuardarCambios_Click;
+            }
+            else
+            {
+                btnModificar.Text = "Editar";
+                EstiloUI.EstilizarBotonSecundario(btnModificar); // Color secundario para editar
+                btnModificar.Click -= btnGuardarCambios_Click;
+                btnModificar.Click += btnModificar_Click;
+            }
+
+            // Cuando se entra en modo edición, el foco va al primer campo editable
+            if (modoEdicionActivo)
+                txtNombre.Focus();
         }
 
         // ------------------------------------------------------------------
@@ -110,7 +211,15 @@ namespace BibliotecaApp
             if (fila.Cells["ID"].Value == null)
                 return;
 
-            idSeleccionado = Convert.ToInt32(fila.Cells["ID"].Value);
+            int nuevoId = Convert.ToInt32(fila.Cells["ID"].Value);
+
+            // Si se selecciona otra fila, salir del modo edición
+            if (modoEdicion && nuevoId != idSeleccionado)
+            {
+                EstablecerModoEdicion(false);
+            }
+
+            idSeleccionado = nuevoId;
 
             txtNombre.Text = fila.Cells["Usuario"].Value?.ToString() ?? string.Empty;
 
@@ -148,10 +257,10 @@ namespace BibliotecaApp
                 comando.CommandText = @"
                     INSERT INTO ControlUsuariosSala
                         (Fecha, NombreUsuario, Genero, Edad, TituloLibro,
-                         HoraEntrega, HoraRecibido, PersonalTurno)
+                         HoraEntrega, HoraRecibido, PersonalTurno, Estado)
                     VALUES
                         ($fecha, $nombre, $genero, $edad, $libro,
-                         $horaEntrega, $horaRecibido, $personal);";
+                         $horaEntrega, $horaRecibido, $personal, $estado);";
 
                 comando.Parameters.AddWithValue("$fecha", dtpFecha.Value.ToString("yyyy-MM-dd"));
                 comando.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
@@ -161,10 +270,11 @@ namespace BibliotecaApp
                 comando.Parameters.AddWithValue("$horaEntrega", DateTime.Now.ToString("HH:mm:ss"));
                 comando.Parameters.AddWithValue("$horaRecibido", EstadoEnLectura);
                 comando.Parameters.AddWithValue("$personal", txtPersonal.Text.Trim());
+                comando.Parameters.AddWithValue("$estado", EstadoPendiente);
 
                 comando.ExecuteNonQuery();
 
-                MessageBox.Show("Lectura registrada. El libro quedó como '" + EstadoEnLectura + "'.",
+                MessageBox.Show("Lectura registrada. El estado quedó como '" + EstadoPendiente + "'.",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LimpiarCampos();
                 CargarRegistros();
@@ -199,15 +309,17 @@ namespace BibliotecaApp
                 using var comando = conexion.CreateCommand();
                 comando.CommandText = @"
                     UPDATE ControlUsuariosSala
-                    SET HoraRecibido = $hora
+                    SET HoraRecibido = $hora,
+                        Estado = $estado
                     WHERE ID = $id;";
                 comando.Parameters.AddWithValue("$hora", DateTime.Now.ToString("HH:mm:ss"));
+                comando.Parameters.AddWithValue("$estado", EstadoEntregado);
                 comando.Parameters.AddWithValue("$id", idSeleccionado);
 
                 int afectados = comando.ExecuteNonQuery();
                 if (afectados > 0)
                 {
-                    MessageBox.Show("Devolución registrada correctamente.",
+                    MessageBox.Show("Devolución registrada correctamente. Estado: " + EstadoEntregado,
                         "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     CargarRegistros();
                     LimpiarCampos();
@@ -221,9 +333,20 @@ namespace BibliotecaApp
         }
 
         // ------------------------------------------------------------------
-        //  Modificar (UPDATE)
+        //  Editar: habilita los campos para edición (botón "Editar")
         // ------------------------------------------------------------------
         private void btnModificar_Click(object sender, EventArgs e)
+        {
+            if (!HayFilaSeleccionada()) return;
+
+            // Entrar en modo edición
+            EstablecerModoEdicion(true);
+        }
+
+        // ------------------------------------------------------------------
+        //  Guardar Cambios: persiste la edición en BD (botón "Guardar Cambios")
+        // ------------------------------------------------------------------
+        private void btnGuardarCambios_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
             if (!ValidarFormulario()) return;
@@ -254,12 +377,113 @@ namespace BibliotecaApp
 
                 MessageBox.Show("Registro modificado correctamente.",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Salir del modo edición y refrescar
+                EstablecerModoEdicion(false);
                 LimpiarCampos();
                 CargarRegistros();
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error al modificar el registro: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        //  Eliminar: borra el registro con autenticación de administrador
+        // ------------------------------------------------------------------
+        private void btnEliminar_Click(object sender, EventArgs e)
+        {
+            if (!HayFilaSeleccionada()) return;
+
+            // Crear diálogo de credenciales dinámicamente
+            using var dlg = new Form
+            {
+                Text = "Autenticación requerida",
+                Size = new Size(340, 260),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = EstiloUI.FondoClaro
+            };
+
+            var lblUsuario = EstiloUI.CrearEtiqueta("Usuario:");
+            lblUsuario.Location = new Point(20, 20);
+            lblUsuario.AutoSize = true;
+
+            var txtUsuario = new TextBox
+            {
+                Location = new Point(20, 50),
+                Width = 280,
+                Font = new Font(EstiloUI.FuenteBase, 10F)
+            };
+            EstiloUI.EstilizarEntrada(txtUsuario);
+
+            var lblClave = EstiloUI.CrearEtiqueta("Contraseña:");
+            lblClave.Location = new Point(20, 95);
+            lblClave.AutoSize = true;
+
+            var txtClave = new TextBox
+            {
+                Location = new Point(20, 125),
+                Width = 280,
+                Font = new Font(EstiloUI.FuenteBase, 10F),
+                PasswordChar = '•'
+            };
+            EstiloUI.EstilizarEntrada(txtClave);
+
+            var btnAceptar = new Button
+            {
+                Text = "Aceptar",
+                Location = new Point(110, 185),
+                Size = new Size(100, 35),
+                DialogResult = DialogResult.OK
+            };
+            EstiloUI.EstilizarBotonPrimario(btnAceptar);
+
+            dlg.Controls.AddRange(new Control[] { lblUsuario, txtUsuario, lblClave, txtClave, btnAceptar });
+            dlg.AcceptButton = btnAceptar;
+
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            const string usuarioValido = "UserCubo";
+            const string claveValida = "1234$";
+
+            if (txtUsuario.Text != usuarioValido || txtClave.Text != claveValida)
+            {
+                MessageBox.Show("Credenciales incorrectas. Acción cancelada.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Credenciales correctas: ejecutar DELETE
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var comando = conexion.CreateCommand();
+                comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
+                comando.Parameters.AddWithValue("$id", idSeleccionado);
+
+                int afectados = comando.ExecuteNonQuery();
+                if (afectados > 0)
+                {
+                    MessageBox.Show("Registro eliminado correctamente.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    CargarRegistros();
+                    LimpiarCampos();
+                }
+                else
+                {
+                    MessageBox.Show("No se encontró el registro para eliminar.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar el registro: " + ex.Message,
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -304,6 +528,18 @@ namespace BibliotecaApp
 
         private void LimpiarCampos()
         {
+            // Salir del modo edición si estaba activo
+            if (modoEdicion)
+                EstablecerModoEdicion(false);
+
+            // Asegurar que los campos estén HABILITADOS para nuevo ingreso
+            txtNombre.ReadOnly = false;
+            cboGenero.Enabled = true;
+            numEdad.Enabled = true;
+            dtpFecha.Enabled = true;
+            cboLibro.Enabled = true;
+            txtPersonal.ReadOnly = false;
+
             idSeleccionado = 0;
             dgvRegistros.ClearSelection();
             txtNombre.Clear();

@@ -42,6 +42,7 @@ namespace BibliotecaApp
             btnRegistrar = new Button();
             btnMarcarDevolucion = new Button();
             btnModificar = new Button();
+            btnEliminar = new Button();
             dgvRegistros = new DataGridView();
             colId = new DataGridViewTextBoxColumn();
             colFecha = new DataGridViewTextBoxColumn();
@@ -75,7 +76,8 @@ namespace BibliotecaApp
             lblTitulo.AutoSize = true;
             lblTitulo.Font = EstiloUI.TituloSeccion();
             lblTitulo.ForeColor = EstiloUI.TextoOscuro;
-            lblTitulo.Location = new Point(16, 10);
+            lblTitulo.Location = new Point(16, 16);
+            lblTitulo.Margin = new Padding(16, 16, 3, 0);
             lblTitulo.Name = "lblTitulo";
             lblTitulo.Text = "Control de Usuarios en Sala (Lectura)";
             // 
@@ -84,7 +86,8 @@ namespace BibliotecaApp
             lblSubtitulo.AutoSize = true;
             lblSubtitulo.Font = EstiloUI.Subtitulo();
             lblSubtitulo.ForeColor = Color.Gray;
-            lblSubtitulo.Location = new Point(19, 36);
+            lblSubtitulo.Location = new Point(19, 44);
+            lblSubtitulo.Margin = new Padding(19, 4, 3, 0);
             lblSubtitulo.Name = "lblSubtitulo";
             lblSubtitulo.Text = "Check-in al entrar a leer y check-out al devolver el libro";
             // 
@@ -154,6 +157,7 @@ namespace BibliotecaApp
             panelBotones.Controls.Add(btnRegistrar);
             panelBotones.Controls.Add(btnMarcarDevolucion);
             panelBotones.Controls.Add(btnModificar);
+            panelBotones.Controls.Add(btnEliminar);
             panelBotones.Dock = DockStyle.Top;
             panelBotones.Location = new Point(0, 230);
             panelBotones.Name = "panelBotones";
@@ -189,6 +193,16 @@ namespace BibliotecaApp
             btnModificar.UseVisualStyleBackColor = false;
             EstiloUI.EstilizarBotonSecundario(btnModificar);
             btnModificar.Click += btnModificar_Click;
+            // 
+            // btnEliminar
+            // 
+            btnEliminar.Location = new Point(760, 8);
+            btnEliminar.Name = "btnEliminar";
+            btnEliminar.Size = new Size(120, 38);
+            btnEliminar.Text = "Eliminar";
+            btnEliminar.UseVisualStyleBackColor = false;
+            EstiloUI.EstilizarBotonSecundario(btnEliminar);
+            btnEliminar.Click += btnEliminar_Click;
             // 
             // dgvRegistros
             // 
@@ -284,6 +298,7 @@ namespace BibliotecaApp
         private Button btnRegistrar;
         private Button btnMarcarDevolucion;
         private Button btnModificar;
+        private Button btnEliminar;
         private DataGridView dgvRegistros;
         private DataGridViewTextBoxColumn colId;
         private DataGridViewTextBoxColumn colFecha;
