@@ -75,9 +75,8 @@ namespace BibliotecaApp
         }
 
         /// <summary>
-        /// Muestra los registros del día actual más los que sigan 'En lectura'
-        /// de días anteriores (para poder marcar su devolución).
-        /// Incluye la columna Estado para control visual.
+        /// Muestra TODOS los registros históricos de la tabla ControlUsuariosSala
+        /// sin filtro de fecha ni estado, para permitir gestión completa (incl. borrado).
         /// </summary>
         private void CargarRegistros()
         {
@@ -97,10 +96,7 @@ namespace BibliotecaApp
                            PersonalTurno               AS PersonalTurno,
                            Estado                      AS Estado
                     FROM ControlUsuariosSala
-                    WHERE Fecha = $hoy OR HoraRecibido = $enLectura
                     ORDER BY ID DESC;";
-                comando.Parameters.AddWithValue("$hoy", DateTime.Today.ToString("yyyy-MM-dd"));
-                comando.Parameters.AddWithValue("$enLectura", EstadoEnLectura);
 
                 var tabla = new DataTable();
                 using (var lector = comando.ExecuteReader())
