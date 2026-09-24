@@ -65,7 +65,8 @@ namespace BibliotecaApp
             // 
             panelEncabezado.BackColor = EstiloUI.Blanco;
             panelEncabezado.Controls.Add(lblTitulo);
-            panelEncabezado.Controls.Add(lblSubtitulo);
+            // lblSubtitulo ocultado por diseño: no se agrega al panel y se marca invisible
+            lblSubtitulo.Visible = false;
             panelEncabezado.Dock = DockStyle.Top;
             panelEncabezado.Location = new Point(0, 0);
             panelEncabezado.Name = "panelEncabezado";
@@ -79,7 +80,7 @@ namespace BibliotecaApp
             lblTitulo.Location = new Point(16, 16);
             lblTitulo.Margin = new Padding(16, 16, 3, 0);
             lblTitulo.Name = "lblTitulo";
-            lblTitulo.Text = "Control de Usuarios en Sala (Lectura)";
+            lblTitulo.Text = "Control de usuarios en sala de lectura";
             // 
             // lblSubtitulo
             // 
@@ -149,6 +150,7 @@ namespace BibliotecaApp
             numEdad.Maximum = 120;
             numEdad.Minimum = 1;
             numEdad.Value = 12;
+            cboLibro.DropDownStyle = ComboBoxStyle.DropDown;
             cboLibro.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cboLibro.AutoCompleteSource = AutoCompleteSource.ListItems;
             // 
