@@ -30,6 +30,7 @@ namespace BibliotecaApp
             CargarTitulosDeLibros();
             CargarRegistros();
             ConfigurarEventosGrid();
+            ConfigurarDragScroll(); // ← Habilita arrastre vertical con cursor
             // Los campos están habilitados por defecto para nueva inserción.
             // El modo edición solo se activa al pulsar "Editar" con una fila seleccionada.
             LimpiarCampos();
@@ -546,6 +547,113 @@ namespace BibliotecaApp
             txtPersonal.Clear();
             dtpFecha.Value = DateTime.Today;
             txtNombre.Focus();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // DRAG SCROLL — Arrastre vertical del DataGridView (estilo táctil)
+        // ═══════════════════════════════════════════════════════════════════
+
+        private bool _dragScrollActivo;
+        private Point _dragScrollInicio;
+        private int _scrollOffsetInicial;
+
+        /// <summary>
+        /// Suscribe los eventos de ratón al DataGridView para habilitar
+        /// el desplazamiento por arrastre (drag scroll) con cambio de cursor.
+        /// </summary>
+        private void ConfigurarDragScroll()
+        {
+            dgvRegistros.MouseDown += DgvRegistros_MouseDown;
+            dgvRegistros.MouseMove += DgvRegistros_MouseMove;
+            dgvRegistros.MouseUp += DgvRegistros_MouseUp;
+            dgvRegistros.MouseLeave += DgvRegistros_MouseLeave;
+        }
+
+        private void DgvRegistros_MouseDown(object? sender, MouseEventArgs e)
+        {
+            // Solo botón izquierdo
+            if (e.Button != MouseButtons.Left) return;
+            if (dgvRegistros.Rows.Count == 0) return;
+
+            // Verificar que hay scroll vertical disponible
+            var vScrollProp = dgvRegistros.GetType().GetProperty("VerticalScrollBar",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var scrollBar = vScrollProp?.GetValue(dgvRegistros) as ScrollBar;
+            if (scrollBar == null || !scrollBar.Visible) return;
+
+            // SOLO iniciar drag-scroll si se hace click en:
+            // - Fondo vacío (HitTestType.None)
+            // - Encabezado de fila (HitTestType.RowHeader)
+            // NO en celdas (para no interferir con selección)
+            var hit = dgvRegistros.HitTest(e.X, e.Y);
+            if (hit.Type != DataGridViewHitTestType.None && hit.Type != DataGridViewHitTestType.RowHeader)
+                return;
+
+            _dragScrollActivo = true;
+            _dragScrollInicio = e.Location;
+            _scrollOffsetInicial = GetVerticalScrollOffset();
+            dgvRegistros.Cursor = Cursors.SizeNS;
+            dgvRegistros.Capture = true; // Capturar ratón para recibir eventos aunque salga del control
+        }
+
+        private void DgvRegistros_MouseMove(object? sender, MouseEventArgs e)
+        {
+            if (!_dragScrollActivo) return;
+
+            // Scroll suave por píxeles (no por filas)
+            int deltaY = _dragScrollInicio.Y - e.Location.Y;
+            int nuevoOffset = _scrollOffsetInicial + deltaY;
+
+            // Clampear al rango válido del scroll interno
+            int maxOffset = GetMaxVerticalScrollOffset();
+            nuevoOffset = Math.Clamp(nuevoOffset, 0, maxOffset);
+
+            SetVerticalScrollOffset(nuevoOffset);
+        }
+
+        private void DgvRegistros_MouseUp(object? sender, MouseEventArgs e)
+        {
+            if (!_dragScrollActivo) return;
+
+            _dragScrollActivo = false;
+            dgvRegistros.Cursor = Cursors.Default;
+            dgvRegistros.Capture = false;
+        }
+
+        private void DgvRegistros_MouseLeave(object? sender, EventArgs e)
+        {
+            if (_dragScrollActivo && !dgvRegistros.Capture)
+            {
+                _dragScrollActivo = false;
+                dgvRegistros.Cursor = Cursors.Default;
+            }
+        }
+
+        /// <summary>Obtiene el offset vertical actual en píxeles (propiedad interna).</summary>
+        private int GetVerticalScrollOffset()
+        {
+            var prop = dgvRegistros.GetType().GetProperty("VerticalOffset",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return (int)(prop?.GetValue(dgvRegistros) ?? 0);
+        }
+
+        /// <summary>Obtiene el offset vertical máximo en píxeles.</summary>
+        private int GetMaxVerticalScrollOffset()
+        {
+            var prop = dgvRegistros.GetType().GetProperty("VerticalScrollBar",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var scrollBar = prop?.GetValue(dgvRegistros) as ScrollBar;
+            if (scrollBar == null) return 0;
+            return Math.Max(0, scrollBar.Maximum - scrollBar.LargeChange + 1);
+        }
+
+        /// <summary>Establece el offset vertical en píxeles (propiedad interna).</summary>
+        private void SetVerticalScrollOffset(int offset)
+        {
+            var prop = dgvRegistros.GetType().GetProperty("VerticalOffset",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            prop?.SetValue(dgvRegistros, offset);
+            dgvRegistros.Invalidate(); // Forzar repintado
         }
     }
 }
