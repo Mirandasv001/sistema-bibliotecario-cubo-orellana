@@ -100,13 +100,14 @@ namespace BibliotecaApp
             lblTitulo.Location = new Point(16, 10);
             lblTitulo.Name = "lblTitulo";
             lblTitulo.Text = "Préstamos de Libros para Llevar a Casa";
+            lblTitulo.Visible = false;
             // 
             // lblSubtitulo
             // 
             lblSubtitulo.AutoSize = true;
-            lblSubtitulo.Font = EstiloUI.Subtitulo();
-            lblSubtitulo.ForeColor = Color.Gray;
-            lblSubtitulo.Location = new Point(19, 36);
+            lblSubtitulo.Font = EstiloUI.TituloSeccion();
+            lblSubtitulo.ForeColor = EstiloUI.FondoOscuro;
+            lblSubtitulo.Location = new Point(14, 24);
             lblSubtitulo.Name = "lblSubtitulo";
             lblSubtitulo.Text = "Gestión de préstamos externos, renovaciones y devoluciones";
             //
@@ -130,7 +131,7 @@ namespace BibliotecaApp
             grpDatos.Name = "grpDatos";
             grpDatos.Padding = new Padding(12, 2, 12, 4);
             grpDatos.TabStop = false;
-            grpDatos.Text = "Registro de Préstamo Externo";
+            grpDatos.Text = "Gestión de préstamos externos";
             // 
             // tlpCampos
             // 
