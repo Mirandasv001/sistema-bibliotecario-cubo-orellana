@@ -38,7 +38,8 @@ namespace BibliotecaApp
             // 
             panelEncabezado.BackColor = EstiloUI.Blanco;
             panelEncabezado.Controls.Add(lblTitulo);
-            panelEncabezado.Controls.Add(lblSubtitulo);
+            // lblSubtitulo ocultado por diseño
+            lblSubtitulo.Visible = false;
             panelEncabezado.Dock = DockStyle.Top;
             panelEncabezado.Location = new Point(0, 0);
             panelEncabezado.Size = new Size(980, 62);
@@ -47,10 +48,10 @@ namespace BibliotecaApp
             // 
             lblTitulo.AutoSize = true;
             lblTitulo.Font = EstiloUI.TituloSeccion();
-            lblTitulo.ForeColor = EstiloUI.TextoOscuro;
+            lblTitulo.ForeColor = EstiloUI.FondoOscuro;
             lblTitulo.Location = new Point(16, 10);
             lblTitulo.Name = "lblTitulo";
-            lblTitulo.Text = "Alertas de Préstamos Vencidos";
+            lblTitulo.Text = "Alertas de préstamos vencidos";
             // 
             // lblSubtitulo
             // 
