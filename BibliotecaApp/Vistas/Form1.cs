@@ -12,6 +12,7 @@
         private UcInventario? _vistaInventario;
         private UcPrestamosExternos? _vistaPrestamos;
         private UcAlertas? _vistaAlertas;
+        private UcEstadisticas? _vistaEstadisticas;
 
         public Form1()
         {
@@ -28,6 +29,7 @@
             ConfigurarBotonMenu(btnPrestamos, "Préstamos Externos");
             ConfigurarBotonMenu(btnAlertas, "Alertas de Vencidos");
             ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
+            ConfigurarBotonMenu(btnEstadisticas, "Estadísticas");
 
             // Suscripción de eventos de navegación
             btnSala.Click += (_, _) => MostrarApartadoSala();
@@ -36,6 +38,7 @@
             btnAlertas.Click += (_, _) => MostrarApartadoAlertas();
             btnAlertas.Paint += btnAlertas_Paint;
             btnGuiaUso.Click += (_, _) => btnGuiaUso_Click();
+            btnEstadisticas.Click += (_, _) => MostrarApartadoEstadisticas();
 
             // Timer de notificaciones: consulta los morosos al arrancar y cada intervalo.
             _timerAlertas = new System.Windows.Forms.Timer { Interval = 30000 };
@@ -134,12 +137,28 @@
             ResaltarBoton(btnAlertas);
         }
 
+        private void MostrarApartadoEstadisticas()
+        {
+            if (_vistaEstadisticas == null)
+            {
+                _vistaEstadisticas = new UcEstadisticas();
+                _vistaEstadisticas.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaEstadisticas);
+            }
+            OcultarVistas();
+            _vistaEstadisticas.BringToFront();
+            _vistaEstadisticas.Show();
+            _vistaEstadisticas.CargarDatos(); // Cargar datos al mostrar
+            ResaltarBoton(btnEstadisticas);
+        }
+
         private void OcultarVistas()
         {
             _vistaSala?.Hide();
             _vistaInventario?.Hide();
             _vistaPrestamos?.Hide();
             _vistaAlertas?.Hide();
+            _vistaEstadisticas?.Hide();
         }
 
         /// <summary>
@@ -208,7 +227,7 @@
 
         private void ResaltarBoton(Button botonActivo)
         {
-            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas })
+            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas, btnEstadisticas })
             {
                 bool activo = ReferenceEquals(boton, botonActivo);
                 boton.BackColor = activo ? EstiloUI.HoverOscuro : EstiloUI.FondoOscuro;
