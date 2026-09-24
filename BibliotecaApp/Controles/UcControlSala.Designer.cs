@@ -53,12 +53,16 @@ namespace BibliotecaApp
             colHoraEntrega = new DataGridViewTextBoxColumn();
             colHoraRecibido = new DataGridViewTextBoxColumn();
             colPersonalTurno = new DataGridViewTextBoxColumn();
+            splitSala = new SplitContainer();
             panelEncabezado.SuspendLayout();
             grpDatos.SuspendLayout();
             tlpCampos.SuspendLayout();
             ((ISupportInitialize)numEdad).BeginInit();
             panelBotones.SuspendLayout();
             ((ISupportInitialize)dgvRegistros).BeginInit();
+            ((ISupportInitialize)splitSala).BeginInit();
+            splitSala.Panel1.SuspendLayout();
+            splitSala.Panel2.SuspendLayout();
             SuspendLayout();
             // 
             // panelEncabezado
@@ -161,7 +165,6 @@ namespace BibliotecaApp
             panelBotones.Controls.Add(btnModificar);
             panelBotones.Controls.Add(btnEliminar);
             panelBotones.Dock = DockStyle.Top;
-            panelBotones.Location = new Point(0, 230);
             panelBotones.Name = "panelBotones";
             panelBotones.Padding = new Padding(14, 6, 14, 6);
             panelBotones.Size = new Size(980, 56);
@@ -215,6 +218,7 @@ namespace BibliotecaApp
             dgvRegistros.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvRegistros.BackgroundColor = EstiloUI.Blanco;
             dgvRegistros.BorderStyle = BorderStyle.None;
+            dgvRegistros.ScrollBars = ScrollBars.Both;
             dgvRegistros.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvRegistros.Columns.AddRange(new DataGridViewColumn[]
             {
@@ -241,13 +245,35 @@ namespace BibliotecaApp
             ConfigurarColumna(colHoraRecibido, "HoraRecibido", "Hora Recibido", 105, 10F);
             ConfigurarColumna(colPersonalTurno, "PersonalTurno", "Personal", 130, 8F);
             // 
+            // splitSala
+            // 
+            splitSala.Dock = DockStyle.Fill;
+            splitSala.FixedPanel = FixedPanel.Panel1;
+            splitSala.Location = new Point(0, 0);
+            splitSala.Name = "splitSala";
+            splitSala.Orientation = Orientation.Horizontal;
+            splitSala.Size = new Size(980, 600);
+            splitSala.SplitterDistance = 300;
+            splitSala.SplitterWidth = 6;
+            // 
+            // splitSala.Panel1
+            // 
+            splitSala.Panel1.BackColor = EstiloUI.FondoClaro;
+            splitSala.Panel1.AutoScroll = true;
+            splitSala.Panel1.Controls.Add(panelBotones);
+            splitSala.Panel1.Controls.Add(grpDatos);
+            splitSala.Panel1.Controls.Add(panelEncabezado);
+            // 
+            // splitSala.Panel2
+            // 
+            splitSala.Panel2.AutoScroll = false;
+            splitSala.Panel2.BackColor = EstiloUI.FondoClaro;
+            splitSala.Panel2.Controls.Add(dgvRegistros);
+            // 
             // UcControlSala
             // 
             BackColor = EstiloUI.FondoClaro;
-            Controls.Add(dgvRegistros);
-            Controls.Add(panelBotones);
-            Controls.Add(grpDatos);
-            Controls.Add(panelEncabezado);
+            Controls.Add(splitSala);
             Name = "UcControlSala";
             Size = new Size(980, 600);
             Load += UcControlSala_Load;
@@ -260,6 +286,10 @@ namespace BibliotecaApp
             ((ISupportInitialize)numEdad).EndInit();
             panelBotones.ResumeLayout(false);
             ((ISupportInitialize)dgvRegistros).EndInit();
+            splitSala.Panel2.ResumeLayout(false);
+            splitSala.Panel1.ResumeLayout(false);
+            splitSala.Panel1.PerformLayout();
+            ((ISupportInitialize)splitSala).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -311,5 +341,6 @@ namespace BibliotecaApp
         private DataGridViewTextBoxColumn colHoraEntrega;
         private DataGridViewTextBoxColumn colHoraRecibido;
         private DataGridViewTextBoxColumn colPersonalTurno;
+        private SplitContainer splitSala;
     }
 }
