@@ -22,6 +22,7 @@ namespace BibliotecaApp
             ComponentResourceManager resources = new ComponentResourceManager(typeof(Form1));
             panelMenu = new Panel();
             panelNav = new Panel();
+            btnEstadisticas = new Button();
             btnGuiaUso = new Button();
             btnAlertas = new Button();
             btnPrestamos = new Button();
@@ -55,6 +56,7 @@ namespace BibliotecaApp
             // panelNav
             // 
             panelNav.BackColor = Color.FromArgb(27, 36, 55);
+            panelNav.Controls.Add(btnEstadisticas);
             panelNav.Controls.Add(btnGuiaUso);
             panelNav.Controls.Add(btnAlertas);
             panelNav.Controls.Add(btnPrestamos);
@@ -67,12 +69,19 @@ namespace BibliotecaApp
             panelNav.Size = new Size(220, 452);
             panelNav.TabIndex = 0;
             // 
+            // btnEstadisticas
+            // 
+            btnEstadisticas.Location = new Point(0, 0);
+            btnEstadisticas.Name = "btnEstadisticas";
+            btnEstadisticas.Size = new Size(75, 23);
+            btnEstadisticas.TabIndex = 0;
+            // 
             // btnGuiaUso
             // 
             btnGuiaUso.Location = new Point(0, 0);
             btnGuiaUso.Name = "btnGuiaUso";
             btnGuiaUso.Size = new Size(75, 23);
-            btnGuiaUso.TabIndex = 0;
+            btnGuiaUso.TabIndex = 1;
             // 
             // btnAlertas
             // 
@@ -213,6 +222,7 @@ namespace BibliotecaApp
         private Button btnInventario;
         private Button btnAlertas;
         private Button btnGuiaUso;
+        private Button btnEstadisticas;
         private Label lblVersion;
         private Button btnCerrarSesion;
         private Panel panelContenedor;

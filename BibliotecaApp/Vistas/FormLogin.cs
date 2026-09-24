@@ -87,12 +87,22 @@ namespace BibliotecaApp
 
         private void btnIngresar_Click(object sender, EventArgs e)
         {
-            if (txtUsuario.Text == "UserCubo" && txtPassword.Text == "1234$")
+            string usuario = txtUsuario.Text.Trim();
+            string password = txtPassword.Text;
+
+            // Validar usuario UserCubo (Operador)
+            if (usuario == "UserCubo" && password == "1234$")
             {
-                Form1 form1 = new Form1();
-                form1.FormClosed += (_, _) => Application.Exit();
-                form1.Show();
-                this.Hide();
+                SesionGlobal.NombreUsuario = "UserCubo";
+                SesionGlobal.Rol = "Operador";
+                AbrirFormularioPrincipal();
+            }
+            // Validar usuario AdminCubo (Admin)
+            else if (usuario == "AdminCubo" && password == "Admin123$")
+            {
+                SesionGlobal.NombreUsuario = "AdminCubo";
+                SesionGlobal.Rol = "Admin";
+                AbrirFormularioPrincipal();
             }
             else
             {
@@ -104,6 +114,14 @@ namespace BibliotecaApp
                 txtPassword.Clear();
                 txtPassword.Focus();
             }
+        }
+
+        private void AbrirFormularioPrincipal()
+        {
+            Form1 form1 = new Form1();
+            form1.FormClosed += (_, _) => Application.Exit();
+            form1.Show();
+            this.Hide();
         }
     }
 }
