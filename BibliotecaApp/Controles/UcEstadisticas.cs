@@ -290,6 +290,7 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Evento Paint: dibuja las barras, valores y etiquetas nativamente con escalado correcto.
+        /// Barras: Total (azul oscuro), Masculino (azul claro), Femenino (rojo coral).
         /// </summary>
         private void PnlGrafica_Paint(object sender, PaintEventArgs e)
         {
@@ -308,9 +309,11 @@ namespace BibliotecaApp
             int baseY = clientRect.Height - paddingBottom; // Línea base (eje X)
 
             // Colores
-            Color colorMasc = Color.FromArgb(52, 152, 219);   // Azul
+            Color colorTotal = Color.FromArgb(27, 43, 66);     // #1B2B42 - Azul oscuro institucional
+            Color colorMasc = Color.FromArgb(52, 152, 219);    // Azul celeste
             Color colorFem = Color.FromArgb(231, 76, 60);      // Rojo coral
             Color colorEje = Color.FromArgb(180, 180, 180);
+            Color colorGrid = Color.FromArgb(230, 230, 230);   // Gris extra claro para gridlines
             Color colorTexto = EstiloUI.TextoOscuro;
             Color colorTextoSecundario = Color.FromArgb(120, 130, 140);
 
@@ -323,11 +326,13 @@ namespace BibliotecaApp
             // Pinceles
             using var brushTexto = new SolidBrush(colorTexto);
             using var brushTextoSec = new SolidBrush(colorTextoSecundario);
+            using var brushTotal = new SolidBrush(colorTotal);
             using var brushMasc = new SolidBrush(colorMasc);
             using var brushFem = new SolidBrush(colorFem);
 
-            // Pluma para eje
+            // Plumas
             using var penEje = new Pen(colorEje, 1);
+            using var penGrid = new Pen(colorGrid, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
 
             // Título de la gráfica
             string tituloGrafica = "Visitas a Sala por Género";
@@ -346,29 +351,47 @@ namespace BibliotecaApp
                 return;
             }
 
-            // ---- CONFIGURACIÓN DE BARRAS ----
-            int numBarras = 2;
-            int espacioEntreBarras = 40;
-            int anchoBarra = Math.Min(80, (areaWidth - espacioEntreBarras * (numBarras + 1)) / numBarras);
-            int inicioX = paddingLeft + (areaWidth - (anchoBarra * numBarras + espacioEntreBarras * (numBarras - 1))) / 2;
+            // ---- CÁLCULO DE ESCALA BASADO EN TOTAL ----
+            int total = _valorMasculino + _valorFemenino; // Total calculado internamente solo para dibujo
+            int maxValor = Math.Max(total, Math.Max(_valorMasculino, _valorFemenino));
 
-            int maxValor = Math.Max(_valorMasculino, _valorFemenino);
+            // Espacio reservado arriba para el texto del valor (altura de fuente + gap)
+            int espacioTextoArriba = (int)Math.Ceiling(g.MeasureString("0", fontValor).Height) + 8; // ~19 + 8 = ~27px
+            const int margenSeguridad = 8; // margen extra de seguridad visual
+            int margenSuperiorTotal = espacioTextoArriba + margenSeguridad; // ~35px total
 
-            // Margen superior estricto (espacio para el número encima de la barra más alta)
-            const int margenSuperior = 40;
-            int maxAlturaBarra = areaHeight - margenSuperior;
+            // Altura máxima real que puede tener una barra (respetando margen superior)
+            int maxAlturaBarra = areaHeight - margenSuperiorTotal;
             if (maxAlturaBarra < 10) maxAlturaBarra = 10; // seguridad
 
             float escalaY = maxValor > 0 ? (float)maxAlturaBarra / maxValor : 1f;
 
+            // Y mínimo que puede alcanzar el tope de una barra (respeta paddingTop + margenSuperiorTotal)
+            int minTopY = paddingTop + margenSuperiorTotal;
+
+            // ---- GRIDLINES HORIZONTALES (fondo profesional) ----
+            int numGridLines = 4;
+            for (int i = 1; i <= numGridLines; i++)
+            {
+                float y = baseY - (maxAlturaBarra * i / (float)numGridLines);
+                g.DrawLine(penGrid, paddingLeft, y, paddingLeft + areaWidth, y);
+            }
+
             // Dibujar eje X (línea base)
             g.DrawLine(penEje, paddingLeft, baseY, paddingLeft + areaWidth, baseY);
 
-            // Datos de las barras
+            // ---- CONFIGURACIÓN DE 3 BARRAS CENTRADAS ----
+            int numBarras = 3;
+            int espacioEntreBarras = 30;
+            int anchoBarra = Math.Min(70, (areaWidth - espacioEntreBarras * (numBarras + 1)) / numBarras);
+            int inicioX = paddingLeft + (areaWidth - (anchoBarra * numBarras + espacioEntreBarras * (numBarras - 1))) / 2;
+
+            // Datos de las 3 barras: Total, Masculino, Femenino
             var barras = new[]
             {
-                new { Label = "Masculino", Valor = _valorMasculino, Brush = brushMasc, X = inicioX },
-                new { Label = "Femenino", Valor = _valorFemenino, Brush = brushFem, X = inicioX + anchoBarra + espacioEntreBarras }
+                new { Label = "Total", Valor = total, Brush = brushTotal, X = inicioX },
+                new { Label = "Masculino", Valor = _valorMasculino, Brush = brushMasc, X = inicioX + anchoBarra + espacioEntreBarras },
+                new { Label = "Femenino", Valor = _valorFemenino, Brush = brushFem, X = inicioX + 2 * (anchoBarra + espacioEntreBarras) }
             };
 
             foreach (var barra in barras)
@@ -378,6 +401,8 @@ namespace BibliotecaApp
                 if (alturaBarra > maxAlturaBarra) alturaBarra = maxAlturaBarra;
 
                 int topY = baseY - alturaBarra;
+                // Garantía dura: la barra nunca sube más allá de minTopY (respeta margen para texto)
+                if (topY < minTopY) topY = minTopY;
 
                 // Rectángulo de la barra
                 var rectBarra = new Rectangle(barra.X, topY, anchoBarra, alturaBarra);
@@ -394,7 +419,7 @@ namespace BibliotecaApp
                     string valorStr = barra.Valor.ToString("N0");
                     SizeF szValor = g.MeasureString(valorStr, fontValor);
                     float textY = topY - szValor.Height - 4;
-                    // Seguridad: nunca por encima del paddingTop
+                    // Con minTopY calculado correctamente, esto nunca debería ser < paddingTop
                     if (textY < paddingTop) textY = paddingTop;
                     g.DrawString(valorStr, fontValor, brushTexto,
                         barra.X + (anchoBarra - szValor.Width) / 2,
