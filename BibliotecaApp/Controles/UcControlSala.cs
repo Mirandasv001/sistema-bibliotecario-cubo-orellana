@@ -398,7 +398,7 @@ namespace BibliotecaApp
             using var dlg = new Form
             {
                 Text = "Autenticación requerida",
-                Size = new Size(340, 260),
+                Size = new Size(340, 300),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
