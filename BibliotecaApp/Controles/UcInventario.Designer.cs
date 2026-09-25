@@ -21,7 +21,6 @@ namespace BibliotecaApp
         {
             panelEncabezado = new Panel();
             lblTitulo = new Label();
-            lblSubtitulo = new Label();
             panelBusqueda = new Panel();
             lblBuscar = EstiloUI.CrearEtiqueta("Buscar por Código o Título:");
             txtBuscar = new TextBox();
@@ -36,7 +35,6 @@ namespace BibliotecaApp
             // 
             panelEncabezado.BackColor = EstiloUI.Blanco;
             panelEncabezado.Controls.Add(lblTitulo);
-            panelEncabezado.Controls.Add(lblSubtitulo);
             panelEncabezado.Dock = DockStyle.Top;
             panelEncabezado.Location = new Point(0, 0);
             panelEncabezado.Name = "panelEncabezado";
@@ -50,15 +48,6 @@ namespace BibliotecaApp
             lblTitulo.Location = new Point(16, 10);
             lblTitulo.Name = "lblTitulo";
             lblTitulo.Text = "Inventario General de Libros";
-            // 
-            // lblSubtitulo
-            // 
-            lblSubtitulo.AutoSize = true;
-            lblSubtitulo.Font = EstiloUI.Subtitulo();
-            lblSubtitulo.ForeColor = Color.Gray;
-            lblSubtitulo.Name = "lblSubtitulo";
-            lblSubtitulo.Text = "Catálogo completo importado del archivo CSV — búsqueda instantánea";
-            lblSubtitulo.Location = new Point(19, 36);
             // 
             // panelBusqueda
             // 
@@ -138,7 +127,6 @@ namespace BibliotecaApp
 
         private Panel panelEncabezado;
         private Label lblTitulo;
-        private Label lblSubtitulo;
         private Panel panelBusqueda;
         private Label lblBuscar;
         private TextBox txtBuscar;
