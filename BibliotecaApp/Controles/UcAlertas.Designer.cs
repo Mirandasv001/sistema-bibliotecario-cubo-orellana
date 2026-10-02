@@ -97,7 +97,7 @@ namespace BibliotecaApp
             // 
             // UcAlertas
             // 
-            BackColor = EstiloUI.FondoClaro;
+            BackColor = Color.AliceBlue;
             Controls.Add(dgvAlertas);
             Controls.Add(panelEncabezado);
             Name = "UcAlertas";

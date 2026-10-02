@@ -28,8 +28,8 @@ namespace BibliotecaApp
         /// <summary>Gris ultra suave para fondo de paneles — #F4F6F9.</summary>
         public static readonly Color FondoClaro = Color.FromArgb(0xF4, 0xF6, 0xF9);          // Sin cambios
 
-        /// <summary>Fondo estilo pergamino (se mantiene por compatibilidad).</summary>
-        public static readonly Color FondoPergamino = Color.FromArgb(0xFA, 0xF7, 0xEF);      // Antes: 250,247,239
+        /// <summary>Fondo moderno profesional — AliceBlue (#F0F8FF), armoniza con el menú lateral azul.</summary>
+        public static readonly Color FondoPergamino = Color.AliceBlue;
 
         /// <summary>Blanco puro para tarjetas e inputs.</summary>
         public static readonly Color Blanco = Color.White;
