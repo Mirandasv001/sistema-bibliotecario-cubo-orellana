@@ -258,7 +258,7 @@ namespace BibliotecaApp
             // 
             // splitSala.Panel1
             // 
-            splitSala.Panel1.BackColor = EstiloUI.FondoClaro;
+            splitSala.Panel1.BackColor = Color.AliceBlue;
             splitSala.Panel1.AutoScroll = true;
             splitSala.Panel1.Controls.Add(panelBotones);
             splitSala.Panel1.Controls.Add(grpDatos);
@@ -267,12 +267,12 @@ namespace BibliotecaApp
             // splitSala.Panel2
             // 
             splitSala.Panel2.AutoScroll = false;
-            splitSala.Panel2.BackColor = EstiloUI.FondoClaro;
+            splitSala.Panel2.BackColor = Color.AliceBlue;
             splitSala.Panel2.Controls.Add(dgvRegistros);
             // 
             // UcControlSala
             // 
-            BackColor = EstiloUI.FondoClaro;
+            BackColor = Color.AliceBlue;
             Controls.Add(splitSala);
             Name = "UcControlSala";
             Size = new Size(980, 600);

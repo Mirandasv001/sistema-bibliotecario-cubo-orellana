@@ -1,4 +1,10 @@
-﻿namespace BibliotecaApp
+﻿using System;
+using System.Drawing;
+using System.IO;
+using System.Windows.Forms;
+using Microsoft.Data.Sqlite;
+
+namespace BibliotecaApp
 {
     /// <summary>
     /// Ventana principal (dashboard): menú lateral + panel central donde se
@@ -13,6 +19,7 @@
         private UcPrestamosExternos? _vistaPrestamos;
         private UcAlertas? _vistaAlertas;
         private UcEstadisticas? _vistaEstadisticas;
+        private UcGuiaUso? _vistaGuiaUso;
 
         public Form1()
         {
@@ -37,7 +44,7 @@
             btnInventario.Click += (_, _) => MostrarApartadoInventario();
             btnAlertas.Click += (_, _) => MostrarApartadoAlertas();
             btnAlertas.Paint += btnAlertas_Paint;
-            btnGuiaUso.Click += (_, _) => btnGuiaUso_Click();
+            btnGuiaUso.Click += (_, _) => MostrarApartadoGuiaUso();
             btnEstadisticas.Click += (_, _) => MostrarApartadoEstadisticas();
 
             // Timer de notificaciones: consulta los morosos al arrancar y cada intervalo.
@@ -137,6 +144,21 @@
             ResaltarBoton(btnAlertas);
         }
 
+        private void MostrarApartadoGuiaUso()
+        {
+            if (_vistaGuiaUso == null)
+            {
+                _vistaGuiaUso = new UcGuiaUso();
+                _vistaGuiaUso.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaGuiaUso);
+            }
+            OcultarVistas();
+            _vistaGuiaUso.BringToFront();
+            _vistaGuiaUso.Show();
+            _vistaGuiaUso.Actualizar();
+            ResaltarBoton(btnGuiaUso);
+        }
+
         private void MostrarApartadoEstadisticas()
         {
             if (_vistaEstadisticas == null)
@@ -159,6 +181,7 @@
             _vistaPrestamos?.Hide();
             _vistaAlertas?.Hide();
             _vistaEstadisticas?.Hide();
+            _vistaGuiaUso?.Hide();
         }
 
         /// <summary>
@@ -188,24 +211,6 @@
                 _vistaPrestamos.CargarDesdeInventario(codigo, titulo);
         }
 
-        /// <summary>Muestra el manual rápido de uso de la aplicación.</summary>
-        private void btnGuiaUso_Click()
-        {
-            const string guia =
-                "\U0001F4D6 CÓMO REGISTRAR UN PRÉSTAMO:\n" +
-                "1. Vaya a la pestaña 'Inventario'.\n" +
-                "2. Busque el libro deseado y haga DOBLE CLIC sobre él.\n" +
-                "3. El sistema lo llevará automáticamente a 'Préstamos Externos' con el libro ya cargado.\n" +
-                "4. Llene los datos del usuario y haga clic en 'Registrar Préstamo'.\n\n" +
-                "\U0001F504 CÓMO RENOVAR O DEVOLVER:\n" +
-                "1. En la tabla inferior de 'Préstamos Externos', seleccione el préstamo activo.\n" +
-                "2. Llene la fecha y personal correspondiente en la sección de Devolución/Renovación.\n" +
-                "3. Haga clic en el botón de la acción deseada.";
-
-            MessageBox.Show(guia, "Guía de Uso",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
         //Botones importantes
 
         private void ConfigurarBotonMenu(Button boton, string texto)
@@ -227,7 +232,7 @@
 
         private void ResaltarBoton(Button botonActivo)
         {
-            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas, btnEstadisticas })
+            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas, btnEstadisticas, btnGuiaUso })
             {
                 bool activo = ReferenceEquals(boton, botonActivo);
                 boton.BackColor = activo ? EstiloUI.HoverOscuro : EstiloUI.FondoOscuro;
