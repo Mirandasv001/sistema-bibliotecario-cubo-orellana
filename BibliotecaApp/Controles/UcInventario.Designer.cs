@@ -108,7 +108,7 @@ namespace BibliotecaApp
             // 
             // UcInventario
             // 
-            BackColor = EstiloUI.FondoClaro;
+            BackColor = Color.AliceBlue;
             Controls.Add(dgvInventario);
             Controls.Add(panelBusqueda);
             Controls.Add(panelEncabezado);
