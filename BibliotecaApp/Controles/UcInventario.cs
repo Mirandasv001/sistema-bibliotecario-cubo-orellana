@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Drawing;
 using System.Reflection;
 using Microsoft.Data.Sqlite;
 
@@ -22,6 +23,9 @@ namespace BibliotecaApp
                 .GetProperty("DoubleBuffered",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .SetValue(dgvInventario, true, null);
+
+            // Suscribir evento de formato condicional para la columna Disponibilidad
+            dgvInventario.CellFormatting += dgvInventario_CellFormatting;
 
             _vistaFiltrada = new DataView(_datosInventario);
         }
@@ -163,6 +167,28 @@ namespace BibliotecaApp
 
             if (FindForm() is Form1 principal)
                 principal.CargarPrestamoDesdeInventario(codigo, titulo);
+        }
+
+        /// <summary>
+        /// Formato condicional para la columna Disponibilidad:
+        /// - "Prestado" → fondo rosa suave (LightPink) y texto rojo oscuro (DarkRed)
+        /// - "Disponible" u otros → estilo por defecto (sin cambios)
+        /// </summary>
+        private void dgvInventario_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            // Solo actuar sobre la columna "Disponibilidad"
+            if (e.ColumnIndex < 0 || e.ColumnIndex >= dgvInventario.Columns.Count) return;
+            if (dgvInventario.Columns[e.ColumnIndex].Name != "Disponibilidad") return;
+            if (e.Value == null) return;
+
+            string valor = e.Value.ToString();
+            if (string.Equals(valor, "Prestado", StringComparison.OrdinalIgnoreCase))
+            {
+                e.CellStyle.BackColor = Color.LightPink;
+                e.CellStyle.ForeColor = Color.DarkRed;
+            }
+            // Para "Disponible" o cualquier otro valor, no modificamos el estilo
+            // y el DataGridView usa su estilo por defecto
         }
     }
 }

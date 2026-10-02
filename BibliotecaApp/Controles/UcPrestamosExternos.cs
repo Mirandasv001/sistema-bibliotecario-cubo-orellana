@@ -584,7 +584,18 @@ namespace BibliotecaApp
             cmd.Parameters.AddWithValue("$personalRenovo",
                 dtpFechaRenovacion.Checked ? txtPersonalRenovo.Text.Trim() : DBNull.Value);
             cmd.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
-            cmd.Parameters.AddWithValue("$personalRecibio", txtPersonalRecibio.Text.Trim());
+
+            // Si el estado es "Renovado", no se debe guardar PersonalRecibio (limpiar dato erróneo)
+            string estadoActual = (txtEstado.Text ?? "").Trim();
+            if (string.Equals(estadoActual, "Renovado", StringComparison.OrdinalIgnoreCase))
+            {
+                cmd.Parameters.AddWithValue("$personalRecibio", DBNull.Value);
+            }
+            else
+            {
+                cmd.Parameters.AddWithValue("$personalRecibio", txtPersonalRecibio.Text.Trim());
+            }
+
             cmd.Parameters.AddWithValue("$estado",
                 string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
             cmd.Parameters.AddWithValue("$id", id);
@@ -827,6 +838,20 @@ namespace BibliotecaApp
 
             if (string.IsNullOrWhiteSpace(txtPersonalPresto.Text))
                 return Notificar("Escriba el personal que realiza el préstamo.", txtPersonalPresto);
+
+            // Validaciones según Estado del préstamo
+            string estado = (txtEstado.Text ?? "").Trim();
+            if (string.Equals(estado, "Renovado", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(txtPersonalRenovo.Text))
+                    return Notificar("Debe ingresar el nombre del personal que realizó la renovación.", txtPersonalRenovo);
+            }
+            else if (string.Equals(estado, "Entregado", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(estado, "Devuelto", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(txtPersonalRecibio.Text))
+                    return Notificar("Debe indicar el personal que recibió el libro.", txtPersonalRecibio);
+            }
 
             // Fechas: los DateTimePicker siempre tienen una fecha válida, pero
             // reforzamos que el rango tenga coherencia.

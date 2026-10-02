@@ -55,7 +55,7 @@ namespace BibliotecaApp
 
         private void InitializeComponent()
         {
-            this.BackColor = EstiloUI.FondoClaro;
+            this.BackColor = Color.AliceBlue;
             this.Dock = DockStyle.Fill;
             this.Padding = new Padding(20);
         }

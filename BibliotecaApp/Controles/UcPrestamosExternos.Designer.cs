@@ -293,7 +293,7 @@ namespace BibliotecaApp
             dgvPrestamos.AllowUserToDeleteRows = false;
             dgvPrestamos.AllowUserToResizeRows = false;
             dgvPrestamos.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvPrestamos.BackgroundColor = EstiloUI.FondoPergamino;
+            dgvPrestamos.BackgroundColor = EstiloUI.Blanco;
             dgvPrestamos.BorderStyle = BorderStyle.None;
             dgvPrestamos.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvPrestamos.Dock = DockStyle.Fill;
@@ -329,7 +329,7 @@ namespace BibliotecaApp
             //
             // UcPrestamosExternos
             // 
-            BackColor = EstiloUI.FondoClaro;
+            BackColor = Color.AliceBlue;
             Controls.Add(splitPrestamos);
             Name = "UcPrestamosExternos";
             Size = new Size(980, 650);

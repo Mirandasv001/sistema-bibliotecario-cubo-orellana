@@ -197,7 +197,7 @@ namespace BibliotecaApp
         }
 
         // ------------------------------------------------------------------
-        //  Selección: puebla los controles con la fila tocada
+        //  Selección: solo guarda el ID de la fila seleccionada y sale de modo edición si cambia de fila
         // ------------------------------------------------------------------
         private void dgvRegistros_CellClick(object? sender, DataGridViewCellEventArgs e)
         {
@@ -217,27 +217,7 @@ namespace BibliotecaApp
             }
 
             idSeleccionado = nuevoId;
-
-            txtNombre.Text = fila.Cells["Usuario"].Value?.ToString() ?? string.Empty;
-
-            string genero = fila.Cells["Género"].Value?.ToString() ?? string.Empty;
-            cboGenero.SelectedItem = cboGenero.Items.Contains(genero) ? genero : null;
-
-            if (int.TryParse(fila.Cells["Edad"].Value?.ToString(), out int edad)
-                && edad >= numEdad.Minimum && edad <= numEdad.Maximum)
-            {
-                numEdad.Value = edad;
-            }
-
-            if (DateTime.TryParseExact(fila.Cells["Fecha"].Value?.ToString(),
-                    "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None,
-                    out DateTime fecha))
-            {
-                dtpFecha.Value = fecha;
-            }
-
-            cboLibro.Text = fila.Cells["TituloLibro"].Value?.ToString() ?? string.Empty;
-            txtPersonal.Text = fila.Cells["PersonalTurno"].Value?.ToString() ?? string.Empty;
+            // NO se cargan los datos en los controles aquí; eso se hace al pulsar "Modificar"
         }
 
         // ------------------------------------------------------------------
@@ -331,10 +311,44 @@ namespace BibliotecaApp
 
         // ------------------------------------------------------------------
         //  Editar: habilita los campos para edición (botón "Editar")
+        // Carga los datos de la fila seleccionada en los controles
         // ------------------------------------------------------------------
         private void btnModificar_Click(object sender, EventArgs e)
         {
-            if (!HayFilaSeleccionada()) return;
+            // Validar que hay una fila seleccionada
+            if (dgvRegistros.CurrentRow == null || dgvRegistros.CurrentRow.Cells["ID"].Value == null)
+            {
+                MessageBox.Show("Por favor, seleccione un registro de la tabla para modificar.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Obtener la fila seleccionada
+            var fila = dgvRegistros.CurrentRow;
+
+            // Cargar los datos en los controles
+            idSeleccionado = Convert.ToInt32(fila.Cells["ID"].Value);
+
+            txtNombre.Text = fila.Cells["Usuario"].Value?.ToString() ?? string.Empty;
+
+            string genero = fila.Cells["Género"].Value?.ToString() ?? string.Empty;
+            cboGenero.SelectedItem = cboGenero.Items.Contains(genero) ? genero : null;
+
+            if (int.TryParse(fila.Cells["Edad"].Value?.ToString(), out int edad)
+                && edad >= numEdad.Minimum && edad <= numEdad.Maximum)
+            {
+                numEdad.Value = edad;
+            }
+
+            if (DateTime.TryParseExact(fila.Cells["Fecha"].Value?.ToString(),
+                    "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None,
+                    out DateTime fecha))
+            {
+                dtpFecha.Value = fecha;
+            }
+
+            cboLibro.Text = fila.Cells["TituloLibro"].Value?.ToString() ?? string.Empty;
+            txtPersonal.Text = fila.Cells["PersonalTurno"].Value?.ToString() ?? string.Empty;
 
             // Entrar en modo edición
             EstablecerModoEdicion(true);
