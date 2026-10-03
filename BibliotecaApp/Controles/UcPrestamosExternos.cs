@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.Data.Sqlite;
@@ -38,8 +39,33 @@ namespace BibliotecaApp
             dgvPrestamos.Dock = DockStyle.Fill;
             dgvPrestamos.ScrollBars = ScrollBars.Both;
 
+            // Suscribir evento de clic en botones de la grilla
+            dgvPrestamos.CellContentClick += DgvPrestamos_CellContentClick;
+
+            // Asegurar que la columna Notificado exista en la BD
+            AsegurarColumnaNotificado();
+
             pnlDatos.SendToBack();
             pnlBotonesAccion.BringToFront();
+        }
+
+        /// <summary>
+        /// Agrega la columna Notificado a la tabla PrestamosExternos si no existe.
+        /// SQLite lanza error si la columna ya existe; el catch lo ignora silenciosamente.
+        /// </summary>
+        private void AsegurarColumnaNotificado()
+        {
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var comando = conexion.CreateCommand();
+                comando.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN Notificado INTEGER DEFAULT 0;";
+                comando.ExecuteNonQuery();
+            }
+            catch
+            {
+                // Si la columna ya existe, SQLite lanza excepción; ignoramos para continuar flujo normal.
+            }
         }
 
         private void UcPrestamosExternos_Load(object sender, EventArgs e)
@@ -251,7 +277,8 @@ namespace BibliotecaApp
                                 ELSE strftime('%d/%m/%Y', FechaRenovacion) END AS FechaRenovacion,
                            strftime('%d/%m/%Y', FechaEntrega)   AS [Entrega Esperada],
                            PersonalPresto,
-                           EstadoLibro                          AS Estado
+                           EstadoLibro                          AS Estado,
+                           Notificado
                     FROM PrestamosExternos
                     WHERE EstadoLibro IN ('Pendiente', 'Renovado')
                     ORDER BY FechaEntrega ASC;";
@@ -263,6 +290,63 @@ namespace BibliotecaApp
                 }
 
                 dgvPrestamos.DataSource = tabla;
+
+                // Asegurar que la columna Notificado exista en el grid (AutoGenerateColumns = false)
+                if (!dgvPrestamos.Columns.Contains("Notificado"))
+                {
+                    var colNotificado = new DataGridViewTextBoxColumn
+                    {
+                        Name = "Notificado",
+                        DataPropertyName = "Notificado",
+                        HeaderText = "Notificado",
+                        Visible = false // Oculta para el usuario
+                    };
+                    dgvPrestamos.Columns.Add(colNotificado);
+                }
+
+                // Agregar columna de botón "Notificar" si no existe
+                if (!dgvPrestamos.Columns.Contains("btnMensaje"))
+                {
+                    var btnCol = new DataGridViewButtonColumn
+                    {
+                        Name = "btnMensaje",
+                        HeaderText = "Notificar",
+                        Text = "Enviar",
+                        UseColumnTextForButtonValue = false, // Permite cambiar texto por celda
+                        FlatStyle = FlatStyle.Flat, // Permite cambiar BackColor
+                        FillWeight = 8F,
+                        MinimumWidth = 80
+                    };
+                    dgvPrestamos.Columns.Add(btnCol);
+                }
+
+                // Valor inicial para cada fila del botón y restaurar estado Notificado
+                foreach (DataGridViewRow row in dgvPrestamos.Rows)
+                {
+                    try
+                    {
+                        // Valor por defecto
+                        row.Cells["btnMensaje"].Value = "Enviar";
+
+                        // Si Notificado == 1, mostrar estado "Enviado" con color verde
+                        var notificadoObj = row.Cells["Notificado"].Value;
+                        if (notificadoObj != null && notificadoObj != DBNull.Value)
+                        {
+                            if (Convert.ToInt32(notificadoObj) == 1)
+                            {
+                                row.Cells["btnMensaje"].Value = "Enviado";
+                                row.Cells["btnMensaje"].Style.BackColor = Color.LightGreen;
+                                row.Cells["btnMensaje"].Style.ForeColor = Color.DarkGreen;
+                                row.Cells["btnMensaje"].Style.SelectionBackColor = Color.LightGreen;
+                                row.Cells["btnMensaje"].Style.SelectionForeColor = Color.DarkGreen;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignorar errores de casteo en fila individual para no romper la carga completa
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -285,6 +369,73 @@ namespace BibliotecaApp
             {
                 fila.DefaultCellStyle.BackColor = EstiloUI.AlertaRojo;
                 fila.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
+            }
+        }
+
+        /// <summary>
+        /// Maneja el clic en la columna de botones "Notificar" para abrir un mailto: individual
+        /// con los datos del préstamo (nombre, correo, título, fecha de entrega).
+        /// </summary>
+        private void DgvPrestamos_CellContentClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            // Validar que sea clic en la columna de botones y fila válida
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            if (dgvPrestamos.Columns[e.ColumnIndex].Name != "btnMensaje") return;
+
+            var fila = dgvPrestamos.Rows[e.RowIndex];
+
+            // Extraer datos de la fila
+            string nombreUsuario = fila.Cells["Usuario"].Value?.ToString()?.Trim() ?? "";
+            string correo = fila.Cells["Correo"].Value?.ToString()?.Trim() ?? "";
+            string tituloLibro = fila.Cells["TituloLibro"].Value?.ToString()?.Trim() ?? "";
+            string fechaEntrega = fila.Cells["Entrega Esperada"].Value?.ToString()?.Trim() ?? "";
+
+            // Validar que hay correo
+            if (string.IsNullOrWhiteSpace(correo) || !correo.Contains("@"))
+            {
+                MessageBox.Show("El usuario no tiene un correo electrónico válido registrado.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Construir URI mailto: individual
+                string subject = Uri.EscapeDataString("Préstamo registrado - Biblioteca CUBO");
+                string body = Uri.EscapeDataString(
+                    $"Estimado/a {nombreUsuario},\n\n" +
+                    $"Muchas gracias por hacer uso de la Biblioteca CUBO. Le confirmamos que el libro '{tituloLibro}' ha sido registrado bajo su nombre.\n\n" +
+                    $"Le recordamos amablemente que la fecha de entrega esperada es el {fechaEntrega}.\n\n" +
+                    $"¡Disfrute su lectura!");
+
+                string mailtoUri = $"mailto:{correo}?subject={subject}&body={body}";
+
+                // Lanzar cliente de correo por defecto
+                var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
+                Process.Start(psi);
+
+                // Feedback visual: cambiar botón a "Enviado" con color verde
+                var celda = dgvPrestamos.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                celda.Value = "Enviado";
+                celda.Style.BackColor = Color.LightGreen;
+                celda.Style.ForeColor = Color.DarkGreen;
+                celda.Style.SelectionBackColor = Color.LightGreen;
+                celda.Style.SelectionForeColor = Color.DarkGreen;
+
+                // Persistir en BD: Notificado = 1
+                int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
+                using (var conexion = ConexionDB.ObtenerConexion())
+                using (var updateCmd = conexion.CreateCommand())
+                {
+                    updateCmd.CommandText = "UPDATE PrestamosExternos SET Notificado = 1 WHERE ID = @id;";
+                    updateCmd.Parameters.AddWithValue("@id", idPrestamo);
+                    updateCmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo abrir el cliente de correo:\n{ex.Message}",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
