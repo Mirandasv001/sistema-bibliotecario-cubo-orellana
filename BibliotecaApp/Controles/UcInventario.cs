@@ -266,38 +266,10 @@ namespace BibliotecaApp
         // ====================================================================
         private void BtnVaciarInventario_Click(object? sender, EventArgs e)
         {
-            // --- Autenticación de seguridad (2FA hardcoded) ---
-            using (Form formSeguridad = new Form())
+            // --- Autenticación de seguridad (usando FormAutenticacion reutilizable) ---
+            using (var frmAuth = new FormAutenticacion("Admin", "Se requiere autenticación de administrador para vaciar el inventario."))
             {
-                formSeguridad.Text = "Autenticación Requerida";
-                formSeguridad.Size = new Size(300, 200);
-                formSeguridad.FormBorderStyle = FormBorderStyle.FixedDialog;
-                formSeguridad.StartPosition = FormStartPosition.CenterParent;
-                formSeguridad.MaximizeBox = false;
-                formSeguridad.MinimizeBox = false;
-
-                Label lblUser = new Label() { Text = "Usuario:", Left = 20, Top = 20, Width = 240 };
-                TextBox txtUser = new TextBox() { Left = 20, Top = 40, Width = 240 };
-                Label lblPass = new Label() { Text = "Contraseña:", Left = 20, Top = 70, Width = 240 };
-                TextBox txtPass = new TextBox() { Left = 20, Top = 90, Width = 240, UseSystemPasswordChar = true };
-                Button btnConfirmar = new Button() { Text = "Confirmar", Left = 160, Top = 125, DialogResult = DialogResult.OK };
-
-                formSeguridad.Controls.Add(lblUser);
-                formSeguridad.Controls.Add(txtUser);
-                formSeguridad.Controls.Add(lblPass);
-                formSeguridad.Controls.Add(txtPass);
-                formSeguridad.Controls.Add(btnConfirmar);
-                formSeguridad.AcceptButton = btnConfirmar;
-
-                if (formSeguridad.ShowDialog(this) != DialogResult.OK) return; // Si cancela, salir
-
-                // Validación de credenciales hardcoded
-                if (txtUser.Text.Trim() != "Admin" || txtPass.Text != "Admin123$")
-                {
-                    MessageBox.Show("Credenciales incorrectas. Operación denegada.", "Acceso Denegado",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return; // Si cancela o falla auth, salir
             }
 
             // --- Confirmación final ---
@@ -346,6 +318,14 @@ namespace BibliotecaApp
         // ====================================================================
         private void BtnImportarCSV_Click(object? sender, EventArgs e)
         {
+            // Validación: Solo permitir importar si el inventario está vacío
+            if (_vistaFiltrada != null && _vistaFiltrada.Count > 0)
+            {
+                MessageBox.Show("El inventario actual contiene registros. Para importar un nuevo catálogo, primero debes vaciar el inventario existente.",
+                    "Acción Denegada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             using var ofd = new OpenFileDialog
             {
                 Title = "Seleccionar archivo CSV de inventario",
