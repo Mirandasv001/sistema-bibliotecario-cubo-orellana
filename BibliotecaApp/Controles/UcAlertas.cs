@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
 {
@@ -30,12 +31,16 @@ namespace BibliotecaApp
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                Margin = new Padding(10, 0, 10, 10)
+                Margin = new Padding(10, 0, 10, 10),
+                Visible = false // Oculto: se usan botones individuales por fila en la grilla
             };
             btnNotificar.FlatAppearance.BorderSize = 0;
             btnNotificar.Click += btnNotificar_Click;
             Controls.Add(btnNotificar);
             btnNotificar.BringToFront();
+
+            // Suscribir evento de clic en botones de la grilla
+            dgvAlertas.CellContentClick += DgvAlertas_CellContentClick;
         }
 
         private void UcAlertas_Load(object sender, EventArgs e)
@@ -85,7 +90,8 @@ namespace BibliotecaApp
                            TituloLibro                            AS [Título del Libro],
                            strftime('%d/%m/%Y', FechaEntrega)     AS [Entrega Esperada],
                            CAST(julianday('now') - julianday(FechaEntrega) AS INTEGER)
-                                                                   AS [Días de Retraso]
+                                                                   AS [Días de Retraso],
+                           Notificado
                     FROM PrestamosExternos
                     WHERE EstadoLibro IN ('Pendiente', 'Renovado')
                       AND date(FechaEntrega) < date('now', 'localtime')
@@ -101,6 +107,63 @@ namespace BibliotecaApp
 
                 if (dgvAlertas.Columns["ID"] != null)
                     dgvAlertas.Columns["ID"]!.Visible = false;
+
+                // Mapear columna Notificado (oculta) para persistencia
+                if (!dgvAlertas.Columns.Contains("Notificado"))
+                {
+                    var colNotificado = new DataGridViewTextBoxColumn
+                    {
+                        Name = "Notificado",
+                        DataPropertyName = "Notificado",
+                        HeaderText = "Notificado",
+                        Visible = false
+                    };
+                    dgvAlertas.Columns.Add(colNotificado);
+                }
+
+                // Agregar columna de botón "Notificar" individual si no existe
+                if (!dgvAlertas.Columns.Contains("btnNotificarIndividual"))
+                {
+                    var btnCol = new DataGridViewButtonColumn
+                    {
+                        Name = "btnNotificarIndividual",
+                        HeaderText = "Notificar",
+                        Text = "Enviar",
+                        UseColumnTextForButtonValue = false, // Permite cambiar texto por celda
+                        FlatStyle = FlatStyle.Flat, // Permite cambiar BackColor
+                        FillWeight = 8F,
+                        MinimumWidth = 80
+                    };
+                    dgvAlertas.Columns.Add(btnCol);
+                }
+
+                // Valor inicial para cada fila del botón y restaurar estado Notificado
+                foreach (DataGridViewRow row in dgvAlertas.Rows)
+                {
+                    try
+                    {
+                        // Valor por defecto
+                        row.Cells["btnNotificarIndividual"].Value = "Enviar";
+
+                        // Si Notificado == 1, mostrar estado "Enviado" con color verde
+                        var notificadoObj = row.Cells["Notificado"].Value;
+                        if (notificadoObj != null && notificadoObj != DBNull.Value)
+                        {
+                            if (Convert.ToInt32(notificadoObj) == 1)
+                            {
+                                row.Cells["btnNotificarIndividual"].Value = "Enviado";
+                                row.Cells["btnNotificarIndividual"].Style.BackColor = Color.LightGreen;
+                                row.Cells["btnNotificarIndividual"].Style.ForeColor = Color.DarkGreen;
+                                row.Cells["btnNotificarIndividual"].Style.SelectionBackColor = Color.LightGreen;
+                                row.Cells["btnNotificarIndividual"].Style.SelectionForeColor = Color.DarkGreen;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignorar errores de casteo en fila individual
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -122,93 +185,158 @@ namespace BibliotecaApp
         }
 
         /// <summary>
-        /// Notifica a los usuarios morosos por correo (mailto) y genera un CSV de respaldo en el Escritorio.
+        /// Notifica a los usuarios morosos por correo (mailto individual por usuario) y genera un CSV de respaldo en la carpeta temporal.
         /// Requiere que exista un botón llamado 'btnNotificar' suscrito a este evento.
         /// </summary>
         private void btnNotificar_Click(object sender, EventArgs e)
         {
-            // 1️⃣ EXTRAER Y FILTRAR CORREOS VÁLIDOS (distinct, no nulos, con @)
-            var correos = dgvAlertas.Rows
+            // 1️⃣ VALIDAR QUE HAY FILAS CON CORREOS VÁLIDOS
+            var filasValidas = dgvAlertas.Rows
                 .Cast<DataGridViewRow>()
                 .Where(r => !r.IsNewRow)
-                .Select(r => r.Cells["Correo"]?.Value?.ToString()?.Trim())
-                .Where(c => !string.IsNullOrWhiteSpace(c) && c.Contains("@"))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(r => new
+                {
+                    Usuario = r.Cells["Usuario"]?.Value?.ToString()?.Trim() ?? "",
+                    Correo = r.Cells["Correo"]?.Value?.ToString()?.Trim() ?? "",
+                    TituloLibro = r.Cells["Título del Libro"]?.Value?.ToString()?.Trim() ?? ""
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Correo) && x.Correo.Contains("@"))
                 .ToList();
 
-            if (correos.Count == 0)
+            if (filasValidas.Count == 0)
             {
                 MessageBox.Show("No hay correos válidos para notificar.", "Biblioteca CUBO",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // 2️⃣ GENERAR CSV DE RESPALDO EN EL ESCRITORIO
+            // 2️⃣ GENERAR CSV DE RESPALDO EN LA CARPETA TEMPORAL DEL SISTEMA
             string csvPath = null;
             try
             {
-                var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string tempPath = Path.GetTempPath();
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                csvPath = Path.Combine(desktop, $"Morosos_Notificados_{timestamp}.csv");
+                csvPath = Path.Combine(tempPath, $"Morosos_Notificados_{timestamp}.csv");
 
                 var sb = new StringBuilder();
                 sb.AppendLine("Usuario,Titulo,Correo"); // Encabezados
 
-                foreach (DataGridViewRow row in dgvAlertas.Rows)
+                foreach (var fila in filasValidas)
                 {
-                    if (row.IsNewRow) continue;
-
-                    string usuario = row.Cells["Usuario"]?.Value?.ToString()?.Trim() ?? "";
-                    string titulo = row.Cells["Título del Libro"]?.Value?.ToString()?.Trim() ?? "";
-                    string correo = row.Cells["Correo"]?.Value?.ToString()?.Trim() ?? "";
-
                     // Escapar comillas y envolver en comillas si contiene coma, salto de línea o comillas
                     string Escape(string s) => s.Contains(',') || s.Contains('"') || s.Contains('\n')
                         ? "\"" + s.Replace("\"", "\"\"") + "\""
                         : s;
 
-                    sb.AppendLine($"{Escape(usuario)},{Escape(titulo)},{Escape(correo)}");
+                    sb.AppendLine($"{Escape(fila.Usuario)},{Escape(fila.TituloLibro)},{Escape(fila.Correo)}");
                 }
 
                 File.WriteAllText(csvPath, sb.ToString(), Encoding.UTF8);
             }
             catch (Exception exCsv)
             {
-                MessageBox.Show($"No se pudo generar el CSV en el Escritorio:\n{exCsv.Message}",
+                MessageBox.Show($"No se pudo generar el CSV en la carpeta temporal:\n{exCsv.Message}",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                // Continuamos para intentar abrir el mailto
+                // Continuamos para intentar abrir los mailto
             }
 
-            // 3️⃣ ARMAR URI MAILTO (BCC para privacidad)
-            string emailsBcc = string.Join(",", correos);
-            string subject = "Aviso: Préstamo de libro vencido - Biblioteca CUBO";
-            string body = "Estimado usuario, le informamos que el plazo para devolver el material bibliográfico ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.";
-
-            string uri = $"mailto:?bcc={Uri.EscapeDataString(emailsBcc)}" +
-                         $"&subject={Uri.EscapeDataString(subject)}" +
-                         $"&body={Uri.EscapeDataString(body)}";
-
-            // 4️⃣ LANZAR CLIENTE DE CORREO POR DEFECTO
-            try
+            // 3️⃣ CREAR Y LANZAR MAILTO INDIVIDUAL POR CADA USUARIO MOROSO
+            int emailsEnviados = 0;
+            foreach (var fila in filasValidas)
             {
-                var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
-                Process.Start(psi);
-            }
-            catch (Exception exMail)
-            {
-                MessageBox.Show($"No se pudo abrir el cliente de correo:\n{exMail.Message}",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                try
+                {
+                    string subject = "Aviso de préstamo vencido - Biblioteca CUBO";
+                    string body = $"Estimado/a {fila.Usuario}, le informamos que el plazo para devolver el material bibliográfico '{fila.TituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.";
+
+                    // IMPORTANTE: El email NO se escapa con Uri.EscapeDataString (rompería el @).
+                    // Solo subject y body llevan Uri.EscapeDataString.
+                    string uri = $"mailto:{fila.Correo}" +
+                                 $"?subject={Uri.EscapeDataString(subject)}" +
+                                 $"&body={Uri.EscapeDataString(body)}";
+
+                    var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
+                    Process.Start(psi);
+                    emailsEnviados++;
+                }
+                catch (Exception exMail)
+                {
+                    // Log pero continuar con los siguientes
+                    System.Diagnostics.Debug.WriteLine($"Error al abrir mailto para {fila.Correo}: {exMail.Message}");
+                }
             }
 
-            // 5️⃣ CONFIRMACIÓN FINAL
-            string msg = "Se abrió la ventana de correo con los destinatarios en copia oculta (BCC).";
+            // 4️⃣ CONFIRMACIÓN FINAL
+            string msg = $"Se abrieron {emailsEnviados} ventana(s) de correo personalizadas (una por usuario moroso).";
             if (!string.IsNullOrEmpty(csvPath) && File.Exists(csvPath))
                 msg += $"\n\nRespaldo CSV guardado en:\n{csvPath}";
             else
                 msg += "\n\n⚠ No se pudo generar el archivo CSV de respaldo.";
 
             MessageBox.Show(msg, "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        /// <summary>
+        /// Maneja el clic en la columna de botones "Notificar" individual por cada moroso.
+        /// Abre un mailto: personalizado y da feedback visual en la celda.
+        /// </summary>
+        private void DgvAlertas_CellContentClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            // Validar que sea clic en la columna de botones y fila válida
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            if (dgvAlertas.Columns[e.ColumnIndex].Name != "btnNotificarIndividual") return;
+
+            var fila = dgvAlertas.Rows[e.RowIndex];
+
+            // Extraer datos de la fila
+            string nombreUsuario = fila.Cells["Usuario"].Value?.ToString()?.Trim() ?? "";
+            string correo = fila.Cells["Correo"].Value?.ToString()?.Trim() ?? "";
+            string tituloLibro = fila.Cells["Título del Libro"].Value?.ToString()?.Trim() ?? "";
+
+            // Validar que hay correo
+            if (string.IsNullOrWhiteSpace(correo) || !correo.Contains("@"))
+            {
+                MessageBox.Show("El usuario no tiene un correo electrónico válido registrado.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Construir URI mailto: individual
+                string subject = Uri.EscapeDataString("Aviso de préstamo vencido - Biblioteca CUBO");
+                string body = Uri.EscapeDataString(
+                    $"Estimado/a {nombreUsuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.");
+
+                string mailtoUri = $"mailto:{correo}?subject={subject}&body={body}";
+
+                // Lanzar cliente de correo por defecto
+                var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
+                Process.Start(psi);
+
+                // Persistir en BD: Notificado = 1
+                int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
+                using (var conexion = ConexionDB.ObtenerConexion())
+                using (var updateCmd = conexion.CreateCommand())
+                {
+                    updateCmd.CommandText = "UPDATE PrestamosExternos SET Notificado = 1 WHERE ID = @id;";
+                    updateCmd.Parameters.AddWithValue("@id", idPrestamo);
+                    updateCmd.ExecuteNonQuery();
+                }
+
+                // Feedback visual: cambiar botón a "Enviado" con color verde
+                var celda = dgvAlertas.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                celda.Value = "Enviado";
+                celda.Style.BackColor = Color.LightGreen;
+                celda.Style.ForeColor = Color.DarkGreen;
+                celda.Style.SelectionBackColor = Color.LightGreen;
+                celda.Style.SelectionForeColor = Color.DarkGreen;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo abrir el cliente de correo:\n{ex.Message}",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }

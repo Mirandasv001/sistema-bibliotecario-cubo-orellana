@@ -22,7 +22,6 @@ namespace BibliotecaApp
             panelEncabezado = new Panel();
             lblTitulo = new Label();
             panelBusqueda = new Panel();
-            lblBuscar = EstiloUI.CrearEtiqueta("Buscar por Código o Título:");
             txtBuscar = new TextBox();
             lblContador = new Label();
             dgvInventario = new DataGridView();
@@ -33,25 +32,28 @@ namespace BibliotecaApp
             // 
             // panelEncabezado
             // 
-            panelEncabezado.BackColor = EstiloUI.Blanco;
+            panelEncabezado.BackColor = Color.White;
             panelEncabezado.Controls.Add(lblTitulo);
             panelEncabezado.Dock = DockStyle.Top;
             panelEncabezado.Location = new Point(0, 0);
             panelEncabezado.Name = "panelEncabezado";
             panelEncabezado.Size = new Size(980, 62);
+            panelEncabezado.TabIndex = 2;
+            panelEncabezado.Paint += panelEncabezado_Paint;
             // 
             // lblTitulo
             // 
             lblTitulo.AutoSize = true;
-            lblTitulo.Font = EstiloUI.TituloSeccion();
-            lblTitulo.ForeColor = EstiloUI.TextoOscuro;
+            lblTitulo.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            lblTitulo.ForeColor = Color.FromArgb(43, 45, 66);
             lblTitulo.Location = new Point(16, 10);
             lblTitulo.Name = "lblTitulo";
+            lblTitulo.Size = new Size(339, 32);
+            lblTitulo.TabIndex = 0;
             lblTitulo.Text = "Inventario General de Libros";
             // 
             // panelBusqueda
             // 
-            panelBusqueda.Controls.Add(lblBuscar);
             panelBusqueda.Controls.Add(txtBuscar);
             panelBusqueda.Controls.Add(lblContador);
             panelBusqueda.Dock = DockStyle.Top;
@@ -59,19 +61,11 @@ namespace BibliotecaApp
             panelBusqueda.Name = "panelBusqueda";
             panelBusqueda.Padding = new Padding(14, 10, 14, 8);
             panelBusqueda.Size = new Size(980, 56);
-            // 
-            // lblBuscar
-            // 
-            lblBuscar.Location = new Point(14, 18);
-            lblBuscar.Name = "lblBuscar";
-            lblBuscar.AutoSize = false;
-            lblBuscar.Size = new Size(190, 23);
-            lblBuscar.TextAlign = ContentAlignment.MiddleLeft;
+            panelBusqueda.TabIndex = 1;
             // 
             // txtBuscar
             // 
             txtBuscar.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            EstiloUI.EstilizarEntrada(txtBuscar);
             txtBuscar.Location = new Point(210, 13);
             txtBuscar.Name = "txtBuscar";
             txtBuscar.PlaceholderText = "Escriba para filtrar el inventario en tiempo real...";
@@ -83,10 +77,12 @@ namespace BibliotecaApp
             // 
             lblContador.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             lblContador.AutoSize = true;
-            lblContador.Font = EstiloUI.Etiqueta();
+            lblContador.Font = new Font("Segoe UI", 9.5F);
             lblContador.ForeColor = Color.Gray;
             lblContador.Location = new Point(820, 18);
             lblContador.Name = "lblContador";
+            lblContador.Size = new Size(62, 21);
+            lblContador.TabIndex = 1;
             lblContador.Text = "0 libros";
             // 
             // dgvInventario
@@ -95,20 +91,25 @@ namespace BibliotecaApp
             dgvInventario.AllowUserToDeleteRows = false;
             dgvInventario.AllowUserToResizeRows = false;
             dgvInventario.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvInventario.BackgroundColor = EstiloUI.Blanco;
+            dgvInventario.BackgroundColor = Color.White;
             dgvInventario.BorderStyle = BorderStyle.None;
             dgvInventario.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvInventario.Dock = DockStyle.Fill;
             dgvInventario.EnableHeadersVisualStyles = false;
+            dgvInventario.Location = new Point(0, 118);
             dgvInventario.MultiSelect = false;
+            dgvInventario.Name = "dgvInventario";
             dgvInventario.ReadOnly = true;
             dgvInventario.RowHeadersVisible = false;
+            dgvInventario.RowHeadersWidth = 51;
             dgvInventario.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvInventario.Size = new Size(980, 482);
+            dgvInventario.TabIndex = 0;
             dgvInventario.CellDoubleClick += dgvInventario_CellDoubleClick;
             // 
             // UcInventario
             // 
-            BackColor = EstiloUI.FondoClaro;
+            BackColor = Color.AliceBlue;
             Controls.Add(dgvInventario);
             Controls.Add(panelBusqueda);
             Controls.Add(panelEncabezado);
