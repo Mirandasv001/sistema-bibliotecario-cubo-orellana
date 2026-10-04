@@ -266,8 +266,8 @@ namespace BibliotecaApp
         // ====================================================================
         private void BtnVaciarInventario_Click(object? sender, EventArgs e)
         {
-            // --- Autenticación de seguridad (usando FormAutenticacion reutilizable) ---
-            using (var frmAuth = new FormAutenticacion("Admin", "Se requiere autenticación de administrador para vaciar el inventario."))
+            // --- Autenticación de seguridad (mismo modal que Control de Sala: AdminCubo / Admin123$) ---
+            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return; // Si cancela o falla auth, salir
             }
@@ -318,11 +318,11 @@ namespace BibliotecaApp
         // ====================================================================
         private void BtnImportarCSV_Click(object? sender, EventArgs e)
         {
-            // Validación: Solo permitir importar si el inventario está vacío
-            if (_vistaFiltrada != null && _vistaFiltrada.Count > 0)
+            // Validar si hay filas (descontando la fila de nuevo registro si AllowUserToAddRows es true)
+            int filasReales = dgvInventario.AllowUserToAddRows ? dgvInventario.Rows.Count - 1 : dgvInventario.Rows.Count;
+            if (filasReales > 0)
             {
-                MessageBox.Show("El inventario actual contiene registros. Para importar un nuevo catálogo, primero debes vaciar el inventario existente.",
-                    "Acción Denegada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("El inventario actual contiene registros. Para importar un nuevo catálogo, primero debes vaciar el inventario existente.", "Acción Denegada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
