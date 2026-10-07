@@ -50,13 +50,6 @@ namespace BibliotecaApp
             txtEstado = new TextBox();
             lblFechaEntrega = EstiloUI.CrearEtiqueta("Fecha de Entrega Esperada:");
             dtpFechaEntrega = new DateTimePicker();
-            lblPersonalRecibio = EstiloUI.CrearEtiqueta("Personal que Recibió:");
-            txtPersonalRecibio = new TextBox();
-            lblSeccionRenovacion = CrearSeccion("DEVOLUCIÓN / RENOVACIÓN (OPCIONAL)");
-            lblFechaRenovacion = EstiloUI.CrearEtiqueta("Fecha de Renovación:");
-            dtpFechaRenovacion = new DateTimePicker();
-            lblPersonalRenovo = EstiloUI.CrearEtiqueta("Personal que Renovó:");
-            txtPersonalRenovo = new TextBox();
             pnlDatos = new Panel();
             grpDatos = new GroupBox();
             tlpCampos = new TableLayoutPanel();
@@ -64,6 +57,7 @@ namespace BibliotecaApp
             flpBotones = new FlowLayoutPanel();
             btnRegistrar = new Button();
             btnDevolver = new Button();
+            btnRenovarFila = new Button();
             btnModificar = new Button();
             pnlContenedorGrid = new Panel();
             dgvPrestamos = new DataGridView();
@@ -90,7 +84,7 @@ namespace BibliotecaApp
             panelEncabezado.Controls.Add(lblSubtitulo);
             panelEncabezado.Dock = DockStyle.Top;
             panelEncabezado.Name = "panelEncabezado";
-            panelEncabezado.Size = new Size(980, 62);
+            panelEncabezado.Size = new Size(980, 35);
             // 
             // lblTitulo
             // 
@@ -107,7 +101,8 @@ namespace BibliotecaApp
             lblSubtitulo.AutoSize = true;
             lblSubtitulo.Font = EstiloUI.TituloSeccion();
             lblSubtitulo.ForeColor = EstiloUI.FondoOscuro;
-            lblSubtitulo.Location = new Point(14, 24);
+            lblSubtitulo.Location = new Point(14, 0);
+            lblSubtitulo.Name = "lblSubtitulo";
             lblSubtitulo.Name = "lblSubtitulo";
             lblSubtitulo.Text = "Gestión de préstamos externos, renovaciones y devoluciones";
             //
@@ -167,16 +162,10 @@ namespace BibliotecaApp
             tlpCampos.Controls.Add(lblEstado, 4, f); tlpCampos.Controls.Add(txtEstado, 5, f); f++;
             tlpCampos.Controls.Add(lblFechaEntrega, 0, f); tlpCampos.Controls.Add(dtpFechaEntrega, 1, f);
             dtpFechaEntrega.Format = DateTimePickerFormat.Short; f++;
-            tlpCampos.Controls.Add(lblSeccionRenovacion, 0, f); tlpCampos.SetColumnSpan(lblSeccionRenovacion, 6); f++;
-            tlpCampos.Controls.Add(lblFechaRenovacion, 0, f); tlpCampos.Controls.Add(dtpFechaRenovacion, 1, f);
-            dtpFechaRenovacion.Format = DateTimePickerFormat.Short;
-            tlpCampos.Controls.Add(lblPersonalRenovo, 2, f); tlpCampos.Controls.Add(txtPersonalRenovo, 3, f); f++;
-            tlpCampos.Controls.Add(lblPersonalRecibio, 0, f); tlpCampos.Controls.Add(txtPersonalRecibio, 1, f);
 
             foreach (Control c in new Control[] { txtNombre, txtCorreo, txtDui, txtTelefono,
                      txtDireccion, txtTituloLibro, dtpFechaPrestamo, txtPersonalPresto,
-                     txtEstado, dtpFechaEntrega, txtPersonalRecibio,
-                     dtpFechaRenovacion, txtPersonalRenovo, txtCodigoLibro })
+                     txtEstado, dtpFechaEntrega, txtCodigoLibro })
             {
                 EstiloUI.EstilizarEntrada(c);
                 c.Dock = DockStyle.Fill;
@@ -198,9 +187,6 @@ namespace BibliotecaApp
             txtEstado.BackColor = SystemColors.Control;
             txtEstado.TabStop = false;
             txtEstado.Text = "Pendiente";
-            dtpFechaRenovacion.ShowCheckBox = true;
-            dtpFechaRenovacion.Checked = false;
-            dtpFechaRenovacion.ValueChanged += dtpFechaRenovacion_ValueChanged;
             dtpFechaPrestamo.ValueChanged += dtpFechaPrestamo_ValueChanged;
             //
             // pnlBotonesAccion
@@ -208,9 +194,10 @@ namespace BibliotecaApp
             pnlBotonesAccion.BackColor = EstiloUI.FondoPergamino;
             pnlBotonesAccion.Controls.Add(flpBotones);
             pnlBotonesAccion.Dock = DockStyle.Top;
+            pnlBotonesAccion.AutoSize = true;
+            pnlBotonesAccion.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlBotonesAccion.Name = "pnlBotonesAccion";
-            pnlBotonesAccion.Padding = new Padding(14, 6, 14, 0);
-            pnlBotonesAccion.Size = new Size(980, 56);
+            pnlBotonesAccion.Padding = new Padding(14, 7, 14, 15);
             // 
             // flpBotones
             // 
@@ -221,12 +208,13 @@ namespace BibliotecaApp
             flpBotones.WrapContents = false;
             flpBotones.Controls.Add(btnRegistrar);
             flpBotones.Controls.Add(btnDevolver);
+            flpBotones.Controls.Add(btnRenovarFila);
             flpBotones.Controls.Add(btnModificar);
             // 
             // btnRegistrar
             // 
             btnRegistrar.AutoSize = true;
-            btnRegistrar.Margin = new Padding(0, 0, 8, 0);
+            btnRegistrar.Margin = new Padding(5, 0, 5, 5);
             btnRegistrar.Name = "btnRegistrar";
             btnRegistrar.Size = new Size(190, 38);
             btnRegistrar.Text = "Registrar Préstamo";
@@ -237,22 +225,33 @@ namespace BibliotecaApp
             // btnDevolver
             // 
             btnDevolver.AutoSize = true;
-            btnDevolver.Margin = new Padding(0, 0, 8, 0);
+            btnDevolver.Margin = new Padding(5, 0, 5, 5);
             btnDevolver.Name = "btnDevolver";
             btnDevolver.Size = new Size(230, 38);
             btnDevolver.Text = "Registrar Devolución (fila)";
             EstiloUI.EstilizarBotonSecundario(btnDevolver);
             btnDevolver.Click += btnDevolver_Click;
             // 
+            // btnRenovarFila
+            // 
+            btnRenovarFila.AutoSize = true;
+            btnRenovarFila.Margin = new Padding(5, 0, 5, 5);
+            btnRenovarFila.Name = "btnRenovarFila";
+            btnRenovarFila.Size = new Size(140, 38);
+            btnRenovarFila.Text = "Renovar (fila)";
+            EstiloUI.EstilizarBotonSecundario(btnRenovarFila);
+            btnRenovarFila.Click += btnRenovarFila_Click;
+            // 
             // btnModificar
             // 
             btnModificar.AutoSize = true;
-            btnModificar.Margin = new Padding(0, 0, 0, 0);
+            btnModificar.Margin = new Padding(5, 0, 5, 5);
             btnModificar.Name = "btnModificar";
             btnModificar.Size = new Size(120, 38);
             btnModificar.Text = "Modificar";
             EstiloUI.EstilizarBotonSecundario(btnModificar);
             btnModificar.Click += btnModificar_Click;
+            //
             //
             // pnlContenedorGrid
             //
@@ -270,7 +269,7 @@ namespace BibliotecaApp
             splitPrestamos.Name = "splitPrestamos";
             splitPrestamos.Orientation = Orientation.Horizontal;
             splitPrestamos.Size = new Size(980, 650);
-            splitPrestamos.SplitterDistance = 520; // <-- AQUI BAJAMOS LA TABLA
+            splitPrestamos.SplitterDistance = 410;
             splitPrestamos.SplitterWidth = 6;
             // 
             // splitPrestamos.Panel1
@@ -362,8 +361,8 @@ namespace BibliotecaApp
             {
                 Text = texto,
                 AutoSize = true,
-                Font = new Font(EstiloUI.FuenteBase, 9F, FontStyle.Bold | FontStyle.Underline),
-                ForeColor = EstiloUI.Acento,
+                Font = new Font("Segoe UI Semibold", 10F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(22, 41, 69),
                 Margin = new Padding(3, 10, 3, 4)
             };
         }
@@ -401,17 +400,11 @@ namespace BibliotecaApp
         private TextBox txtEstado;
         private Label lblFechaEntrega;
         private DateTimePicker dtpFechaEntrega;
-        private Label lblPersonalRecibio;
-        private TextBox txtPersonalRecibio;
-        private Label lblSeccionRenovacion;
-        private Label lblFechaRenovacion;
-        private DateTimePicker dtpFechaRenovacion;
-        private Label lblPersonalRenovo;
-        private TextBox txtPersonalRenovo;
         private Panel pnlBotonesAccion;
         private FlowLayoutPanel flpBotones;
         private Button btnRegistrar;
         private Button btnDevolver;
+        private Button btnRenovarFila;
         private Button btnModificar;
         private Panel pnlContenedorGrid;
         private DataGridView dgvPrestamos;

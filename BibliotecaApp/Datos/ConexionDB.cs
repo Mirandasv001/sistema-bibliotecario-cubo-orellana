@@ -36,6 +36,25 @@ namespace BibliotecaApp
             MigrarEsquemaControlSala(conexion);
             MigrarEsquemaPrestamos(conexion);
             ImportarCatalogoDesdeCsv(conexion);
+            SeedUsuarios(conexion);
+        }
+
+        /// <summary>
+        /// Inserta los usuarios por defecto si la tabla está vacía.
+        /// </summary>
+        private static void SeedUsuarios(SqliteConnection conexion)
+        {
+            using var check = conexion.CreateCommand();
+            check.CommandText = "SELECT COUNT(*) FROM Usuarios;";
+            long count = (long)(check.ExecuteScalar() ?? 0);
+            if (count > 0) return;
+
+            using var cmd = conexion.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO Usuarios (Nombre, Usuario, Contrasena, Rol) VALUES
+                ('Usuario Operador', 'UserCubo', '1234$', 'Operador'),
+                ('Administrador', 'AdminCubo', 'Admin123$', 'Administrador');";
+            cmd.ExecuteNonQuery();
         }
 
         /// <summary>
@@ -302,9 +321,18 @@ namespace BibliotecaApp
                     FechaDevolucion  TEXT
                 );";
 
+            const string sqlUsuarios = @"
+                CREATE TABLE IF NOT EXISTS Usuarios (
+                    Id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Nombre         TEXT NOT NULL,
+                    Usuario        TEXT NOT NULL UNIQUE,
+                    Contrasena     TEXT NOT NULL,
+                    Rol            TEXT NOT NULL DEFAULT 'Operador'
+                );";
+
             using (var cmd = conexion.CreateCommand())
             {
-                cmd.CommandText = sqlLibros + sqlSala + sqlPrestamos;
+                cmd.CommandText = sqlLibros + sqlSala + sqlPrestamos + sqlUsuarios;
                 cmd.ExecuteNonQuery();
             }
 

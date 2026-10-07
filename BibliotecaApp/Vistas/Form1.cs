@@ -20,6 +20,8 @@ namespace BibliotecaApp
         private UcAlertas? _vistaAlertas;
         private UcEstadisticas? _vistaEstadisticas;
         private UcGuiaUso? _vistaGuiaUso;
+        private UcHistorialPrestamos? _vistaHistorialPrestamos;
+        private Button? _btnGestionUsuarios;
 
         public Form1()
         {
@@ -37,6 +39,14 @@ namespace BibliotecaApp
             ConfigurarBotonMenu(btnAlertas, "Alertas de Vencidos");
             ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
             ConfigurarBotonMenu(btnEstadisticas, "Estadísticas");
+            ConfigurarBotonMenu(btnHistorialPrestamos, "Historial Préstamos");
+
+            // Botón Gestión de Usuarios (solo para Admin)
+            _btnGestionUsuarios = new Button();
+            ConfigurarBotonMenu(_btnGestionUsuarios, "Gestión de Usuarios");
+            _btnGestionUsuarios.Click += (_, _) => MostrarGestionUsuarios();
+            panelNav.Controls.Add(_btnGestionUsuarios);
+            _btnGestionUsuarios.BringToFront(); // Lo coloca al final (arriba de Cerrar Sesión)
 
             // Suscripción de eventos de navegación
             btnSala.Click += (_, _) => MostrarApartadoSala();
@@ -46,6 +56,7 @@ namespace BibliotecaApp
             btnAlertas.Paint += btnAlertas_Paint;
             btnGuiaUso.Click += (_, _) => MostrarApartadoGuiaUso();
             btnEstadisticas.Click += (_, _) => MostrarApartadoEstadisticas();
+            btnHistorialPrestamos.Click += (_, _) => MostrarApartadoHistorialPrestamos();
 
             // Timer de notificaciones: consulta los morosos al arrancar y cada intervalo.
             _timerAlertas = new System.Windows.Forms.Timer { Interval = 30000 };
@@ -63,6 +74,12 @@ namespace BibliotecaApp
             // Consulta inicial del contador de morosos y arranque del refill periódico.
             ActualizarContadorAlertas();
             _timerAlertas.Start();
+
+            // Visibilidad de Gestión de Usuarios solo para Admin
+            if (_btnGestionUsuarios != null)
+            {
+                _btnGestionUsuarios.Visible = SesionGlobal.Rol == "Administrador" || SesionGlobal.Rol == "Admin";
+            }
         }
 
         /// <summary>Carga el logo CUBO desde la carpeta Recursos sin bloquear el archivo.</summary>
@@ -174,6 +191,21 @@ namespace BibliotecaApp
             ResaltarBoton(btnEstadisticas);
         }
 
+        private void MostrarApartadoHistorialPrestamos()
+        {
+            if (_vistaHistorialPrestamos == null)
+            {
+                _vistaHistorialPrestamos = new UcHistorialPrestamos();
+                _vistaHistorialPrestamos.Dock = DockStyle.Fill;
+                panelContenedor.Controls.Add(_vistaHistorialPrestamos);
+            }
+            OcultarVistas();
+            _vistaHistorialPrestamos.BringToFront();
+            _vistaHistorialPrestamos.Show();
+            _vistaHistorialPrestamos.CargarHistorial(); // Cargar datos al mostrar
+            ResaltarBoton(btnHistorialPrestamos);
+        }
+
         private void OcultarVistas()
         {
             _vistaSala?.Hide();
@@ -182,6 +214,7 @@ namespace BibliotecaApp
             _vistaAlertas?.Hide();
             _vistaEstadisticas?.Hide();
             _vistaGuiaUso?.Hide();
+            _vistaHistorialPrestamos?.Hide();
         }
 
         /// <summary>
@@ -232,8 +265,9 @@ namespace BibliotecaApp
 
         private void ResaltarBoton(Button botonActivo)
         {
-            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas, btnEstadisticas, btnGuiaUso })
+            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas, btnEstadisticas, btnGuiaUso, btnHistorialPrestamos, _btnGestionUsuarios })
             {
+                if (boton == null) continue;
                 bool activo = ReferenceEquals(boton, botonActivo);
                 boton.BackColor = activo ? EstiloUI.HoverOscuro : EstiloUI.FondoOscuro;
                 boton.ForeColor = activo ? Color.White : Color.WhiteSmoke;
@@ -322,6 +356,15 @@ namespace BibliotecaApp
             {
                 Application.Restart();
             }
+        }
+
+        // ====================================================================
+        //  GESTIÓN DE USUARIOS (Solo Admin)
+        // ====================================================================
+        private void MostrarGestionUsuarios()
+        {
+            using var frm = new FormGestionUsuarios();
+            frm.ShowDialog(this);
         }
 
         private void lblNombreApp_Click(object sender, EventArgs e)

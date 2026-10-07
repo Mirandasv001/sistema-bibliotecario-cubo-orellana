@@ -33,7 +33,7 @@ namespace BibliotecaApp
         /// <summary>
         /// Verifica si el usuario actual tiene rol de administrador.
         /// </summary>
-        public static bool EsAdmin => Rol == "Admin";
+        public static bool EsAdmin => Rol == "Administrador";
 
         /// <summary>
         /// Verifica si el usuario actual tiene rol de operador.
