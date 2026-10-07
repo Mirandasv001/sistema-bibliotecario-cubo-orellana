@@ -23,6 +23,7 @@ namespace BibliotecaApp
             panelMenu = new Panel();
             panelNav = new Panel();
             btnEstadisticas = new Button();
+            btnHistorialPrestamos = new Button();
             btnGuiaUso = new Button();
             btnAlertas = new Button();
             btnPrestamos = new Button();
@@ -57,6 +58,7 @@ namespace BibliotecaApp
             // 
             panelNav.BackColor = Color.FromArgb(27, 36, 55);
             panelNav.Controls.Add(btnEstadisticas);
+            panelNav.Controls.Add(btnHistorialPrestamos);
             panelNav.Controls.Add(btnGuiaUso);
             panelNav.Controls.Add(btnAlertas);
             panelNav.Controls.Add(btnPrestamos);
@@ -76,40 +78,47 @@ namespace BibliotecaApp
             btnEstadisticas.Size = new Size(75, 23);
             btnEstadisticas.TabIndex = 0;
             // 
+            // btnHistorialPrestamos
+            // 
+            btnHistorialPrestamos.Location = new Point(0, 0);
+            btnHistorialPrestamos.Name = "btnHistorialPrestamos";
+            btnHistorialPrestamos.Size = new Size(75, 23);
+            btnHistorialPrestamos.TabIndex = 1;
+            // 
             // btnGuiaUso
             // 
             btnGuiaUso.Location = new Point(0, 0);
             btnGuiaUso.Name = "btnGuiaUso";
             btnGuiaUso.Size = new Size(75, 23);
-            btnGuiaUso.TabIndex = 1;
+            btnGuiaUso.TabIndex = 2;
             // 
             // btnAlertas
             // 
             btnAlertas.Location = new Point(0, 0);
             btnAlertas.Name = "btnAlertas";
             btnAlertas.Size = new Size(75, 23);
-            btnAlertas.TabIndex = 1;
+            btnAlertas.TabIndex = 3;
             // 
             // btnPrestamos
             // 
             btnPrestamos.Location = new Point(0, 0);
             btnPrestamos.Name = "btnPrestamos";
             btnPrestamos.Size = new Size(75, 23);
-            btnPrestamos.TabIndex = 2;
+            btnPrestamos.TabIndex = 4;
             // 
             // btnInventario
             // 
             btnInventario.Location = new Point(0, 0);
             btnInventario.Name = "btnInventario";
             btnInventario.Size = new Size(75, 23);
-            btnInventario.TabIndex = 3;
+            btnInventario.TabIndex = 5;
             // 
             // btnSala
             // 
             btnSala.Location = new Point(0, 0);
             btnSala.Name = "btnSala";
             btnSala.Size = new Size(75, 23);
-            btnSala.TabIndex = 4;
+            btnSala.TabIndex = 6;
             // 
             // btnCerrarSesion
             // 
@@ -223,6 +232,7 @@ namespace BibliotecaApp
         private Button btnAlertas;
         private Button btnGuiaUso;
         private Button btnEstadisticas;
+        private Button btnHistorialPrestamos;
         private Label lblVersion;
         private Button btnCerrarSesion;
         private Panel panelContenedor;
