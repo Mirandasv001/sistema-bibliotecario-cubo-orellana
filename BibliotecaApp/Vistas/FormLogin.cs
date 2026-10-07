@@ -1,3 +1,5 @@
+using Microsoft.Data.Sqlite;
+
 namespace BibliotecaApp
 {
     public partial class FormLogin : Form
@@ -90,29 +92,45 @@ namespace BibliotecaApp
             string usuario = txtUsuario.Text.Trim();
             string password = txtPassword.Text;
 
-            // Validar usuario UserCubo (Operador)
-            if (usuario == "UserCubo" && password == "1234$")
+            if (string.IsNullOrWhiteSpace(usuario) || string.IsNullOrWhiteSpace(password))
             {
-                SesionGlobal.NombreUsuario = "UserCubo";
-                SesionGlobal.Rol = "Operador";
-                AbrirFormularioPrincipal();
+                MessageBox.Show("Ingrese usuario y contraseña.", "Biblioteca CUBO",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtUsuario.Focus();
+                return;
             }
-            // Validar usuario AdminCubo (Admin)
-            else if (usuario == "AdminCubo" && password == "Admin123$")
+
+            try
             {
-                SesionGlobal.NombreUsuario = "AdminCubo";
-                SesionGlobal.Rol = "Admin";
-                AbrirFormularioPrincipal();
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var cmd = conexion.CreateCommand();
+                cmd.CommandText = "SELECT Rol FROM Usuarios WHERE Usuario = @usuario AND Contrasena = @contrasena;";
+                cmd.Parameters.AddWithValue("@usuario", usuario);
+                cmd.Parameters.AddWithValue("@contrasena", password);
+
+                var rol = cmd.ExecuteScalar()?.ToString();
+
+                if (rol != null)
+                {
+                    SesionGlobal.NombreUsuario = usuario;
+                    SesionGlobal.Rol = rol;
+                    AbrirFormularioPrincipal();
+                }
+                else
+                {
+                    MessageBox.Show(
+                        "Usuario o contraseña incorrectos.",
+                        "Error de autenticación",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    txtPassword.Clear();
+                    txtPassword.Focus();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Usuario o contraseña incorrectos.",
-                    "Error de autenticación",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                txtPassword.Clear();
-                txtPassword.Focus();
+                MessageBox.Show($"Error al autenticar: {ex.Message}",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

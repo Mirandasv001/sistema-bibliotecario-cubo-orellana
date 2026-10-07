@@ -20,7 +20,7 @@ namespace BibliotecaApp
             InitializeComponent();
 
             // Configurar filas dinámicas (rescatado del diseñador para evitar errores)
-            for (int i = 0; i < 11; i++)
+            for (int i = 0; i < 8; i++)
             {
                 tlpCampos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
@@ -28,8 +28,8 @@ namespace BibliotecaApp
             splitPrestamos.Dock = DockStyle.Fill;
             splitPrestamos.Orientation = Orientation.Horizontal;
 
-            // AQUI BAJAMOS LA TABLA (Cambiado de 380 a 520)
-            splitPrestamos.SplitterDistance = 520;
+            // Ajuste a contenido real (eliminada sección Renovación/Devolución) + 30px margen botones
+            splitPrestamos.SplitterDistance = 410;
 
             splitPrestamos.Panel2.AutoScroll = false;
 
@@ -75,7 +75,6 @@ namespace BibliotecaApp
             // Fecha de Préstamo: sin restricción de MinDate (puede ser cualquier fecha)
             // Fecha de Entrega Esperada: nunca menor a la Fecha de Préstamo
             dtpFechaEntrega.MinDate = dtpFechaPrestamo.Value;
-            // Fecha de Renovación: sin restricción adicional (el checkBox controla su uso)
 
             dtpFechaPrestamo.Value = DateTime.Today;
             dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
@@ -445,7 +444,15 @@ namespace BibliotecaApp
 
         private void btnRegistrar_Click(object sender, EventArgs e)
         {
-            if (!ValidarFormulario()) return;
+            // 1. VALIDACIÓN ESTRICTA SOLO PARA ALTA DE PRÉSTAMO
+            if (string.IsNullOrWhiteSpace(txtNombre.Text) ||
+                string.IsNullOrWhiteSpace(txtDui.Text) ||
+                string.IsNullOrWhiteSpace(txtCodigoLibro.Text) ||
+                string.IsNullOrWhiteSpace(txtPersonalPresto.Text))
+            {
+                MessageBox.Show("Por favor, complete todos los datos requeridos para registrar el préstamo (Nombre, DUI, Código del Libro y Personal que Prestó).", "Validación de Préstamo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
             if (_prstamoEditandoId.HasValue)
                 ActualizarPrestamo(_prstamoEditandoId.Value);
@@ -507,12 +514,10 @@ namespace BibliotecaApp
                         insertar.CommandText = @"
                             INSERT INTO PrestamosExternos
                                 (NombreUsuario, Correo, DUI, Telefono, Direccion, TituloLibro,
-                                 FechaPrestamo, PersonalPresto, FechaRenovacion, PersonalRenovo,
-                                 FechaEntrega, PersonalRecibio, EstadoLibro, CodigoLibro, FechaDevolucion)
+                                 FechaPrestamo, PersonalPresto, FechaEntrega, EstadoLibro, CodigoLibro)
                             VALUES
                                 ($nombre, $correo, $dui, $telefono, $direccion, $titulo,
-                                 $fechaPrestamo, $personalPresto, $fechaRenovacion, $personalRenovo,
-                                 $fechaEntrega, $personalRecibio, $estado, $codigo, NULL);";
+                                 $fechaPrestamo, $personalPresto, $fechaEntrega, $estado, $codigo);";
 
                         insertar.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
                         insertar.Parameters.AddWithValue("$correo", txtCorreo.Text.Trim());
@@ -522,12 +527,7 @@ namespace BibliotecaApp
                         insertar.Parameters.AddWithValue("$titulo", titulo);
                         insertar.Parameters.AddWithValue("$fechaPrestamo", dtpFechaPrestamo.Value.ToString("yyyy-MM-dd"));
                         insertar.Parameters.AddWithValue("$personalPresto", txtPersonalPresto.Text.Trim());
-                        insertar.Parameters.AddWithValue("$fechaRenovacion",
-                            dtpFechaRenovacion.Checked ? dtpFechaRenovacion.Value.ToString("yyyy-MM-dd") : DBNull.Value);
-                        insertar.Parameters.AddWithValue("$personalRenovo",
-                            dtpFechaRenovacion.Checked ? txtPersonalRenovo.Text.Trim() : DBNull.Value);
                         insertar.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
-                        insertar.Parameters.AddWithValue("$personalRecibio", DBNull.Value);
                         insertar.Parameters.AddWithValue("$estado",
                             string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
                         insertar.Parameters.AddWithValue("$codigo", codigo);
@@ -617,7 +617,7 @@ namespace BibliotecaApp
                     using var transaccion = conexion.BeginTransaction();
                     try
                     {
-                        RenovarPrestamo(conexion, transaccion, id);
+                        RenovarPrestamo(conexion, transaccion, id, DateTime.Now, "");
                         transaccion.Commit();
                     }
                     catch
@@ -715,10 +715,7 @@ namespace BibliotecaApp
                     TituloLibro     = $titulo,
                     FechaPrestamo   = $fechaPrestamo,
                     PersonalPresto  = $personalPresto,
-                    FechaRenovacion = $fechaRenovacion,
-                    PersonalRenovo  = $personalRenovo,
                     FechaEntrega    = $fechaEntrega,
-                    PersonalRecibio = $personalRecibio,
                     EstadoLibro     = $estado
                 WHERE ID = $id;";
 
@@ -730,23 +727,7 @@ namespace BibliotecaApp
             cmd.Parameters.AddWithValue("$titulo", txtTituloLibro.Text.Trim());
             cmd.Parameters.AddWithValue("$fechaPrestamo", dtpFechaPrestamo.Value.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("$personalPresto", txtPersonalPresto.Text.Trim());
-            cmd.Parameters.AddWithValue("$fechaRenovacion",
-                dtpFechaRenovacion.Checked ? dtpFechaRenovacion.Value.ToString("yyyy-MM-dd") : DBNull.Value);
-            cmd.Parameters.AddWithValue("$personalRenovo",
-                dtpFechaRenovacion.Checked ? txtPersonalRenovo.Text.Trim() : DBNull.Value);
             cmd.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
-
-            // Si el estado es "Renovado", no se debe guardar PersonalRecibio (limpiar dato erróneo)
-            string estadoActual = (txtEstado.Text ?? "").Trim();
-            if (string.Equals(estadoActual, "Renovado", StringComparison.OrdinalIgnoreCase))
-            {
-                cmd.Parameters.AddWithValue("$personalRecibio", DBNull.Value);
-            }
-            else
-            {
-                cmd.Parameters.AddWithValue("$personalRecibio", txtPersonalRecibio.Text.Trim());
-            }
-
             cmd.Parameters.AddWithValue("$estado",
                 string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
             cmd.Parameters.AddWithValue("$id", id);
@@ -758,7 +739,7 @@ namespace BibliotecaApp
         /// la nueva Fecha de Entrega Esperada y EstadoLibro = 'Renovado'.
         /// No toca inventario ni ejecuta lógica de devolución.
         /// </summary>
-        private void RenovarPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id)
+        private void RenovarPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id, DateTime fechaRenovacion, string personalRenovo)
         {
             using var cmd = conexion.CreateCommand();
             cmd.Transaction = transaccion;
@@ -769,12 +750,9 @@ namespace BibliotecaApp
                     EstadoLibro       = 'Renovado',
                     FechaEntrega      = $nuevaFechaEntrega
                 WHERE ID = $id;";
-            cmd.Parameters.AddWithValue("$fechaRenovacion",
-                dtpFechaRenovacion.Checked ? dtpFechaRenovacion.Value.ToString("yyyy-MM-dd") : DBNull.Value);
-            cmd.Parameters.AddWithValue("$personalRenovo",
-                dtpFechaRenovacion.Checked ? txtPersonalRenovo.Text.Trim() : DBNull.Value);
-            cmd.Parameters.AddWithValue("$nuevaFechaEntrega",
-                dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("$fechaRenovacion", fechaRenovacion.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("$personalRenovo", personalRenovo);
+            cmd.Parameters.AddWithValue("$nuevaFechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("$id", id);
             cmd.ExecuteNonQuery();
         }
@@ -785,6 +763,7 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Marca el préstamo como "Entregado" y libera el ejemplar físico (por Codigo).
+        /// Usa fecha del sistema y popup para el nombre del personal.
         /// </summary>
         private void btnDevolver_Click(object sender, EventArgs e)
         {
@@ -795,14 +774,14 @@ namespace BibliotecaApp
                 return;
             }
 
-            if (txtPersonalRecibio.Text.Trim().Length == 0)
-            {
-                Notificar("Escriba el nombre del personal que recibió el libro.", txtPersonalRecibio);
+            // Popup para obtener nombre del personal
+            string personal = ObtenerNombrePersonal("recibió");
+            if (string.IsNullOrWhiteSpace(personal))
                 return;
-            }
 
             int id = Convert.ToInt32(dgvPrestamos.CurrentRow.Cells["ID"].Value);
             string? titulo = dgvPrestamos.CurrentRow.Cells["TituloLibro"].Value?.ToString();
+            DateTime fechaDevolucion = DateTime.Now;
 
             if (MessageBox.Show("¿Confirmar la devolución del préstamo seleccionado?",
                     "Registrar Devolución", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
@@ -837,8 +816,8 @@ namespace BibliotecaApp
                                 PersonalRecibio = $personal
                             WHERE ID = $id
                               AND EstadoLibro IN ('Pendiente', 'Renovado');";
-                        actualizar.Parameters.AddWithValue("$hoy", DateTime.Today.ToString("yyyy-MM-dd"));
-                        actualizar.Parameters.AddWithValue("$personal", txtPersonalRecibio.Text.Trim());
+                        actualizar.Parameters.AddWithValue("$hoy", fechaDevolucion.ToString("yyyy-MM-dd"));
+                        actualizar.Parameters.AddWithValue("$personal", personal);
                         actualizar.Parameters.AddWithValue("$id", id);
                         if (actualizar.ExecuteNonQuery() != 1)
                             throw new InvalidOperationException("El préstamo ya fue devuelto o ya no existe.");
@@ -869,6 +848,112 @@ namespace BibliotecaApp
             catch (Exception ex)
             {
                 MessageBox.Show("Error al registrar la devolución: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Muestra un modal estilo InputBox para solicitar el nombre del personal.
+        /// </summary>
+        private string ObtenerNombrePersonal(string accion)
+        {
+            using var form = new Form
+            {
+                Text = "Personal - " + accion,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                ClientSize = new Size(380, 150),
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ShowInTaskbar = false
+            };
+
+            var lbl = new Label
+            {
+                Text = $"Ingrese el nombre del personal que {accion}:",
+                AutoSize = true,
+                Location = new Point(20, 20),
+                Font = new Font("Segoe UI", 10F)
+            };
+
+            var txt = new TextBox
+            {
+                Location = new Point(20, 50),
+                Width = 340,
+                Font = new Font("Segoe UI", 10F)
+            };
+
+            var btnOk = new Button
+            {
+                Text = "Aceptar",
+                DialogResult = DialogResult.OK,
+                Location = new Point(170, 95),
+                Size = new Size(90, 35)
+            };
+            EstiloUI.EstilizarBotonPrimario(btnOk);
+
+            var btnCancel = new Button
+            {
+                Text = "Cancelar",
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(270, 95),
+                Size = new Size(90, 35)
+            };
+            EstiloUI.EstilizarBotonSecundario(btnCancel);
+
+            form.Controls.AddRange(new Control[] { lbl, txt, btnOk, btnCancel });
+            form.AcceptButton = btnOk;
+            form.CancelButton = btnCancel;
+
+            return form.ShowDialog(this) == DialogResult.OK ? txt.Text.Trim() : string.Empty;
+        }
+
+        /// <summary>
+        /// Renueva el préstamo seleccionado: fecha actual, personal por popup, estado = Renovado.
+        /// </summary>
+        private void btnRenovarFila_Click(object sender, EventArgs e)
+        {
+            if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
+            {
+                MessageBox.Show("Seleccione un préstamo de la lista.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            string personal = ObtenerNombrePersonal("renovó");
+            if (string.IsNullOrWhiteSpace(personal))
+                return;
+
+            int id = Convert.ToInt32(dgvPrestamos.CurrentRow.Cells["ID"].Value);
+            DateTime fechaRenovacion = DateTime.Now;
+
+            if (MessageBox.Show("¿Confirmar la renovación del préstamo seleccionado?",
+                    "Renovar Préstamo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var transaccion = conexion.BeginTransaction();
+                try
+                {
+                    RenovarPrestamo(conexion, transaccion, id, fechaRenovacion, personal);
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw;
+                }
+
+                MessageBox.Show("Renovación registrada correctamente.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                CargarPrestamosActivos();
+                NotificarCambioPrestamos();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al registrar la renovación: " + ex.Message,
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -934,23 +1019,8 @@ namespace BibliotecaApp
 
                 txtEstado.Text = fila["EstadoLibro"]?.ToString() ?? "Pendiente";
 
-                string fechaRenovacion = fila["FechaRenovacion"]?.ToString() ?? "";
-                if (!string.IsNullOrEmpty(fechaRenovacion) && DateTime.TryParse(fechaRenovacion, out var fr))
-                {
-                    dtpFechaRenovacion.Checked = true;
-                    dtpFechaRenovacion.Value = fr;
-                    txtPersonalRenovo.Text = fila["PersonalRenovo"]?.ToString() ?? "";
-                }
-                else
-                {
-                    dtpFechaRenovacion.Checked = false;
-                    txtPersonalRenovo.Text = "";
-                }
-
                 if (DateTime.TryParse(fila["FechaEntrega"]?.ToString(), out var fe))
                     dtpFechaEntrega.Value = fe;
-
-                txtPersonalRecibio.Text = fila["PersonalRecibio"]?.ToString() ?? "";
 
                 // Seleccionar el título en el ComboBox (por texto).
                 txtTituloLibro.Text = tituloLibro;
@@ -990,20 +1060,6 @@ namespace BibliotecaApp
             if (string.IsNullOrWhiteSpace(txtPersonalPresto.Text))
                 return Notificar("Escriba el personal que realiza el préstamo.", txtPersonalPresto);
 
-            // Validaciones según Estado del préstamo
-            string estado = (txtEstado.Text ?? "").Trim();
-            if (string.Equals(estado, "Renovado", StringComparison.OrdinalIgnoreCase))
-            {
-                if (string.IsNullOrWhiteSpace(txtPersonalRenovo.Text))
-                    return Notificar("Debe ingresar el nombre del personal que realizó la renovación.", txtPersonalRenovo);
-            }
-            else if (string.Equals(estado, "Entregado", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(estado, "Devuelto", StringComparison.OrdinalIgnoreCase))
-            {
-                if (string.IsNullOrWhiteSpace(txtPersonalRecibio.Text))
-                    return Notificar("Debe indicar el personal que recibió el libro.", txtPersonalRecibio);
-            }
-
             // Fechas: los DateTimePicker siempre tienen una fecha válida, pero
             // reforzamos que el rango tenga coherencia.
             if (dtpFechaEntrega.Value.Date < dtpFechaPrestamo.Value.Date)
@@ -1033,33 +1089,17 @@ namespace BibliotecaApp
             dtpFechaEntrega.Value = dtpFechaPrestamo.Value.AddDays(8);
         }
 
-        /// <summary>
-        /// Automatiza el campo Estado: el DateTimePicker con checkBox de renovación
-        /// decide el valor. Marcado → "Renovado"; sin marcar → "Pendiente".
-        /// Además, si hay renovación vigente, sugiere la entrega esperada
-        /// sumando 8 días a la fecha de renovación.
-        /// </summary>
-        private void dtpFechaRenovacion_ValueChanged(object? sender, EventArgs e)
-        {
-            txtEstado.Text = dtpFechaRenovacion.Checked ? "Renovado" : "Pendiente";
-
-            if (dtpFechaRenovacion.Checked)
-                dtpFechaEntrega.Value = dtpFechaRenovacion.Value.AddDays(8);
-        }
-
         private void LimpiarCampos()
         {
             foreach (var caja in new[] { txtNombre, txtCorreo, txtDui, txtTelefono,
-                     txtDireccion, txtPersonalPresto, txtPersonalRecibio, txtPersonalRenovo })
+                     txtDireccion, txtPersonalPresto })
             {
                 caja.Clear();
             }
             txtTituloLibro.Text = string.Empty;
-            txtEstado.Text = "Pendiente";
+
             dtpFechaPrestamo.Value = DateTime.Today;
             dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
-            dtpFechaRenovacion.Value = DateTime.Today;
-            dtpFechaRenovacion.Checked = false;
             LimpiarEstadoCodigo();
         }
 
