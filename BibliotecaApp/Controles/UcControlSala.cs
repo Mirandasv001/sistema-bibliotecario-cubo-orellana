@@ -431,66 +431,10 @@ namespace BibliotecaApp
         {
             if (!HayFilaSeleccionada()) return;
 
-            // Crear diálogo de credenciales dinámicamente
-            using var dlg = new Form
+            // Usar FormAutenticacion unificado (AdminCubo / Admin123$)
+            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
-                Text = "Autenticación requerida",
-                Size = new Size(340, 300),
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = EstiloUI.FondoClaro
-            };
-
-            var lblUsuario = EstiloUI.CrearEtiqueta("Usuario:");
-            lblUsuario.Location = new Point(20, 20);
-            lblUsuario.AutoSize = true;
-
-            var txtUsuario = new TextBox
-            {
-                Location = new Point(20, 50),
-                Width = 280,
-                Font = new Font(EstiloUI.FuenteBase, 10F)
-            };
-            EstiloUI.EstilizarEntrada(txtUsuario);
-
-            var lblClave = EstiloUI.CrearEtiqueta("Contraseña:");
-            lblClave.Location = new Point(20, 95);
-            lblClave.AutoSize = true;
-
-            var txtClave = new TextBox
-            {
-                Location = new Point(20, 125),
-                Width = 280,
-                Font = new Font(EstiloUI.FuenteBase, 10F),
-                PasswordChar = '•'
-            };
-            EstiloUI.EstilizarEntrada(txtClave);
-
-            var btnAceptar = new Button
-            {
-                Text = "Aceptar",
-                Location = new Point(110, 185),
-                Size = new Size(100, 35),
-                DialogResult = DialogResult.OK
-            };
-            EstiloUI.EstilizarBotonPrimario(btnAceptar);
-
-            dlg.Controls.AddRange(new Control[] { lblUsuario, txtUsuario, lblClave, txtClave, btnAceptar });
-            dlg.AcceptButton = btnAceptar;
-
-            if (dlg.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            const string usuarioValido = "UserCubo";
-            const string claveValida = "1234$";
-
-            if (txtUsuario.Text != usuarioValido || txtClave.Text != claveValida)
-            {
-                MessageBox.Show("Credenciales incorrectas. Acción cancelada.",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
             }
 
             // Credenciales correctas: ejecutar DELETE
@@ -597,6 +541,7 @@ namespace BibliotecaApp
         /// <summary>
         /// Suscribe los eventos de ratón al DataGridView para habilitar
         /// el desplazamiento por arrastre (drag scroll) con cambio de cursor.
+        /// W-06: Implementación SIN reflection — usa VScrollBar público del control.
         /// </summary>
         private void ConfigurarDragScroll()
         {
@@ -606,17 +551,23 @@ namespace BibliotecaApp
             dgvRegistros.MouseLeave += DgvRegistros_MouseLeave;
         }
 
+        private VScrollBar? _vScrollBar;
+
+        private VScrollBar? GetVScrollBar()
+        {
+            if (_vScrollBar != null) return _vScrollBar;
+            _vScrollBar = dgvRegistros.Controls.OfType<VScrollBar>().FirstOrDefault();
+            return _vScrollBar;
+        }
+
         private void DgvRegistros_MouseDown(object? sender, MouseEventArgs e)
         {
             // Solo botón izquierdo
             if (e.Button != MouseButtons.Left) return;
             if (dgvRegistros.Rows.Count == 0) return;
 
-            // Verificar que hay scroll vertical disponible
-            var vScrollProp = dgvRegistros.GetType().GetProperty("VerticalScrollBar",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var scrollBar = vScrollProp?.GetValue(dgvRegistros) as ScrollBar;
-            if (scrollBar == null || !scrollBar.Visible) return;
+            var vScroll = GetVScrollBar();
+            if (vScroll == null || !vScroll.Visible) return;
 
             // SOLO iniciar drag-scroll si se hace click en:
             // - Fondo vacío (HitTestType.None)
@@ -628,24 +579,26 @@ namespace BibliotecaApp
 
             _dragScrollActivo = true;
             _dragScrollInicio = e.Location;
-            _scrollOffsetInicial = GetVerticalScrollOffset();
+            _scrollOffsetInicial = vScroll.Value;
             dgvRegistros.Cursor = Cursors.SizeNS;
-            dgvRegistros.Capture = true; // Capturar ratón para recibir eventos aunque salga del control
+            dgvRegistros.Capture = true;
         }
 
         private void DgvRegistros_MouseMove(object? sender, MouseEventArgs e)
         {
             if (!_dragScrollActivo) return;
 
-            // Scroll suave por píxeles (no por filas)
+            var vScroll = GetVScrollBar();
+            if (vScroll == null) return;
+
+            // Scroll suave por píxeles usando el Value del VScrollBar público
             int deltaY = _dragScrollInicio.Y - e.Location.Y;
-            int nuevoOffset = _scrollOffsetInicial + deltaY;
+            int nuevoValor = _scrollOffsetInicial + deltaY;
 
-            // Clampear al rango válido del scroll interno
-            int maxOffset = GetMaxVerticalScrollOffset();
-            nuevoOffset = Math.Clamp(nuevoOffset, 0, maxOffset);
+            // Clampear al rango válido del scrollbar
+            nuevoValor = Math.Clamp(nuevoValor, vScroll.Minimum, vScroll.Maximum - vScroll.LargeChange + 1);
 
-            SetVerticalScrollOffset(nuevoOffset);
+            vScroll.Value = nuevoValor;
         }
 
         private void DgvRegistros_MouseUp(object? sender, MouseEventArgs e)
@@ -666,31 +619,15 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>Obtiene el offset vertical actual en píxeles (propiedad interna).</summary>
-        private int GetVerticalScrollOffset()
+        /// <summary>
+        /// Limpia suscripciones a eventos para evitar fugas de memoria
+        /// (C-04: VisibleChanged suscrito en constructor sin desuscribir).
+        /// Usamos HandleDestroyed en lugar de Dispose para no colisionar con el Designer.
+        /// </summary>
+        protected override void OnHandleDestroyed(EventArgs e)
         {
-            var prop = dgvRegistros.GetType().GetProperty("VerticalOffset",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            return (int)(prop?.GetValue(dgvRegistros) ?? 0);
-        }
-
-        /// <summary>Obtiene el offset vertical máximo en píxeles.</summary>
-        private int GetMaxVerticalScrollOffset()
-        {
-            var prop = dgvRegistros.GetType().GetProperty("VerticalScrollBar",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var scrollBar = prop?.GetValue(dgvRegistros) as ScrollBar;
-            if (scrollBar == null) return 0;
-            return Math.Max(0, scrollBar.Maximum - scrollBar.LargeChange + 1);
-        }
-
-        /// <summary>Establece el offset vertical en píxeles (propiedad interna).</summary>
-        private void SetVerticalScrollOffset(int offset)
-        {
-            var prop = dgvRegistros.GetType().GetProperty("VerticalOffset",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            prop?.SetValue(dgvRegistros, offset);
-            dgvRegistros.Invalidate(); // Forzar repintado
+            this.VisibleChanged -= UcControlSala_VisibleChanged;
+            base.OnHandleDestroyed(e);
         }
     }
 }

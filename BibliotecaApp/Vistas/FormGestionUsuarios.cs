@@ -243,27 +243,14 @@ namespace BibliotecaApp
             {
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var cmd = conexion.CreateCommand();
-                
-                // IMPORTANTE: El sistema usa TEXTO PLANO (sin hash), igual que FormLogin
+
+                // Hash seguro de la nueva contraseña
+                string hashedPass = PasswordHasher.Hash(nuevaPass);
                 cmd.CommandText = "UPDATE Usuarios SET Contrasena = @pass WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@pass", nuevaPass);
+                cmd.Parameters.AddWithValue("@pass", hashedPass);
                 cmd.Parameters.AddWithValue("@id", idUsuario);
 
                 int filasAfectadas = cmd.ExecuteNonQuery();
-
-                // --- VERIFICACIÓN POST-UPDATE (Diagnóstico) ---
-                string passGuardada = "";
-                using (var cmdVerificar = conexion.CreateCommand())
-                {
-                    cmdVerificar.CommandText = "SELECT Contrasena FROM Usuarios WHERE Id = @id;";
-                    cmdVerificar.Parameters.AddWithValue("@id", idUsuario);
-                    var result = cmdVerificar.ExecuteScalar();
-                    passGuardada = result?.ToString() ?? "(null)";
-                }
-                
-                // Mensaje de diagnóstico detallado
-                string msgDebug = $"Filas afectadas = {filasAfectadas}\nPass registrada en BD: {passGuardada}\nPass enviada: {nuevaPass}";
-                MessageBox.Show(msgDebug, "Diagnóstico Actualización", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 if (filasAfectadas > 0)
                 {

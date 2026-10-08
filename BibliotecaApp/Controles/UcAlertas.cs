@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Data.Sqlite;
 
@@ -188,7 +189,7 @@ namespace BibliotecaApp
         /// Notifica a los usuarios morosos por correo (mailto individual por usuario) y genera un CSV de respaldo en la carpeta temporal.
         /// Requiere que exista un botón llamado 'btnNotificar' suscrito a este evento.
         /// </summary>
-        private void btnNotificar_Click(object sender, EventArgs e)
+        private async void btnNotificar_Click(object sender, EventArgs e)
         {
             // 1️⃣ VALIDAR QUE HAY FILAS CON CORREOS VÁLIDOS
             var filasValidas = dgvAlertas.Rows
@@ -241,30 +242,41 @@ namespace BibliotecaApp
             }
 
             // 3️⃣ CREAR Y LANZAR MAILTO INDIVIDUAL POR CADA USUARIO MOROSO
+            // W-05: Fire-and-forget para no bloquear el hilo de UI al abrir múltiples mailto:
             int emailsEnviados = 0;
             foreach (var fila in filasValidas)
             {
-                try
-                {
-                    string subject = "Aviso de préstamo vencido - Biblioteca CUBO";
-                    string body = $"Estimado/a {fila.Usuario}, le informamos que el plazo para devolver el material bibliográfico '{fila.TituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.";
+                // Capturar variables locales para el closure
+                string usuario = fila.Usuario;
+                string correo = fila.Correo;
+                string tituloLibro = fila.TituloLibro;
 
-                    // IMPORTANTE: El email NO se escapa con Uri.EscapeDataString (rompería el @).
-                    // Solo subject y body llevan Uri.EscapeDataString.
-                    string uri = $"mailto:{fila.Correo}" +
-                                 $"?subject={Uri.EscapeDataString(subject)}" +
-                                 $"&body={Uri.EscapeDataString(body)}";
-
-                    var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
-                    Process.Start(psi);
-                    emailsEnviados++;
-                }
-                catch (Exception exMail)
+                Task.Run(() =>
                 {
-                    // Log pero continuar con los siguientes
-                    System.Diagnostics.Debug.WriteLine($"Error al abrir mailto para {fila.Correo}: {exMail.Message}");
-                }
+                    try
+                    {
+                        string subject = "Aviso de préstamo vencido - Biblioteca CUBO";
+                        string body = $"Estimado/a {usuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.";
+
+                        string uri = $"mailto:{correo}" +
+                                     $"?subject={Uri.EscapeDataString(subject)}" +
+                                     $"&body={Uri.EscapeDataString(body)}";
+
+                        var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
+                        Process.Start(psi);
+
+                        // Incrementar contador de forma thread-safe
+                        Interlocked.Increment(ref emailsEnviados);
+                    }
+                    catch (Exception exMail)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error al abrir mailto para {correo}: {exMail.Message}");
+                    }
+                });
             }
+
+            // Pequeña pausa para dar tiempo a que se lancen los procesos (fire-and-forget)
+            await Task.Delay(100);
 
             // 4️⃣ CONFIRMACIÓN FINAL
             string msg = $"Se abrieron {emailsEnviados} ventana(s) de correo personalizadas (una por usuario moroso).";
