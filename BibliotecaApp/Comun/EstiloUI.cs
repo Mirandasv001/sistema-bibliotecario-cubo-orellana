@@ -94,9 +94,21 @@ namespace BibliotecaApp
             boton.Height = 40;
             boton.UseVisualStyleBackColor = false;
 
-            // Hover suave via eventos (además de FlatAppearance)
-            boton.MouseEnter += (_, _) => boton.BackColor = Acento;
-            boton.MouseLeave += (_, _) => boton.BackColor = FondoOscuro;
+            // W-16: Evitar suscripciones múltiples - remover handlers previos antes de agregar
+            boton.MouseEnter -= BotonPrimario_MouseEnter;
+            boton.MouseLeave -= BotonPrimario_MouseLeave;
+            boton.MouseEnter += BotonPrimario_MouseEnter;
+            boton.MouseLeave += BotonPrimario_MouseLeave;
+        }
+
+        private static void BotonPrimario_MouseEnter(object? sender, EventArgs e)
+        {
+            if (sender is Button btn) btn.BackColor = Acento;
+        }
+
+        private static void BotonPrimario_MouseLeave(object? sender, EventArgs e)
+        {
+            if (sender is Button btn) btn.BackColor = FondoOscuro;
         }
 
         /// <summary>Botón secundario: fondo gris claro, texto azul oscuro, Flat, sin bordes, hover sutil.</summary>
@@ -116,10 +128,21 @@ namespace BibliotecaApp
             boton.Height = 40;
             boton.UseVisualStyleBackColor = false;
 
-            // Hover suave via eventos
-            Color hoverColor = Color.FromArgb(0xD0, 0xDC, 0xF0);
-            boton.MouseEnter += (_, _) => boton.BackColor = hoverColor;
-            boton.MouseLeave += (_, _) => boton.BackColor = Color.FromArgb(0xE2, 0xEA, 0xFC);
+            // W-16: Evitar suscripciones múltiples - remover handlers previos antes de agregar
+            boton.MouseEnter -= BotonSecundario_MouseEnter;
+            boton.MouseLeave -= BotonSecundario_MouseLeave;
+            boton.MouseEnter += BotonSecundario_MouseEnter;
+            boton.MouseLeave += BotonSecundario_MouseLeave;
+        }
+
+        private static void BotonSecundario_MouseEnter(object? sender, EventArgs e)
+        {
+            if (sender is Button btn) btn.BackColor = Color.FromArgb(0xD0, 0xDC, 0xF0);
+        }
+
+        private static void BotonSecundario_MouseLeave(object? sender, EventArgs e)
+        {
+            if (sender is Button btn) btn.BackColor = Color.FromArgb(0xE2, 0xEA, 0xFC);
         }
 
 

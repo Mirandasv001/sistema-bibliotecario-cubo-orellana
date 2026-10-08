@@ -104,17 +104,53 @@ namespace BibliotecaApp
             {
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var cmd = conexion.CreateCommand();
-                cmd.CommandText = "SELECT Rol FROM Usuarios WHERE Usuario = @usuario AND Contrasena = @contrasena;";
+                // Obtenemos el hash almacenado y el rol
+                cmd.CommandText = "SELECT Contrasena, Rol FROM Usuarios WHERE Usuario = @usuario;";
                 cmd.Parameters.AddWithValue("@usuario", usuario);
-                cmd.Parameters.AddWithValue("@contrasena", password);
 
-                var rol = cmd.ExecuteScalar()?.ToString();
-
-                if (rol != null)
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
                 {
-                    SesionGlobal.NombreUsuario = usuario;
-                    SesionGlobal.Rol = rol;
-                    AbrirFormularioPrincipal();
+                    string storedHash = reader.GetString(0);
+                    string rol = reader.GetString(1);
+
+                    // Verificar contraseña (soporta hash PBKDF2 y legacy texto plano)
+                    bool passwordValid;
+                    if (PasswordHasher.IsLegacyHash(storedHash))
+                    {
+                        // Migración silenciosa: texto plano -> hash
+                        passwordValid = (storedHash == password);
+                        if (passwordValid)
+                        {
+                            // Actualizar a hash seguro
+                            using var updateCmd = conexion.CreateCommand();
+                            updateCmd.CommandText = "UPDATE Usuarios SET Contrasena = @newhash WHERE Usuario = @usuario;";
+                            updateCmd.Parameters.AddWithValue("@newhash", PasswordHasher.Hash(password));
+                            updateCmd.Parameters.AddWithValue("@usuario", usuario);
+                            updateCmd.ExecuteNonQuery();
+                        }
+                    }
+                    else
+                    {
+                        passwordValid = PasswordHasher.Verify(password, storedHash);
+                    }
+
+                    if (passwordValid)
+                    {
+                        SesionGlobal.NombreUsuario = usuario;
+                        SesionGlobal.Rol = rol;
+                        AbrirFormularioPrincipal();
+                    }
+                    else
+                    {
+                        MessageBox.Show(
+                            "Usuario o contraseña incorrectos.",
+                            "Error de autenticación",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                        txtPassword.Clear();
+                        txtPassword.Focus();
+                    }
                 }
                 else
                 {

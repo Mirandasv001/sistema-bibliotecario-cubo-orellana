@@ -205,8 +205,9 @@ namespace BibliotecaApp
         public void NotificarCambioPrestamos()
         {
             ActualizarContadorAlertas();
-            _vistaAlertas?.Actualizar();
-            _vistaInventario?.Actualizar();
+            // W-10: Verificar !IsDisposed para evitar ObjectDisposedException
+            if (_vistaAlertas is { IsDisposed: false }) _vistaAlertas.Actualizar();
+            if (_vistaInventario is { IsDisposed: false }) _vistaInventario.Actualizar();
         }
 
         // ------------------------------------------------------------------
