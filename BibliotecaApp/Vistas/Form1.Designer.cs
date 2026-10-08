@@ -23,7 +23,6 @@ namespace BibliotecaApp
             panelMenu = new Panel();
             panelNav = new Panel();
             btnEstadisticas = new Button();
-            btnHistorialPrestamos = new Button();
             btnGuiaUso = new Button();
             btnAlertas = new Button();
             btnPrestamos = new Button();
@@ -58,7 +57,6 @@ namespace BibliotecaApp
             // 
             panelNav.BackColor = Color.FromArgb(27, 36, 55);
             panelNav.Controls.Add(btnEstadisticas);
-            panelNav.Controls.Add(btnHistorialPrestamos);
             panelNav.Controls.Add(btnGuiaUso);
             panelNav.Controls.Add(btnAlertas);
             panelNav.Controls.Add(btnPrestamos);
@@ -77,13 +75,6 @@ namespace BibliotecaApp
             btnEstadisticas.Name = "btnEstadisticas";
             btnEstadisticas.Size = new Size(75, 23);
             btnEstadisticas.TabIndex = 0;
-            // 
-            // btnHistorialPrestamos
-            // 
-            btnHistorialPrestamos.Location = new Point(0, 0);
-            btnHistorialPrestamos.Name = "btnHistorialPrestamos";
-            btnHistorialPrestamos.Size = new Size(75, 23);
-            btnHistorialPrestamos.TabIndex = 1;
             // 
             // btnGuiaUso
             // 
@@ -232,7 +223,6 @@ namespace BibliotecaApp
         private Button btnAlertas;
         private Button btnGuiaUso;
         private Button btnEstadisticas;
-        private Button btnHistorialPrestamos;
         private Label lblVersion;
         private Button btnCerrarSesion;
         private Panel panelContenedor;
