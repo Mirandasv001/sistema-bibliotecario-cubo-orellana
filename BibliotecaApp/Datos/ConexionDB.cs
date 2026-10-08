@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.Sqlite;
+using System.Configuration; // Para ConfigurationManager
 
 namespace BibliotecaApp
 {
@@ -19,6 +20,12 @@ namespace BibliotecaApp
                 DataSource = RutaBaseDatos,
                 Mode = SqliteOpenMode.ReadWriteCreate
             }.ToString();
+
+        /// <summary>
+        /// Ruta opcional del CSV de catálogo. Si es null, usa búsqueda automática.
+        /// Configurable via app.config: <add key="CatalogoCsvPath" value="ruta\archivo.csv" />
+        /// </summary>
+        public static string? CatalogoCsvPath { get; set; } = null;
 
         /// <summary>Abre y devuelve una conexión SQLite ya abierta.</summary>
         public static SqliteConnection ObtenerConexion()
@@ -52,8 +59,16 @@ namespace BibliotecaApp
             using var cmd = conexion.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO Usuarios (Nombre, Usuario, Contrasena, Rol) VALUES
-                ('Usuario Operador', 'UserCubo', '1234$', 'Operador'),
-                ('Administrador', 'AdminCubo', 'Admin123$', 'Administrador');";
+                (@nombre1, @usuario1, @pass1, @rol1),
+                (@nombre2, @usuario2, @pass2, @rol2);";
+            cmd.Parameters.AddWithValue("@nombre1", "Usuario Operador");
+            cmd.Parameters.AddWithValue("@usuario1", "UserCubo");
+            cmd.Parameters.AddWithValue("@pass1", PasswordHasher.Hash("1234$"));
+            cmd.Parameters.AddWithValue("@rol1", "Operador");
+            cmd.Parameters.AddWithValue("@nombre2", "Administrador");
+            cmd.Parameters.AddWithValue("@usuario2", "AdminCubo");
+            cmd.Parameters.AddWithValue("@pass2", PasswordHasher.Hash("Admin123$"));
+            cmd.Parameters.AddWithValue("@rol2", "Administrador");
             cmd.ExecuteNonQuery();
         }
 
@@ -445,8 +460,11 @@ namespace BibliotecaApp
 
         private static string? BuscarArchivoCsv()
         {
-            // Busca el CSV en el directorio de salida y en las carpetas superiores
-            // (solución/proyecto) para cubrir también la ejecución en desarrollo.
+            // W-07: Prioridad 1 - Ruta configurable via app.config / property
+            if (!string.IsNullOrWhiteSpace(CatalogoCsvPath) && File.Exists(CatalogoCsvPath))
+                return CatalogoCsvPath;
+
+            // Prioridad 2 - Búsqueda automática (legacy): sube hasta 6 niveles
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             for (int i = 0; i < 6 && dir != null; i++, dir = dir.Parent!)
             {

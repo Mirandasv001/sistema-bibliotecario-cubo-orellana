@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.Data.Sqlite;
 using System.Drawing.Drawing2D;
+using System.Collections.Generic;
 
 namespace BibliotecaApp
 {
@@ -8,6 +9,7 @@ namespace BibliotecaApp
     /// Módulo de Estadísticas: muestra gráfica de barras de visitas por género
     /// con filtros de rango de fechas sobre la tabla ControlUsuariosSala.
     /// Implementación 100% nativa sin dependencias externas (pintado GDI+).
+    /// W-12: Soporte dinámico de géneros (Dictionary) — no hardcodea Masculino/Femenino.
     /// </summary>
     public partial class UcEstadisticas : UserControl
     {
@@ -22,23 +24,25 @@ namespace BibliotecaApp
         // Labels (se asignan vía 'out' en CrearTarjetaResumen)
         private Label _lblTotalVisitasTitulo;
         private Label _lblTotalVisitasValor;
-        private Label _lblMasculinoTitulo;
-        private Label _lblMasculinoValor;
-        private Label _lblFemeninoTitulo;
-        private Label _lblFemeninoValor;
+        private Label _lblGenero1Titulo;
+        private Label _lblGenero1Valor;
+        private Label _lblGenero2Titulo;
+        private Label _lblGenero2Valor;
 
         // Panel para la gráfica custom (pintado en Paint)
         private Panel _pnlGrafica;
 
         // Datos para el pintado (no readonly, se modifican en CargarDatos)
-        private int _valorMasculino = 0;
-        private int _valorFemenino = 0;
+        private int _valorGenero1 = 0;
+        private int _valorGenero2 = 0;
         private int _valorTotal = 0;
+        private string _nombreGenero1 = "Masculino";
+        private string _nombreGenero2 = "Femenino";
 
-        // Contadores de la consulta actual (se reinician en cada CargarDatos)
-        private int totalMasculino = 0;
-        private int totalFemenino = 0;
-        private int totalVisitas = 0;
+        // Colores por género (configurables)
+        private static readonly Color ColorGenero1 = Color.FromArgb(52, 152, 219);  // Azul
+        private static readonly Color ColorGenero2 = Color.FromArgb(231, 76, 60);   // Rojo
+        private static readonly Color ColorTotal = Color.FromArgb(27, 43, 66);      // Azul oscuro
 
         public UcEstadisticas()
         {
@@ -49,8 +53,8 @@ namespace BibliotecaApp
             // LIMPIAR LABELS DE INICIO: forzar textos en "0" al arrancar
             // ============================================================
             _lblTotalVisitasValor.Text = "0";
-            _lblMasculinoValor.Text = "0";
-            _lblFemeninoValor.Text = "0";
+            _lblGenero1Valor.Text = "0";
+            _lblGenero2Valor.Text = "0";
         }
 
         private void InitializeComponent()
@@ -138,18 +142,18 @@ namespace BibliotecaApp
             };
 
             // Tarjeta Total Visitas
-            var cardTotal = CrearTarjetaResumen("Total Visitas", "0", EstiloUI.Acento, out _lblTotalVisitasTitulo, out _lblTotalVisitasValor);
+            var cardTotal = CrearTarjetaResumen("Total Visitas", "0", ColorTotal, out _lblTotalVisitasTitulo, out _lblTotalVisitasValor);
             cardTotal.Location = new Point(0, 0);
 
-            // Tarjeta Masculino
-            var cardMasc = CrearTarjetaResumen("Masculino", "0", Color.FromArgb(52, 152, 219), out _lblMasculinoTitulo, out _lblMasculinoValor);
-            cardMasc.Location = new Point(280, 0);
+            // Tarjeta Género 1 (dinámico)
+            var cardGenero1 = CrearTarjetaResumen(_nombreGenero1, "0", ColorGenero1, out _lblGenero1Titulo, out _lblGenero1Valor);
+            cardGenero1.Location = new Point(280, 0);
 
-            // Tarjeta Femenino
-            var cardFem = CrearTarjetaResumen("Femenino", "0", Color.FromArgb(231, 76, 60), out _lblFemeninoTitulo, out _lblFemeninoValor);
-            cardFem.Location = new Point(560, 0);
+            // Tarjeta Género 2 (dinámico)
+            var cardGenero2 = CrearTarjetaResumen(_nombreGenero2, "0", ColorGenero2, out _lblGenero2Titulo, out _lblGenero2Valor);
+            cardGenero2.Location = new Point(560, 0);
 
-            _panelResumen.Controls.AddRange(new Control[] { cardTotal, cardMasc, cardFem });
+            _panelResumen.Controls.AddRange(new Control[] { cardTotal, cardGenero1, cardGenero2 });
             this.Controls.Add(_panelResumen);
 
             // =================================================================
@@ -218,15 +222,15 @@ namespace BibliotecaApp
         /// <summary>
         /// Carga los datos desde la BD y actualiza tarjetas y gráfica.
         /// Método público para ser llamado desde Form1 al mostrar la vista.
+        /// W-12: Usa Dictionary para soportar cualquier género dinámicamente.
         /// </summary>
         public void CargarDatos()
         {
             // ============================================================
             // PASO 1: REINICIAR VARIABLES (lo primero, obligatorio)
             // ============================================================
-            totalMasculino = 0;
-            totalFemenino = 0;
-            totalVisitas = 0;
+            var generos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            int totalVisitas = 0;
 
             // Formato estricto yyyy-MM-dd para parámetros
             string fechaDesde = _dtpDesde.Value.ToString("yyyy-MM-dd");
@@ -250,7 +254,7 @@ namespace BibliotecaApp
                 comando.Parameters.AddWithValue("$hasta", fechaHasta);
 
                 // ============================================================
-                // PASO 3: LEER Y ACUMULAR (if/else sobre columna "Genero")
+                // PASO 3: LEER Y ACUMULAR (Dictionary dinámico — W-12)
                 // ============================================================
                 using var lector = comando.ExecuteReader();
                 while (lector.Read())
@@ -258,14 +262,13 @@ namespace BibliotecaApp
                     string genero = lector.GetString(0);
                     int cantidad = lector.GetInt32(1);
 
-                    if (genero.Equals("Masculino", StringComparison.OrdinalIgnoreCase))
-                        totalMasculino += cantidad;
-                    else if (genero.Equals("Femenino", StringComparison.OrdinalIgnoreCase))
-                        totalFemenino += cantidad;
-                }
+                    if (generos.ContainsKey(genero))
+                        generos[genero] += cantidad;
+                    else
+                        generos[genero] = cantidad;
 
-                // Total general = suma de ambos
-                totalVisitas = totalMasculino + totalFemenino;
+                    totalVisitas += cantidad;
+                }
             }
             catch (Exception ex)
             {
@@ -274,15 +277,46 @@ namespace BibliotecaApp
             }
 
             // ============================================================
-            // PASO 4: ASIGNAR A CAMPOS DE INSTANCIA, ACTUALIZAR LABELS Y DIBUJAR
+            // PASO 4: ASIGNAR TOP 2 GÉNEROS + TOTAL
             // ============================================================
-            _valorMasculino = totalMasculino;
-            _valorFemenino = totalFemenino;
+            // Ordenar por cantidad descendente y tomar top 2
+            var topGeneros = generos
+                .OrderByDescending(kvp => kvp.Value)
+                .Take(2)
+                .ToList();
+
+            // Asignar primer género
+            if (topGeneros.Count > 0)
+            {
+                _nombreGenero1 = topGeneros[0].Key;
+                _valorGenero1 = topGeneros[0].Value;
+            }
+            else
+            {
+                _nombreGenero1 = "Masculino";
+                _valorGenero1 = 0;
+            }
+
+            // Asignar segundo género
+            if (topGeneros.Count > 1)
+            {
+                _nombreGenero2 = topGeneros[1].Key;
+                _valorGenero2 = topGeneros[1].Value;
+            }
+            else
+            {
+                _nombreGenero2 = "Femenino";
+                _valorGenero2 = 0;
+            }
+
             _valorTotal = totalVisitas;
 
+            // Actualizar labels
             _lblTotalVisitasValor.Text = totalVisitas.ToString("N0");
-            _lblMasculinoValor.Text = totalMasculino.ToString("N0");
-            _lblFemeninoValor.Text = totalFemenino.ToString("N0");
+            _lblGenero1Titulo.Text = _nombreGenero1;
+            _lblGenero1Valor.Text = _valorGenero1.ToString("N0");
+            _lblGenero2Titulo.Text = _nombreGenero2;
+            _lblGenero2Valor.Text = _valorGenero2.ToString("N0");
 
             // Forzar repintado de la gráfica desde cero
             _pnlGrafica.Invalidate();
@@ -290,7 +324,7 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Evento Paint: dibuja las barras, valores y etiquetas nativamente con escalado correcto.
-        /// Barras: Total (azul oscuro), Masculino (azul claro), Femenino (rojo coral).
+        /// W-12: Barras dinámicas — Total + Top 2 géneros detectados.
         /// </summary>
         private void PnlGrafica_Paint(object sender, PaintEventArgs e)
         {
@@ -308,12 +342,12 @@ namespace BibliotecaApp
             int areaHeight = clientRect.Height - paddingTop - paddingBottom;
             int baseY = clientRect.Height - paddingBottom; // Línea base (eje X)
 
-            // Colores
-            Color colorTotal = Color.FromArgb(27, 43, 66);     // #1B2B42 - Azul oscuro institucional
-            Color colorMasc = Color.FromArgb(52, 152, 219);    // Azul celeste
-            Color colorFem = Color.FromArgb(231, 76, 60);      // Rojo coral
+            // Colores (usar estáticos definidos en la clase)
+            Color colorTotal = ColorTotal;
+            Color colorGenero1 = ColorGenero1;
+            Color colorGenero2 = ColorGenero2;
             Color colorEje = Color.FromArgb(180, 180, 180);
-            Color colorGrid = Color.FromArgb(230, 230, 230);   // Gris extra claro para gridlines
+            Color colorGrid = Color.FromArgb(230, 230, 230);
             Color colorTexto = EstiloUI.TextoOscuro;
             Color colorTextoSecundario = Color.FromArgb(120, 130, 140);
 
@@ -327,8 +361,8 @@ namespace BibliotecaApp
             using var brushTexto = new SolidBrush(colorTexto);
             using var brushTextoSec = new SolidBrush(colorTextoSecundario);
             using var brushTotal = new SolidBrush(colorTotal);
-            using var brushMasc = new SolidBrush(colorMasc);
-            using var brushFem = new SolidBrush(colorFem);
+            using var brushGenero1 = new SolidBrush(colorGenero1);
+            using var brushGenero2 = new SolidBrush(colorGenero2);
 
             // Plumas
             using var penEje = new Pen(colorEje, 1);
@@ -341,7 +375,7 @@ namespace BibliotecaApp
                 paddingLeft + (areaWidth - szTitulo.Width) / 2, paddingTop - 5);
 
             // ---- CASO SIN DATOS (evita dibujar gráfica fantasma) ----
-            if (totalMasculino == 0 && totalFemenino == 0)
+            if (_valorGenero1 == 0 && _valorGenero2 == 0)
             {
                 string msg = "No hay registros";
                 SizeF szMsg = g.MeasureString(msg, fontNoDatos);
@@ -352,8 +386,8 @@ namespace BibliotecaApp
             }
 
             // ---- CÁLCULO DE ESCALA BASADO EN TOTAL ----
-            int total = _valorMasculino + _valorFemenino; // Total calculado internamente solo para dibujo
-            int maxValor = Math.Max(total, Math.Max(_valorMasculino, _valorFemenino));
+            int total = _valorTotal; // Usar el total real
+            int maxValor = Math.Max(total, Math.Max(_valorGenero1, _valorGenero2));
 
             // Espacio reservado arriba para el texto del valor (altura de fuente + gap)
             int espacioTextoArriba = (int)Math.Ceiling(g.MeasureString("0", fontValor).Height) + 8; // ~19 + 8 = ~27px
@@ -386,12 +420,12 @@ namespace BibliotecaApp
             int anchoBarra = Math.Min(70, (areaWidth - espacioEntreBarras * (numBarras + 1)) / numBarras);
             int inicioX = paddingLeft + (areaWidth - (anchoBarra * numBarras + espacioEntreBarras * (numBarras - 1))) / 2;
 
-            // Datos de las 3 barras: Total, Masculino, Femenino
+            // Datos de las 3 barras: Total, Género 1, Género 2 (dinámicos — W-12)
             var barras = new[]
             {
                 new { Label = "Total", Valor = total, Brush = brushTotal, X = inicioX },
-                new { Label = "Masculino", Valor = _valorMasculino, Brush = brushMasc, X = inicioX + anchoBarra + espacioEntreBarras },
-                new { Label = "Femenino", Valor = _valorFemenino, Brush = brushFem, X = inicioX + 2 * (anchoBarra + espacioEntreBarras) }
+                new { Label = _nombreGenero1, Valor = _valorGenero1, Brush = brushGenero1, X = inicioX + anchoBarra + espacioEntreBarras },
+                new { Label = _nombreGenero2, Valor = _valorGenero2, Brush = brushGenero2, X = inicioX + 2 * (anchoBarra + espacioEntreBarras) }
             };
 
             foreach (var barra in barras)
