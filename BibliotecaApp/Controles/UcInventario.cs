@@ -153,6 +153,10 @@ namespace BibliotecaApp
                         codigo + " " + titulo).ToLowerInvariant();
                 }
 
+                // W-18: Dispose DataTable/DataView anterior para liberar memoria antes de reasignar
+                _vistaFiltrada?.Dispose();
+                _datosInventario?.Dispose();
+
                 _datosInventario = tabla;
                 _vistaFiltrada = new DataView(_datosInventario);
 
@@ -294,12 +298,8 @@ namespace BibliotecaApp
                     cmd.ExecuteNonQuery();
                 }
 
-                // Reiniciar autoincremento si existe
-                using (var cmd = conexion.CreateCommand())
-                {
-                    cmd.CommandText = "DELETE FROM sqlite_sequence WHERE name = 'Libros';";
-                    cmd.ExecuteNonQuery();
-                }
+                // W-08: ELIMINADO — 'Libros.Codigo' es TEXT PRIMARY KEY (no AUTOINCREMENT),
+                // por tanto sqlite_sequence no aplica. La línea siguiente era código muerto.
 
                 // PERSISTENCIA: marcar el vaciado. Sin esta bandera, el arranque
                 // volvería a importar el catálogo CSV y el inventario reaparecería.
@@ -355,6 +355,12 @@ namespace BibliotecaApp
 
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var transaction = conexion.BeginTransaction();
+
+                // Preparar comando para verificar disponibilidad actual antes de insertar/reemplazar
+                using var checkCmd = conexion.CreateCommand();
+                checkCmd.Transaction = transaction;
+                checkCmd.CommandText = "SELECT Disponibilidad FROM Libros WHERE Codigo = @codigo;";
+                var pCheckCodigo = checkCmd.Parameters.Add("@codigo", SqliteType.Text);
 
                 // Preparar comando INSERT OR REPLACE parametrizado (tolera duplicados en Codigo UNIQUE)
                 using var cmd = conexion.CreateCommand();
@@ -417,9 +423,24 @@ namespace BibliotecaApp
                     string editorial = campos.Length > 3 ? campos[3].Trim() : "";
                     string estado = campos.Length > 4 ? campos[4].Trim() : "";
                     string ubicacion = campos.Length > 5 ? campos[5].Trim() : "";
-                    string disponibilidad = (campos.Length > 6 && !string.IsNullOrWhiteSpace(campos[6]))
+                    string disponibilidadCsv = (campos.Length > 6 && !string.IsNullOrWhiteSpace(campos[6]))
                         ? campos[6].Trim()
                         : "Disponible";
+
+                    // C-05: No sobrescribir 'Prestado' a 'Disponible' si el ejemplar ya está prestado.
+                    // Verificamos la disponibilidad actual en BD antes de insertar/reemplazar.
+                    string disponibilidadFinal = disponibilidadCsv;
+                    pCheckCodigo.Value = codigo;
+                    object? result = checkCmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        string disponibilidadActual = result.ToString() ?? "";
+                        if (string.Equals(disponibilidadActual, "Prestado", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // El ejemplar está prestado: preservar estado 'Prestado' para no desincronizar préstamos activos.
+                            disponibilidadFinal = "Prestado";
+                        }
+                    }
 
                     pCodigo.Value = codigo;
                     pTitulo.Value = titulo;
@@ -427,7 +448,7 @@ namespace BibliotecaApp
                     pEditorial.Value = editorial;
                     pEstado.Value = estado;
                     pUbicacion.Value = ubicacion;
-                    pDisponibilidad.Value = disponibilidad;
+                    pDisponibilidad.Value = disponibilidadFinal;
 
                     cmd.ExecuteNonQuery();
                     filasInsertadas++;

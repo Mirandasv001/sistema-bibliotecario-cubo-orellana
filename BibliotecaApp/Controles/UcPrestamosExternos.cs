@@ -82,7 +82,7 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Agrega la columna Notificado a la tabla PrestamosExternos si no existe.
-        /// SQLite lanza error si la columna ya existe; el catch lo ignora silenciosamente.
+        /// SQLite lanza error si la columna ya existe; lo manejamos explícitamente.
         /// </summary>
         private void AsegurarColumnaNotificado()
         {
@@ -93,9 +93,16 @@ namespace BibliotecaApp
                 comando.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN Notificado INTEGER DEFAULT 0;";
                 comando.ExecuteNonQuery();
             }
-            catch
+            catch (SqliteException ex) when (ex.SqliteErrorCode == 1 || ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
             {
-                // Si la columna ya existe, SQLite lanza excepción; ignoramos para continuar flujo normal.
+                // La columna ya existe (SQLite error code 1 = SQLITE_ERROR para duplicate column).
+                // No es un error, continuamos flujo normal.
+            }
+            catch (Exception ex)
+            {
+                // Cualquier otra excepción: log y relanzar para no fallar silenciosamente.
+                System.Diagnostics.Debug.WriteLine($"AsegurarColumnaNotificado: {ex.Message}");
+                throw;
             }
         }
 
@@ -490,8 +497,17 @@ namespace BibliotecaApp
             flpBotones.Controls.Add(lblPagina);
             flpBotones.Controls.Add(btnSiguiente);
 
-            // Reajustar el espaciador cuando cambie el ancho de la fila (resize del formulario)
-            flpBotones.Resize += (_, _) => ActualizarEspaciadorPaginacion();
+            // W-11: WeakReference en lambda Resize para evitar retención de 'this'
+            var weakThis = new WeakReference<UcPrestamosExternos>(this);
+            EventHandler resizeHandler = null;
+            resizeHandler = (_, _) =>
+            {
+                if (weakThis.TryGetTarget(out var target))
+                    target.ActualizarEspaciadorPaginacion();
+                else
+                    flpBotones.Resize -= resizeHandler; // Auto-limpieza si target recolectado
+            };
+            flpBotones.Resize += resizeHandler;
             ActualizarEspaciadorPaginacion();
         }
 
@@ -615,6 +631,8 @@ namespace BibliotecaApp
         /// </summary>
         private void btnEliminar_Click(object? sender, EventArgs e)
         {
+            // W-02: Capturar valores de la fila ANTES de cualquier MessageBox/Dialog
+            // para evitar race condition si el usuario cambia de fila mientras el dialog está abierto.
             if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
             {
                 MessageBox.Show("Seleccione un préstamo de la lista para eliminar.",
@@ -622,14 +640,9 @@ namespace BibliotecaApp
                 return;
             }
 
-            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
-            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
-            {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
-            }
-
             int id = Convert.ToInt32(dgvPrestamos.CurrentRow.Cells["ID"].Value);
             string estado = dgvPrestamos.CurrentRow.Cells["Estado"].Value?.ToString()?.Trim() ?? "";
+            string tituloFila = dgvPrestamos.CurrentRow.Cells["TituloLibro"].Value?.ToString() ?? "";
 
             // Solo se pueden eliminar préstamos ya entregados (cerrados).
             if (!string.Equals(estado, "Entregado", StringComparison.OrdinalIgnoreCase))
@@ -638,6 +651,12 @@ namespace BibliotecaApp
                     "Registre primero la devolución del libro.",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
+            }
+
+            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
+            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
+            {
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
             }
 
             var resultado = MessageBox.Show(
@@ -650,15 +669,80 @@ namespace BibliotecaApp
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
-                using var cmd = conexion.CreateCommand();
-                cmd.CommandText = "DELETE FROM PrestamosExternos WHERE ID = @id AND EstadoLibro = 'Entregado';";
-                cmd.Parameters.AddWithValue("@id", id);
 
-                if (cmd.ExecuteNonQuery() == 0)
+                // DELETE + UPDATE de inventario como una sola unidad: si algo falla,
+                // no se borra el préstamo y tampoco se altera la disponibilidad.
+                using var transaccion = conexion.BeginTransaction();
+                try
                 {
-                    MessageBox.Show("No se pudo eliminar el préstamo (ya no existe o no está en estado 'Entregado').",
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+                    // Resolver el ejemplar ANTES del DELETE (después ya no existirá
+                    // el registro). Compatibilidad con préstamos antiguos sin
+                    // CodigoLibro: se toma el ejemplar 'Prestado' de ese título.
+                    string? codigoLibro;
+                    using (var obtenerCodigo = conexion.CreateCommand())
+                    {
+                        obtenerCodigo.Transaction = transaccion;
+                        obtenerCodigo.CommandText =
+                            "SELECT CodigoLibro FROM PrestamosExternos WHERE ID = $id;";
+                        obtenerCodigo.Parameters.AddWithValue("$id", id);
+                        codigoLibro = obtenerCodigo.ExecuteScalar()?.ToString();
+                    }
+
+                    if (string.IsNullOrEmpty(codigoLibro))
+                    {
+                        using var obtenerPorTitulo = conexion.CreateCommand();
+                        obtenerPorTitulo.Transaction = transaccion;
+                        obtenerPorTitulo.CommandText = @"
+                            SELECT Codigo FROM Libros
+                            WHERE Titulo = $titulo AND Disponibilidad = 'Prestado'
+                            LIMIT 1;";
+                        obtenerPorTitulo.Parameters.AddWithValue("$titulo", tituloFila);
+                        codigoLibro = obtenerPorTitulo.ExecuteScalar()?.ToString();
+                    }
+
+                    using (var cmd = conexion.CreateCommand())
+                    {
+                        cmd.Transaction = transaccion;
+                        cmd.CommandText = "DELETE FROM PrestamosExternos WHERE ID = @id AND EstadoLibro = 'Entregado';";
+                        cmd.Parameters.AddWithValue("@id", id);
+
+                        if (cmd.ExecuteNonQuery() == 0)
+                        {
+                            // Rollback: el using de la transacción no dejará nada a medias.
+                            transaccion.Rollback();
+                            MessageBox.Show("No se pudo eliminar el préstamo (ya no existe o no está en estado 'Entregado').",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+
+                    // Re-sincronizar el Inventario: el ejemplar del préstamo borrado
+                    // debe quedar 'Disponible'. El NOT EXISTS evita liberarlo si otro
+                    // préstamo activo (Pendiente/Renovado) sigue reteniéndolo, cosa
+                    // que ocurriría si el mismo ejemplar ya fue prestado de nuevo.
+                    if (!string.IsNullOrEmpty(codigoLibro))
+                    {
+                        using var liberar = conexion.CreateCommand();
+                        liberar.Transaction = transaccion;
+                        liberar.CommandText = @"
+                            UPDATE Libros SET Disponibilidad = 'Disponible'
+                            WHERE Codigo = $codigo
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM PrestamosExternos
+                                  WHERE CodigoLibro = $codigo
+                                    AND ID <> $id
+                                    AND EstadoLibro IN ('Pendiente', 'Renovado'));";
+                        liberar.Parameters.AddWithValue("$codigo", codigoLibro);
+                        liberar.Parameters.AddWithValue("$id", id);
+                        liberar.ExecuteNonQuery();
+                    }
+
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw;
                 }
 
                 MessageBox.Show("Préstamo eliminado correctamente.", "Biblioteca CUBO",
@@ -953,8 +1037,11 @@ namespace BibliotecaApp
                         insertar.Parameters.AddWithValue("$fechaPrestamo", dtpFechaPrestamo.Value.ToString("yyyy-MM-dd"));
                         insertar.Parameters.AddWithValue("$personalPresto", txtPersonalPresto.Text.Trim());
                         insertar.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
-                        insertar.Parameters.AddWithValue("$estado",
-                            string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
+                        // ALTA: el estado de un préstamo NUEVO es SIEMPRE 'Pendiente'.
+                        // txtEstado es un TextBox de solo lectura que refleja el estado
+                        // de la fila cargada para editar; leerlo aquí hacía que un alta
+                        // heredara 'Entregado' y Alertas de Vencidos lo ignorara.
+                        insertar.Parameters.AddWithValue("$estado", "Pendiente");
                         insertar.Parameters.AddWithValue("$codigo", codigo);
                         insertar.ExecuteNonQuery();
                     }
@@ -1069,36 +1156,72 @@ namespace BibliotecaApp
                 else
                 {
                     // Título distinto: liberar ejemplar viejo + marcar ejemplar nuevo.
-                    string? codigoViejo = ObtenerCodigoPrestado(conexion, tituloViejo);
-                    string? codigoNuevo = ObtenerCodigoDisponible(conexion, tituloNuevo);
-
-                    if (codigoNuevo == null)
-                    {
-                        MessageBox.Show(
-                            $"No hay ejemplares disponibles del título \"{tituloNuevo}\".",
-                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
+                    // W-09: Validación de stock DENTRO de la transacción para evitar race condition.
                     using var transaccion = conexion.BeginTransaction();
                     try
                     {
+                        // Resolver ejemplar viejo: prioridad al CodigoLibro del préstamo; fallback por título.
+                        string? codigoViejo;
+                        using (var cmdViejo = conexion.CreateCommand())
+                        {
+                            cmdViejo.Transaction = transaccion;
+                            cmdViejo.CommandText = "SELECT CodigoLibro FROM PrestamosExternos WHERE ID = $id;";
+                            cmdViejo.Parameters.AddWithValue("$id", id);
+                            codigoViejo = cmdViejo.ExecuteScalar()?.ToString();
+                        }
+
+                        if (string.IsNullOrEmpty(codigoViejo))
+                            codigoViejo = ObtenerCodigoPrestado(conexion, tituloViejo);
+
+                        // Resolver ejemplar nuevo: debe estar 'Disponible'.
+                        string? codigoNuevo = ObtenerCodigoDisponible(conexion, tituloNuevo);
+
+                        if (codigoNuevo == null)
+                        {
+                            transaccion.Rollback();
+                            MessageBox.Show(
+                                $"No hay ejemplares disponibles del título \"{tituloNuevo}\".",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        // Actualizar datos del préstamo
                         ActualizarDatosPrestamo(conexion, transaccion, id);
 
+                        // Liberar ejemplar viejo SOLO si ningún otro préstamo activo lo retiene.
                         if (!string.IsNullOrEmpty(codigoViejo))
                         {
                             using var liberar = conexion.CreateCommand();
                             liberar.Transaction = transaccion;
-                            liberar.CommandText = "UPDATE Libros SET Disponibilidad = 'Disponible' WHERE Codigo = $codigo;";
+                            liberar.CommandText = @"
+                                UPDATE Libros SET Disponibilidad = 'Disponible'
+                                WHERE Codigo = $codigo
+                                  AND NOT EXISTS (
+                                      SELECT 1 FROM PrestamosExternos
+                                      WHERE CodigoLibro = $codigo
+                                        AND ID <> $id
+                                        AND EstadoLibro IN ('Pendiente', 'Renovado'));";
                             liberar.Parameters.AddWithValue("$codigo", codigoViejo);
+                            liberar.Parameters.AddWithValue("$id", id);
                             liberar.ExecuteNonQuery();
                         }
 
+                        // Marcar ejemplar nuevo como Prestado, verificando que siga disponible.
                         using var marcar = conexion.CreateCommand();
                         marcar.Transaction = transaccion;
-                        marcar.CommandText = "UPDATE Libros SET Disponibilidad = 'Prestado' WHERE Codigo = $codigo;";
+                        marcar.CommandText = @"
+                            UPDATE Libros SET Disponibilidad = 'Prestado'
+                            WHERE Codigo = $codigo
+                              AND Titulo = $titulo
+                              AND Disponibilidad = 'Disponible';";
                         marcar.Parameters.AddWithValue("$codigo", codigoNuevo);
-                        marcar.ExecuteNonQuery();
+                        marcar.Parameters.AddWithValue("$titulo", tituloNuevo);
+                        if (marcar.ExecuteNonQuery() != 1)
+                        {
+                            transaccion.Rollback();
+                            throw new InvalidOperationException(
+                                "El ejemplar nuevo ya no está disponible (posible carrera).");
+                        }
 
                         transaccion.Commit();
                     }
@@ -1248,13 +1371,46 @@ namespace BibliotecaApp
                             throw new InvalidOperationException("El préstamo ya fue devuelto o ya no existe.");
                     }
 
+                    // Resolución robusta del código del ejemplar (igual que en Eliminar):
+                    // 1) CodigoLibro del préstamo; 2) fallback por título + estado 'Prestado'.
+                    if (string.IsNullOrEmpty(codigoLibro))
+                    {
+                        string tituloFila = dgvPrestamos.CurrentRow?.Cells["TituloLibro"]?.Value?.ToString() ?? "";
+                        using var obtenerPorTitulo = conexion.CreateCommand();
+                        obtenerPorTitulo.Transaction = transaccion;
+                        obtenerPorTitulo.CommandText = @"
+                            SELECT Codigo FROM Libros
+                            WHERE Titulo = $titulo AND Disponibilidad = 'Prestado'
+                            LIMIT 1;";
+                        obtenerPorTitulo.Parameters.AddWithValue("$titulo", tituloFila);
+                        codigoLibro = obtenerPorTitulo.ExecuteScalar()?.ToString();
+                    }
+
+                    // Re-sincronizar Inventario: el ejemplar devuelto pasa a 'Disponible'.
+                    // El NOT EXISTS evita liberarlo si OTRO préstamo activo (Pendiente/Renovado)
+                    // ya está reteniendo ese mismo ejemplar (p.ej. se prestó de nuevo).
                     if (!string.IsNullOrEmpty(codigoLibro))
                     {
                         using var liberar = conexion.CreateCommand();
                         liberar.Transaction = transaccion;
-                        liberar.CommandText = "UPDATE Libros SET Disponibilidad = 'Disponible' WHERE Codigo = $codigo;";
+                        liberar.CommandText = @"
+                            UPDATE Libros SET Disponibilidad = 'Disponible'
+                            WHERE Codigo = $codigo
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM PrestamosExternos
+                                  WHERE CodigoLibro = $codigo
+                                    AND ID <> $id
+                                    AND EstadoLibro IN ('Pendiente', 'Renovado'));";
                         liberar.Parameters.AddWithValue("$codigo", codigoLibro);
-                        liberar.ExecuteNonQuery();
+                        liberar.Parameters.AddWithValue("$id", id);
+                        int filas = liberar.ExecuteNonQuery();
+                        if (filas == 0)
+                        {
+                            transaccion.Rollback();
+                            throw new InvalidOperationException(
+                                "No se pudo liberar el ejemplar (código no encontrado o " +
+                                "otro préstamo activo lo retiene). La devolución se canceló.");
+                        }
                     }
 
                     transaccion.Commit();
@@ -1522,6 +1678,11 @@ namespace BibliotecaApp
                 caja.Clear();
             }
             txtTituloLibro.Text = string.Empty;
+
+            // El estado vuelve a 'Pendiente' al preparar un préstamo nuevo: si no,
+            // seguía mostrando el estado de la última fila cargada con "Modificar"
+            // (p. ej. 'Entregado') y el formulario quedaba engañoso.
+            txtEstado.Text = "Pendiente";
 
             dtpFechaPrestamo.Value = DateTime.Today;
             dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
