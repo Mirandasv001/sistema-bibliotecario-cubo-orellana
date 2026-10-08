@@ -330,9 +330,18 @@ namespace BibliotecaApp
                     Rol            TEXT NOT NULL DEFAULT 'Operador'
                 );";
 
+            // Clave/valor para banderas de negocio persistentes.
+            // Se usa, entre otras, para recordar que el admin vació el inventario
+            // y evitar que la importación automática del CSV lo repueble al arrancar.
+            const string sqlConfiguracion = @"
+                CREATE TABLE IF NOT EXISTS Configuracion (
+                    Clave TEXT PRIMARY KEY,
+                    Valor TEXT
+                );";
+
             using (var cmd = conexion.CreateCommand())
             {
-                cmd.CommandText = sqlLibros + sqlSala + sqlPrestamos + sqlUsuarios;
+                cmd.CommandText = sqlLibros + sqlSala + sqlPrestamos + sqlUsuarios + sqlConfiguracion;
                 cmd.ExecuteNonQuery();
             }
 
@@ -342,10 +351,46 @@ namespace BibliotecaApp
         }
 
         // ------------------------------------------------------------------
+        //  Bandera: inventario vaciado manualmente por el administrador
+        // ------------------------------------------------------------------
+        private const string ClaveInventarioVaciado = "InventarioVaciado";
+
+        /// <summary>
+        /// Marca (o desmarca) que el administrador vació el inventario a mano.
+        /// Mientras la marca esté en '1', el arranque NO repuebla la tabla Libros
+        /// desde el CSV, de modo que el vaciado persiste entre sesiones.
+        /// </summary>
+        public static void MarcarInventarioVaciado(bool vaciado)
+        {
+            using var conexion = ObtenerConexion();
+            using var cmd = conexion.CreateCommand();
+            cmd.CommandText = "INSERT OR REPLACE INTO Configuracion (Clave, Valor) VALUES (@clave, @valor);";
+            cmd.Parameters.AddWithValue("@clave", ClaveInventarioVaciado);
+            cmd.Parameters.AddWithValue("@valor", vaciado ? "1" : "0");
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>Lee la bandera de forma atómica sobre la conexión ya abierta.</summary>
+        private static bool InventarioVaciadoPorUsuario(SqliteConnection conexion)
+        {
+            using var cmd = conexion.CreateCommand();
+            cmd.CommandText = "SELECT Valor FROM Configuracion WHERE Clave = @clave;";
+            cmd.Parameters.AddWithValue("@clave", ClaveInventarioVaciado);
+
+            object? valor = cmd.ExecuteScalar();
+            return string.Equals(valor as string, "1", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // ------------------------------------------------------------------
         //  Importación del catálogo CSV
         // ------------------------------------------------------------------
         private static void ImportarCatalogoDesdeCsv(SqliteConnection conexion)
         {
+            // Si el administrador vació el inventario explícitamente, NO se
+            // repuebla desde el CSV: el vaciado debe sobrevivir al reinicio.
+            // Se restaura con la importación manual de un CSV desde el inventario.
+            if (InventarioVaciadoPorUsuario(conexion)) return;
+
             string? rutaCsv = BuscarArchivoCsv();
             if (rutaCsv == null) return;
 
