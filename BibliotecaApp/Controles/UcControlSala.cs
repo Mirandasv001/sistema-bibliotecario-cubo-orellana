@@ -22,6 +22,29 @@ namespace BibliotecaApp
         public UcControlSala()
         {
             InitializeComponent();
+
+            // El ComboBox de títulos debe reflejar siempre la BD real: otros
+            // módulos (p. ej. "Vaciar Inventario" en UcInventario) pueden borrar
+            // libros mientras esta pantalla está oculta. Al volver a mostrarla se
+            // fuerza la recarga para no conservar títulos en memoria obsoletos.
+            this.VisibleChanged += UcControlSala_VisibleChanged;
+        }
+
+        /// <summary>
+        /// Recarga el ComboBox de títulos desde la base de datos real.
+        /// Método público: puede invocarse desde otros controles cuando el
+        /// inventario cambia.
+        /// </summary>
+        public void RecargarLibros()
+        {
+            CargarTitulosDeLibros();
+        }
+
+        private void UcControlSala_VisibleChanged(object? sender, EventArgs e)
+        {
+            // Solo al hacerse visible (VisibleChanged también dispara al ocultarse)
+            if (this.Visible)
+                RecargarLibros();
         }
 
         private void UcControlSala_Load(object sender, EventArgs e)

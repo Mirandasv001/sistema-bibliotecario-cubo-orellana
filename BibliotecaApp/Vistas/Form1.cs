@@ -20,7 +20,6 @@ namespace BibliotecaApp
         private UcAlertas? _vistaAlertas;
         private UcEstadisticas? _vistaEstadisticas;
         private UcGuiaUso? _vistaGuiaUso;
-        private UcHistorialPrestamos? _vistaHistorialPrestamos;
         private Button? _btnGestionUsuarios;
 
         public Form1()
@@ -39,7 +38,6 @@ namespace BibliotecaApp
             ConfigurarBotonMenu(btnAlertas, "Alertas de Vencidos");
             ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
             ConfigurarBotonMenu(btnEstadisticas, "Estadísticas");
-            ConfigurarBotonMenu(btnHistorialPrestamos, "Historial Préstamos");
 
             // Botón Gestión de Usuarios (solo para Admin)
             _btnGestionUsuarios = new Button();
@@ -56,7 +54,6 @@ namespace BibliotecaApp
             btnAlertas.Paint += btnAlertas_Paint;
             btnGuiaUso.Click += (_, _) => MostrarApartadoGuiaUso();
             btnEstadisticas.Click += (_, _) => MostrarApartadoEstadisticas();
-            btnHistorialPrestamos.Click += (_, _) => MostrarApartadoHistorialPrestamos();
 
             // Timer de notificaciones: consulta los morosos al arrancar y cada intervalo.
             _timerAlertas = new System.Windows.Forms.Timer { Interval = 30000 };
@@ -191,21 +188,6 @@ namespace BibliotecaApp
             ResaltarBoton(btnEstadisticas);
         }
 
-        private void MostrarApartadoHistorialPrestamos()
-        {
-            if (_vistaHistorialPrestamos == null)
-            {
-                _vistaHistorialPrestamos = new UcHistorialPrestamos();
-                _vistaHistorialPrestamos.Dock = DockStyle.Fill;
-                panelContenedor.Controls.Add(_vistaHistorialPrestamos);
-            }
-            OcultarVistas();
-            _vistaHistorialPrestamos.BringToFront();
-            _vistaHistorialPrestamos.Show();
-            _vistaHistorialPrestamos.CargarHistorial(); // Cargar datos al mostrar
-            ResaltarBoton(btnHistorialPrestamos);
-        }
-
         private void OcultarVistas()
         {
             _vistaSala?.Hide();
@@ -214,7 +196,6 @@ namespace BibliotecaApp
             _vistaAlertas?.Hide();
             _vistaEstadisticas?.Hide();
             _vistaGuiaUso?.Hide();
-            _vistaHistorialPrestamos?.Hide();
         }
 
         /// <summary>
@@ -265,7 +246,7 @@ namespace BibliotecaApp
 
         private void ResaltarBoton(Button botonActivo)
         {
-            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas, btnEstadisticas, btnGuiaUso, btnHistorialPrestamos, _btnGestionUsuarios })
+            foreach (var boton in new[] { btnSala, btnInventario, btnPrestamos, btnAlertas, btnEstadisticas, btnGuiaUso, _btnGestionUsuarios })
             {
                 if (boton == null) continue;
                 bool activo = ReferenceEquals(boton, botonActivo);

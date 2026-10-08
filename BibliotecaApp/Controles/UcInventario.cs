@@ -301,10 +301,20 @@ namespace BibliotecaApp
                     cmd.ExecuteNonQuery();
                 }
 
+                // PERSISTENCIA: marcar el vaciado. Sin esta bandera, el arranque
+                // volvería a importar el catálogo CSV y el inventario reaparecería.
+                ConexionDB.MarcarInventarioVaciado(true);
+
+                // CRÍTICO: limpiar de inmediato el DataSource del DataGridView para
+                // que la tabla se vea vacía al instante, sin esperar a la recarga.
+                dgvInventario.DataSource = null;
+
+                // Recargar desde la BD real: reconstruye la tabla vacía, el
+                // contador de libros y reaplica el filtro de búsqueda activo.
+                CargarInventario();
+
                 MessageBox.Show("Inventario vaciado correctamente.", "Biblioteca CUBO",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                CargarInventario();
             }
             catch (Exception ex)
             {
@@ -425,6 +435,10 @@ namespace BibliotecaApp
                 }
 
                 transaction.Commit();
+
+                // El catálogo vuelve a estar poblado: retirar la bandera de
+                // "vaciado" para que el arranque retome la importación normal.
+                ConexionDB.MarcarInventarioVaciado(false);
 
                 MessageBox.Show(
                     $"Importación completada.\n\nArchivo: {Path.GetFileName(rutaArchivo)}\nLíneas procesadas: {lineasProcesadas}\nLibros insertados: {filasInsertadas}",

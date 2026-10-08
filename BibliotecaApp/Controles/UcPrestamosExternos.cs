@@ -14,6 +14,23 @@ namespace BibliotecaApp
     public partial class UcPrestamosExternos : UserControl // HERNCIA
     {
         private int? _prstamoEditandoId = null;
+        
+        // Variables de paginación
+        private int paginaActual = 1;
+        private int tamanoPagina = 11; // Definitivo (producción): llena el DataGridView dejando una fila de margen
+        private int totalPaginas = 1;
+        
+        // Botones de paginación (creados dinámicamente para no tocar Designer)
+        private Button? btnAnterior;
+        private Button? btnSiguiente;
+        private Label? lblPagina;
+        
+        // Botones de administración (creados dinámicamente para no tocar Designer)
+        private Button? btnEliminar;
+        private Button? btnLimpiar;
+
+        // Espaciador invisible que empuja la paginación al extremo derecho de flpBotones
+        private Control? _espaciadorPaginacion;
 
         public UcPrestamosExternos()
         {
@@ -41,6 +58,20 @@ namespace BibliotecaApp
 
             // Suscribir evento de clic en botones de la grilla
             dgvPrestamos.CellContentClick += DgvPrestamos_CellContentClick;
+
+            // Suscribir evento de selección para habilitar/deshabilitar notificaciones según estado
+            dgvPrestamos.SelectionChanged += DgvPrestamos_SelectionChanged;
+
+            // Suscribir evento CellFormatting para coloreo dinámico de la columna Estado
+            dgvPrestamos.CellFormatting += DgvPrestamos_CellFormatting_Estado;
+
+            // Crear botones de administración (Eliminar y Limpiar) dinámicamente.
+            // Se agregan ANTES que la paginación para que queden junto a "Modificar".
+            CrearBotonesAdministracion();
+
+            // Crear botones de paginación dinámicamente (sin tocar Designer).
+            // Van al FINAL de la fila y un espaciador los empuja al extremo derecho.
+            CrearBotonesPaginacion();
 
             // Asegurar que la columna Notificado exista en la BD
             AsegurarColumnaNotificado();
@@ -78,6 +109,23 @@ namespace BibliotecaApp
 
             dtpFechaPrestamo.Value = DateTime.Today;
             dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
+
+            // Control de visibilidad por rol: ocultar botones destructivos para no administradores
+            if (SesionGlobal.HaySesionActiva)
+            {
+                bool esAdmin = SesionGlobal.EsAdmin;
+                if (btnEliminar != null) btnEliminar.Visible = esAdmin;
+                if (btnLimpiar != null) btnLimpiar.Visible = esAdmin;
+            }
+            else
+            {
+                // Sin sesión activa: ocultar botones de administración
+                if (btnEliminar != null) btnEliminar.Visible = false;
+                if (btnLimpiar != null) btnLimpiar.Visible = false;
+            }
+
+            // La visibilidad de los botones admin cambia el ancho ocupado: reajustar espaciador
+            ActualizarEspaciadorPaginacion();
 
             CargarPrestamosActivos();
         }
@@ -264,6 +312,14 @@ namespace BibliotecaApp
                 using var conexion = ConexionDB.ObtenerConexion();
 
                 using var comando = conexion.CreateCommand();
+
+                // --- Paginación: calcula total de páginas y offset defensivo ---
+                CalcularTotalPaginas();
+                if (paginaActual > totalPaginas) paginaActual = totalPaginas;
+                if (paginaActual <= 0) paginaActual = 1;
+                int offset = (paginaActual - 1) * tamanoPagina;
+                if (offset < 0) offset = 0;
+
                 comando.CommandText = @"
                     SELECT ID,
                            NombreUsuario                        AS Usuario,
@@ -279,8 +335,11 @@ namespace BibliotecaApp
                            EstadoLibro                          AS Estado,
                            Notificado
                     FROM PrestamosExternos
-                    WHERE EstadoLibro IN ('Pendiente', 'Renovado')
-                    ORDER BY FechaEntrega ASC;";
+                    WHERE EstadoLibro IN ('Pendiente', 'Renovado', 'Entregado')
+                    ORDER BY ID DESC
+                    LIMIT @tamanoPagina OFFSET @offset;";
+                comando.Parameters.AddWithValue("@tamanoPagina", tamanoPagina);
+                comando.Parameters.AddWithValue("@offset", offset);
 
                 var tabla = new System.Data.DataTable();
                 using (var lector = comando.ExecuteReader())
@@ -289,6 +348,14 @@ namespace BibliotecaApp
                 }
 
                 dgvPrestamos.DataSource = tabla;
+
+                // --- UI de paginación (botones dinámicos) ---
+                if (lblPagina != null) lblPagina.Text = $"Página {paginaActual} de {totalPaginas}";
+                if (btnAnterior != null) btnAnterior.Enabled = (paginaActual > 1);
+                if (btnSiguiente != null) btnSiguiente.Enabled = (paginaActual < totalPaginas);
+
+                // El texto de lblPagina es AutoSize y cambia de ancho: reajustar espaciador
+                ActualizarEspaciadorPaginacion();
 
                 // Asegurar que la columna Notificado exista en el grid (AutoGenerateColumns = false)
                 if (!dgvPrestamos.Columns.Contains("Notificado"))
@@ -354,21 +421,378 @@ namespace BibliotecaApp
             }
         }
 
+        // ====================================================================
+        //  PAGINACIÓN (botones creados dinámicamente en code-behind)
+        // ====================================================================
+
+        /// <summary>
+        /// Crea los botones de paginación (Anterior / Siguiente / lblPagina)
+        /// sin tocar el archivo Designer.cs. Se colocan al FINAL de flpBotones,
+        /// precedidos por un espaciador que los empuja al extremo derecho.
+        /// </summary>
+        private void CrearBotonesPaginacion()
+        {
+            // --- Espaciador invisible: ocupa el hueco sobrante de la fila ---
+            _espaciadorPaginacion = new Label
+            {
+                Name = "espaciadorPaginacion",
+                Text = string.Empty,
+                AutoSize = false,
+                Size = new Size(0, 1),
+                Margin = new Padding(0)
+            };
+            flpBotones.Controls.Add(_espaciadorPaginacion);
+
+            // --- Botón "Anterior": estilo minimalista, icono cuadrado 35px ---
+            btnAnterior = new Button
+            {
+                Name = "btnAnterior",
+                Text = "<",
+                AutoSize = false,
+                Size = new Size(35, 40),
+                Margin = new Padding(5, 0, 5, 5),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Enabled = false
+            };
+            EstiloUI.EstilizarBotonSecundario(btnAnterior);
+            btnAnterior.AutoSize = false;
+            btnAnterior.Size = new Size(35, 40);
+            btnAnterior.Click += btnAnterior_Click;
+
+            // --- Etiqueta de página ---
+            lblPagina = new Label
+            {
+                Name = "lblPagina",
+                Text = "Página 1 de 1",
+                AutoSize = true,
+                Margin = new Padding(10, 10, 10, 5),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+
+            // --- Botón "Siguiente": estilo minimalista, icono cuadrado 35px ---
+            btnSiguiente = new Button
+            {
+                Name = "btnSiguiente",
+                Text = ">",
+                AutoSize = false,
+                Size = new Size(35, 40),
+                Margin = new Padding(5, 0, 5, 5),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            EstiloUI.EstilizarBotonSecundario(btnSiguiente);
+            btnSiguiente.AutoSize = false;
+            btnSiguiente.Size = new Size(35, 40);
+            btnSiguiente.Click += btnSiguiente_Click;
+
+            // Orden de izquierda a derecha en la esquina: btnAnterior -> lblPagina -> btnSiguiente
+            flpBotones.Controls.Add(btnAnterior);
+            flpBotones.Controls.Add(lblPagina);
+            flpBotones.Controls.Add(btnSiguiente);
+
+            // Reajustar el espaciador cuando cambie el ancho de la fila (resize del formulario)
+            flpBotones.Resize += (_, _) => ActualizarEspaciadorPaginacion();
+            ActualizarEspaciadorPaginacion();
+        }
+
+        /// <summary>
+        /// Calcula el ancho sobrante de flpBotones y se lo asigna al espaciador,
+        /// de modo que la paginación quede pegada al borde derecho de la barra.
+        /// </summary>
+        private void ActualizarEspaciadorPaginacion()
+        {
+            if (_espaciadorPaginacion == null || !flpBotones.IsHandleCreated) return;
+
+            int ocupado = 0;
+            foreach (Control c in flpBotones.Controls)
+            {
+                if (c == _espaciadorPaginacion || !c.Visible) continue;
+                ocupado += c.Width + c.Margin.Horizontal;
+            }
+
+            // 35 px de margen derecho: evita que la paginación choque contra el
+            // borde visible del FlowLayoutPanel y se desborde de la barra.
+            const int margenDerecho = 35;
+
+            int disponible = flpBotones.ClientSize.Width - ocupado
+                             - _espaciadorPaginacion.Margin.Horizontal - margenDerecho;
+
+            // Nunca se aplica un ancho negativo (ventana demasiado angosta)
+            int nuevoAncho = disponible < 0 ? 0 : disponible;
+
+            // Evita ciclos de layout: solo escribe si el valor realmente cambió
+            if (_espaciadorPaginacion.Width != nuevoAncho)
+                _espaciadorPaginacion.Width = nuevoAncho;
+        }
+
+        private void btnAnterior_Click(object? sender, EventArgs e)
+        {
+            if (paginaActual > 1)
+            {
+                paginaActual--;
+                CargarPrestamosActivos();
+            }
+        }
+
+        private void btnSiguiente_Click(object? sender, EventArgs e)
+        {
+            if (paginaActual < totalPaginas)
+            {
+                paginaActual++;
+                CargarPrestamosActivos();
+            }
+        }
+
+        /// <summary>
+        /// Calcula totalPaginas según los registros activos de la BD.
+        /// Nunca devuelve 0 páginas (mínimo 1).
+        /// </summary>
+        private void CalcularTotalPaginas()
+        {
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var comando = conexion.CreateCommand();
+                comando.CommandText = "SELECT COUNT(*) FROM PrestamosExternos WHERE EstadoLibro IN ('Pendiente', 'Renovado', 'Entregado');";
+
+                var resultado = comando.ExecuteScalar();
+                int totalRegistros = (resultado != null && resultado != DBNull.Value) ? Convert.ToInt32(resultado) : 0;
+
+                if (tamanoPagina <= 0) tamanoPagina = 25; // Fallback de seguridad
+
+                totalPaginas = (int)Math.Ceiling((double)totalRegistros / tamanoPagina);
+                if (totalPaginas <= 0) totalPaginas = 1;
+            }
+            catch
+            {
+                totalPaginas = 1;
+            }
+        }
+
+        // ====================================================================
+        //  BOTONES DE ADMINISTRACIÓN (Eliminar / Limpiar) — solo administrador
+        // ====================================================================
+
+        /// <summary>
+        /// Crea btnEliminar y btnLimpiar dinámicamente (sin tocar Designer)
+        /// y los agrega a flpBotones. La visibilidad por rol se aplica en el Load.
+        /// </summary>
+        private void CrearBotonesAdministracion()
+        {
+            btnEliminar = new Button
+            {
+                Name = "btnEliminar",
+                Text = "Eliminar préstamo",
+                AutoSize = true,
+                Margin = new Padding(5, 0, 5, 5),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Visible = false // Solo administrador (se muestra en Load)
+            };
+            EstiloUI.EstilizarBotonSecundario(btnEliminar);
+            btnEliminar.Click += btnEliminar_Click;
+
+            btnLimpiar = new Button
+            {
+                Name = "btnLimpiar",
+                Text = "Limpiar campos",
+                AutoSize = true,
+                Margin = new Padding(5, 0, 5, 5),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Visible = false // Solo administrador (se muestra en Load)
+            };
+            EstiloUI.EstilizarBotonSecundario(btnLimpiar);
+            btnLimpiar.Click += btnLimpiar_Click;
+
+            flpBotones.Controls.Add(btnEliminar);
+            flpBotones.Controls.Add(btnLimpiar);
+        }
+
+        /// <summary>
+        /// Elimina (DELETE) el préstamo seleccionado. Acción exclusiva de administrador:
+        /// pide autenticación con FormAutenticacion (AdminCubo / Admin123$) y solo
+        /// permite eliminar registros en estado 'Entregado'. Los usuarios normales
+        /// jamás usan DELETE (solo UPDATE).
+        /// </summary>
+        private void btnEliminar_Click(object? sender, EventArgs e)
+        {
+            if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
+            {
+                MessageBox.Show("Seleccione un préstamo de la lista para eliminar.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
+            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
+            {
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
+            }
+
+            int id = Convert.ToInt32(dgvPrestamos.CurrentRow.Cells["ID"].Value);
+            string estado = dgvPrestamos.CurrentRow.Cells["Estado"].Value?.ToString()?.Trim() ?? "";
+
+            // Solo se pueden eliminar préstamos ya entregados (cerrados).
+            if (!string.Equals(estado, "Entregado", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Solo se pueden eliminar préstamos con estado 'Entregado'.\n" +
+                    "Registre primero la devolución del libro.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var resultado = MessageBox.Show(
+                "¿Está seguro de que desea ELIMINAR este préstamo definitivamente?\n\nEsta acción no se puede deshacer.",
+                "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (resultado != DialogResult.Yes) return;
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var cmd = conexion.CreateCommand();
+                cmd.CommandText = "DELETE FROM PrestamosExternos WHERE ID = @id AND EstadoLibro = 'Entregado';";
+                cmd.Parameters.AddWithValue("@id", id);
+
+                if (cmd.ExecuteNonQuery() == 0)
+                {
+                    MessageBox.Show("No se pudo eliminar el préstamo (ya no existe o no está en estado 'Entregado').",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                MessageBox.Show("Préstamo eliminado correctamente.", "Biblioteca CUBO",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                CargarPrestamosActivos();
+                NotificarCambioPrestamos();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar el préstamo: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Limpia los campos del formulario dejándolo listo para un nuevo préstamo.
+        /// </summary>
+        private void btnLimpiar_Click(object? sender, EventArgs e)
+        {
+            LimpiarParaNuevo();
+        }
+
+        // ====================================================================
+        //  EVENTOS DEL DataGridView (nombres exactos que exige el Designer)
+        // ====================================================================
+
+        /// <summary>
+        /// Bloquea/habilita las acciones de la fila seleccionada según el estado:
+        /// un préstamo 'Entregado' no puede renovarse ni notificarse.
+        /// </summary>
+        private void DgvPrestamos_SelectionChanged(object? sender, EventArgs e)
+        {
+            try
+            {
+                bool entregado = false;
+
+                if (dgvPrestamos.CurrentRow != null &&
+                    dgvPrestamos.CurrentRow.Cells["ID"].Value != null)
+                {
+                    string estado = dgvPrestamos.CurrentRow.Cells["Estado"].Value?.ToString()?.Trim() ?? "";
+                    entregado = string.Equals(estado, "Entregado", StringComparison.OrdinalIgnoreCase);
+                }
+
+                // Candados de UI: devolución / renovación / notificación inactivos si ya fue entregado
+                btnDevolver.Enabled = !entregado;
+                btnRenovarFila.Enabled = !entregado;
+
+                foreach (DataGridViewRow fila in dgvPrestamos.Rows)
+                {
+                    if (fila.Cells.Count == 0) continue;
+
+                    string est = fila.Cells["Estado"].Value?.ToString()?.Trim() ?? "";
+                    bool filaEntregada = string.Equals(est, "Entregado", StringComparison.OrdinalIgnoreCase);
+
+                    var celdaBtn = fila.Cells["btnMensaje"];
+                    celdaBtn.ReadOnly = filaEntregada; // Bloquea el clic de "Enviar"
+
+                    if (filaEntregada)
+                    {
+                        celdaBtn.Value = "Entregado";
+                        celdaBtn.Style.BackColor = Color.FromArgb(204, 255, 204);
+                        celdaBtn.Style.ForeColor = Color.DarkGreen;
+                        celdaBtn.Style.SelectionBackColor = Color.FromArgb(204, 255, 204);
+                        celdaBtn.Style.SelectionForeColor = Color.DarkGreen;
+                    }
+                    else if (celdaBtn.Value?.ToString() == "Entregado")
+                    {
+                        celdaBtn.Value = "Enviar";
+                        celdaBtn.Style.BackColor = Color.Empty;
+                        celdaBtn.Style.ForeColor = Color.Empty;
+                        celdaBtn.Style.SelectionBackColor = Color.Empty;
+                        celdaBtn.Style.SelectionForeColor = Color.Empty;
+                    }
+                }
+            }
+            catch
+            {
+                // Evita excepciones durante la reordenación interna del grid
+            }
+        }
+
         private void dgvPrestamos_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.RowIndex < 0) return;
 
-            var fila = dgvPrestamos.Rows[e.RowIndex];
-            if (fila.Cells["Entrega Esperada"].Value is not string fechaTexto ||
-                !DateTime.TryParseExact(fechaTexto, "dd/MM/yyyy",
-                    null, System.Globalization.DateTimeStyles.None, out DateTime fechaEntrega))
-                return;
+            var col = dgvPrestamos.Columns[e.ColumnIndex];
 
-            if (fechaEntrega.Date < DateTime.Today)
+            // La columna Estado la pinta DgvPrestamos_CellFormatting_Estado
+            if (col.Name == "Estado") return;
+
+            // El botón "Notificar" conserva sus colores propios (Enviado / Entregado)
+            if (col.Name == "btnMensaje") return;
+
+            // Resto de la fila: siempre fondo blanco
+            e.CellStyle.BackColor = Color.White;
+            e.CellStyle.SelectionBackColor = EstiloUI.Acento;
+        }
+
+        /// <summary>
+        /// Colorea únicamente la celda de la columna "Estado":
+        /// Pendiente = rojo (255,204,204) · Renovado = celeste (204,235,255) ·
+        /// Entregado = verde (204,255,204).
+        /// </summary>
+        private void DgvPrestamos_CellFormatting_Estado(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var colEstado = dgvPrestamos.Columns["Estado"];
+            if (colEstado == null || e.ColumnIndex != colEstado.Index) return;
+
+            string estado = e.Value?.ToString()?.Trim() ?? "";
+
+            Color colorFondo;
+            switch (estado)
             {
-                fila.DefaultCellStyle.BackColor = EstiloUI.AlertaRojo;
-                fila.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
+                case "Pendiente":
+                    colorFondo = Color.FromArgb(255, 204, 204); // Rojo suave
+                    break;
+                case "Renovado":
+                    colorFondo = Color.FromArgb(204, 235, 255); // Celeste suave
+                    break;
+                case "Entregado":
+                    colorFondo = Color.FromArgb(204, 255, 204); // Verde suave
+                    break;
+                default:
+                    return; // Sin color para estados no reconocidos
             }
+
+            e.CellStyle.BackColor = colorFondo;
+            e.CellStyle.SelectionBackColor = Color.FromArgb(
+                Math.Max(0, colorFondo.R - 30),
+                Math.Max(0, colorFondo.G - 30),
+                Math.Max(0, colorFondo.B - 30));
         }
 
         /// <summary>
@@ -399,13 +823,14 @@ namespace BibliotecaApp
 
             try
             {
-                // Construir URI mailto: individual
-                string subject = Uri.EscapeDataString("Préstamo registrado - Biblioteca CUBO");
+                // Construir URI mailto: con subject y body según requerimientos exactos
+                // Subject: "Confirmación de préstamo - Biblioteca CUBO"
+                // Body: "Hola [usuario], muchas gracias por elegir la Biblioteca CUBO.\n\nTe confirmamos el préstamo del libro '[libro]'. Te recordamos amablemente que la fecha esperada de devolución o renovación es el [fecha].\n\n¡Esperamos que disfrutes tu lectura!"
+                string subject = Uri.EscapeDataString("Confirmación de préstamo - Biblioteca CUBO");
                 string body = Uri.EscapeDataString(
-                    $"Estimado/a {nombreUsuario},\n\n" +
-                    $"Muchas gracias por hacer uso de la Biblioteca CUBO. Le confirmamos que el libro '{tituloLibro}' ha sido registrado bajo su nombre.\n\n" +
-                    $"Le recordamos amablemente que la fecha de entrega esperada es el {fechaEntrega}.\n\n" +
-                    $"¡Disfrute su lectura!");
+                    $"Hola {nombreUsuario}, muchas gracias por elegir la Biblioteca CUBO.\n\n" +
+                    $"Te confirmamos el préstamo del libro '{tituloLibro}'. Te recordamos amablemente que la fecha esperada de devolución o renovación es el {fechaEntrega}.\n\n" +
+                    $"¡Esperamos que disfrutes tu lectura!");
 
                 string mailtoUri = $"mailto:{correo}?subject={subject}&body={body}";
 
