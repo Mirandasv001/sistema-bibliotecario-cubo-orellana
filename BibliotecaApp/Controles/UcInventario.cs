@@ -31,6 +31,10 @@ namespace BibliotecaApp
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .SetValue(dgvInventario, true, null);
 
+            // Color de selección unificado (azul oscuro institucional igual que UcPrestamosExternos)
+            dgvInventario.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
+            dgvInventario.DefaultCellStyle.SelectionForeColor = Color.White;
+
             // Suscribir evento de formato condicional para la columna Disponibilidad
             dgvInventario.CellFormatting += dgvInventario_CellFormatting;
 
