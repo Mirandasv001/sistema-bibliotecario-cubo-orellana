@@ -19,6 +19,19 @@ namespace BibliotecaApp
         /// <summary>Indica si estamos en modo edición (true) o visualización (false).</summary>
         private bool modoEdicion = false;
 
+        // Variables de paginación (estilo minimalista igual que UcPrestamosExternos)
+        private int paginaActual = 1;
+        private int tamanoPagina = 11; // Definitivo (producción): llena el DataGridView dejando una fila de margen
+        private int totalPaginas = 1;
+
+        // Botones de paginación (creados dinámicamente para no tocar Designer)
+        private Button? btnAnterior;
+        private Button? btnSiguiente;
+        private Label? lblPagina;
+
+        // Espaciador invisible que empuja la paginación al extremo derecho del FlowLayoutPanel
+        private Control? _espaciadorPaginacion;
+
         public UcControlSala()
         {
             InitializeComponent();
@@ -28,6 +41,34 @@ namespace BibliotecaApp
             // libros mientras esta pantalla está oculta. Al volver a mostrarla se
             // fuerza la recarga para no conservar títulos en memoria obsoletos.
             this.VisibleChanged += UcControlSala_VisibleChanged;
+
+            // Ajustar panelBotones para que crezca y acomode tanto botones de acción (arriba) como paginación (abajo)
+            panelBotones.AutoSize = true;
+            panelBotones.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            panelBotones.Dock = DockStyle.Top; // Mantener dock superior para que el SplitContainer lo respete
+
+            // Crear FlowLayoutPanel para paginación (estilo minimalista igual que UcPrestamosExternos)
+            // Se agrega al final de panelBotones para que quede DEBAJO de los botones de acción
+            var flpPaginacion = new FlowLayoutPanel
+            {
+                Name = "flpPaginacion",
+                Dock = DockStyle.Bottom,
+                Height = 50,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoSize = false,
+                Padding = new Padding(14, 6, 14, 6),
+                BackColor = Color.Transparent
+            };
+            panelBotones.Controls.Add(flpPaginacion);
+            // NO hacer BringToFront() - los botones de acción (Top) deben quedar arriba
+
+            // Crear botones de paginación dinámicamente
+            CrearBotonesPaginacion(flpPaginacion);
+
+            // Configurar color de selección del DataGridView (azul oscuro institucional igual que UcPrestamosExternos)
+            dgvRegistros.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
+            dgvRegistros.DefaultCellStyle.SelectionForeColor = Color.White;
         }
 
         /// <summary>
@@ -38,6 +79,159 @@ namespace BibliotecaApp
         public void RecargarLibros()
         {
             CargarTitulosDeLibros();
+        }
+
+        /// <summary>
+        /// Configura eventos adicionales del DataGridView (CellFormatting para colores).
+        /// </summary>
+        private void ConfigurarEventosGrid()
+        {
+            dgvRegistros.CellFormatting += DgvRegistros_CellFormatting;
+        }
+
+        // ====================================================================
+        //  PAGINACIÓN (botones creados dinámicamente en code-behind)
+        //  Estilo minimalista idéntico a UcPrestamosExternos
+        // ====================================================================
+
+        /// <summary>
+        /// Crea los botones de paginación (Anterior / Siguiente / lblPagina)
+        /// sin tocar el archivo Designer.cs. Se colocan en el FlowLayoutPanel proporcionado.
+        /// </summary>
+        private void CrearBotonesPaginacion(FlowLayoutPanel flpPaginacion)
+        {
+            // --- Espaciador invisible: ocupa el hueco sobrante de la fila ---
+            _espaciadorPaginacion = new Label
+            {
+                Name = "espaciadorPaginacion",
+                Text = string.Empty,
+                AutoSize = false,
+                Size = new Size(0, 1),
+                Margin = new Padding(0)
+            };
+            flpPaginacion.Controls.Add(_espaciadorPaginacion);
+
+            // --- Botón "Anterior": estilo minimalista, icono cuadrado 35px ---
+            btnAnterior = new Button
+            {
+                Name = "btnAnterior",
+                Text = "<",
+                AutoSize = false,
+                Size = new Size(35, 40),
+                Margin = new Padding(5, 0, 5, 5),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Enabled = false
+            };
+            EstiloUI.EstilizarBotonSecundario(btnAnterior);
+            btnAnterior.AutoSize = false;
+            btnAnterior.Size = new Size(35, 40);
+            btnAnterior.Click += btnAnterior_Click;
+
+            // --- Etiqueta de página ---
+            lblPagina = new Label
+            {
+                Name = "lblPagina",
+                Text = "Página 1 de 1",
+                AutoSize = true,
+                Margin = new Padding(10, 10, 10, 5),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+
+            // --- Botón "Siguiente": estilo minimalista, icono cuadrado 35px ---
+            btnSiguiente = new Button
+            {
+                Name = "btnSiguiente",
+                Text = ">",
+                AutoSize = false,
+                Size = new Size(35, 40),
+                Margin = new Padding(5, 0, 5, 5),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            EstiloUI.EstilizarBotonSecundario(btnSiguiente);
+            btnSiguiente.AutoSize = false;
+            btnSiguiente.Size = new Size(35, 40);
+            btnSiguiente.Click += btnSiguiente_Click;
+
+            // Orden de izquierda a derecha en la esquina: btnAnterior -> lblPagina -> btnSiguiente
+            flpPaginacion.Controls.Add(btnAnterior);
+            flpPaginacion.Controls.Add(lblPagina);
+            flpPaginacion.Controls.Add(btnSiguiente);
+
+            // Reajustar el espaciador cuando cambie el ancho (resize)
+            flpPaginacion.Resize += (_, _) => ActualizarEspaciadorPaginacion(flpPaginacion);
+            ActualizarEspaciadorPaginacion(flpPaginacion);
+        }
+
+        /// <summary>
+        /// Calcula el ancho sobrante del FlowLayoutPanel y se lo asigna al espaciador,
+        /// de modo que la paginación quede pegada al borde derecho.
+        /// </summary>
+        private void ActualizarEspaciadorPaginacion(FlowLayoutPanel flpPaginacion)
+        {
+            if (_espaciadorPaginacion == null || !flpPaginacion.IsHandleCreated) return;
+
+            int ocupado = 0;
+            foreach (Control c in flpPaginacion.Controls)
+            {
+                if (c == _espaciadorPaginacion || !c.Visible) continue;
+                ocupado += c.Width + c.Margin.Horizontal;
+            }
+
+            // 35 px de margen derecho: evita que la paginación choque contra el borde
+            const int margenDerecho = 35;
+
+            int disponible = flpPaginacion.ClientSize.Width - ocupado
+                             - _espaciadorPaginacion.Margin.Horizontal - margenDerecho;
+
+            int nuevoAncho = disponible < 0 ? 0 : disponible;
+
+            if (_espaciadorPaginacion.Width != nuevoAncho)
+                _espaciadorPaginacion.Width = nuevoAncho;
+        }
+
+        private void btnAnterior_Click(object? sender, EventArgs e)
+        {
+            if (paginaActual > 1)
+            {
+                paginaActual--;
+                CargarRegistros();
+            }
+        }
+
+        private void btnSiguiente_Click(object? sender, EventArgs e)
+        {
+            if (paginaActual < totalPaginas)
+            {
+                paginaActual++;
+                CargarRegistros();
+            }
+        }
+
+        /// <summary>
+        /// Calcula totalPaginas según los registros de la BD.
+        /// Nunca devuelve 0 páginas (mínimo 1).
+        /// </summary>
+        private void CalcularTotalPaginas()
+        {
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var comando = conexion.CreateCommand();
+                comando.CommandText = "SELECT COUNT(*) FROM ControlUsuariosSala;";
+
+                var resultado = comando.ExecuteScalar();
+                int totalRegistros = (resultado != null && resultado != DBNull.Value) ? Convert.ToInt32(resultado) : 0;
+
+                if (tamanoPagina <= 0) tamanoPagina = 25; // Fallback de seguridad
+
+                totalPaginas = (int)Math.Ceiling((double)totalRegistros / tamanoPagina);
+                if (totalPaginas <= 0) totalPaginas = 1;
+            }
+            catch
+            {
+                totalPaginas = 1;
+            }
         }
 
         private void UcControlSala_VisibleChanged(object? sender, EventArgs e)
@@ -57,14 +251,6 @@ namespace BibliotecaApp
             // Los campos están habilitados por defecto para nueva inserción.
             // El modo edición solo se activa al pulsar "Editar" con una fila seleccionada.
             LimpiarCampos();
-        }
-
-        /// <summary>
-        /// Configura eventos adicionales del DataGridView (CellFormatting para colores).
-        /// </summary>
-        private void ConfigurarEventosGrid()
-        {
-            dgvRegistros.CellFormatting += DgvRegistros_CellFormatting;
         }
 
         // ------------------------------------------------------------------
@@ -99,15 +285,24 @@ namespace BibliotecaApp
         }
 
         /// <summary>
-        /// Muestra TODOS los registros históricos de la tabla ControlUsuariosSala
-        /// sin filtro de fecha ni estado, para permitir gestión completa (incl. borrado).
+        /// Muestra los registros históricos de la tabla ControlUsuariosSala
+        /// con paginación (LIMIT/OFFSET), para permitir gestión completa (incl. borrado).
         /// </summary>
         private void CargarRegistros()
         {
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
+
                 using var comando = conexion.CreateCommand();
+
+                // --- Paginación: calcula total de páginas y offset defensivo ---
+                CalcularTotalPaginas();
+                if (paginaActual > totalPaginas) paginaActual = totalPaginas;
+                if (paginaActual <= 0) paginaActual = 1;
+                int offset = (paginaActual - 1) * tamanoPagina;
+                if (offset < 0) offset = 0;
+
                 comando.CommandText = @"
                     SELECT ID,
                            strftime('%d/%m/%Y', Fecha) AS Fecha,
@@ -120,7 +315,10 @@ namespace BibliotecaApp
                            PersonalTurno               AS PersonalTurno,
                            Estado                      AS Estado
                     FROM ControlUsuariosSala
-                    ORDER BY ID DESC;";
+                    ORDER BY ID DESC
+                    LIMIT @tamanoPagina OFFSET @offset;";
+                comando.Parameters.AddWithValue("@tamanoPagina", tamanoPagina);
+                comando.Parameters.AddWithValue("@offset", offset);
 
                 var tabla = new DataTable();
                 using (var lector = comando.ExecuteReader())
@@ -129,6 +327,17 @@ namespace BibliotecaApp
                 }
 
                 dgvRegistros.DataSource = tabla;
+
+                // --- UI de paginación (botones dinámicos) ---
+                if (lblPagina != null) lblPagina.Text = $"Página {paginaActual} de {totalPaginas}";
+                if (btnAnterior != null) btnAnterior.Enabled = (paginaActual > 1);
+                if (btnSiguiente != null) btnSiguiente.Enabled = (paginaActual < totalPaginas);
+
+                // El texto de lblPagina es AutoSize y cambia de ancho: reajustar espaciador
+                // Buscar el FlowLayoutPanel que contiene los botones de paginación
+                var flpPaginacion = panelBotones.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+                if (flpPaginacion != null)
+                    ActualizarEspaciadorPaginacion(flpPaginacion);
 
                 // Añadir columna Estado programáticamente si no existe
                 if (!dgvRegistros.Columns.Contains("Estado"))
@@ -155,6 +364,7 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Evento CellFormatting: aplica colores a la columna Estado según su valor.
+        /// Estilo idéntico a UcPrestamosExternos: selección con versión oscura del color de fondo y texto blanco.
         /// </summary>
         private void DgvRegistros_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
@@ -166,20 +376,32 @@ namespace BibliotecaApp
             string? estado = e.Value?.ToString();
             if (string.IsNullOrEmpty(estado)) return;
 
+            Color colorFondo;
+            Color colorTexto;
             if (estado.Equals(EstadoPendiente, StringComparison.OrdinalIgnoreCase))
             {
-                e.CellStyle.BackColor = Color.MistyRose;
-                e.CellStyle.ForeColor = Color.DarkRed;
-                e.CellStyle.SelectionBackColor = Color.LightCoral;
-                e.CellStyle.SelectionForeColor = Color.DarkRed;
+                colorFondo = Color.MistyRose;
+                colorTexto = Color.DarkRed;
             }
             else if (estado.Equals(EstadoEntregado, StringComparison.OrdinalIgnoreCase))
             {
-                e.CellStyle.BackColor = Color.Honeydew;
-                e.CellStyle.ForeColor = Color.DarkGreen;
-                e.CellStyle.SelectionBackColor = Color.LightGreen;
-                e.CellStyle.SelectionForeColor = Color.DarkGreen;
+                colorFondo = Color.Honeydew;
+                colorTexto = Color.DarkGreen;
             }
+            else
+            {
+                return; // Sin color para estados no reconocidos
+            }
+
+            e.CellStyle.BackColor = colorFondo;
+            e.CellStyle.ForeColor = colorTexto;
+
+            // Selección: versión oscura del color de fondo (igual que UcPrestamosExternos) con texto blanco
+            e.CellStyle.SelectionBackColor = Color.FromArgb(
+                Math.Max(0, colorFondo.R - 30),
+                Math.Max(0, colorFondo.G - 30),
+                Math.Max(0, colorFondo.B - 30));
+            e.CellStyle.SelectionForeColor = Color.White;
         }
 
         /// <summary>
