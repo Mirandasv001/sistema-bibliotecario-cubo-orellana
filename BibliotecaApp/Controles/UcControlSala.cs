@@ -21,7 +21,7 @@ namespace BibliotecaApp
 
         // Variables de paginación (estilo minimalista igual que UcPrestamosExternos)
         private int paginaActual = 1;
-        private int tamanoPagina = 11; // Definitivo (producción): llena el DataGridView dejando una fila de margen
+        private int tamanoPagina = 11; // Valor inicial/respaldo; CalcularTamanoPagina() lo ajusta a la altura real de pantalla
         private int totalPaginas = 1;
 
         // Botones de paginación (creados dinámicamente para no tocar Designer)
@@ -69,6 +69,17 @@ namespace BibliotecaApp
             // Configurar color de selección del DataGridView (azul oscuro institucional igual que UcPrestamosExternos)
             dgvRegistros.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
             dgvRegistros.DefaultCellStyle.SelectionForeColor = Color.White;
+
+            // ESTÉTICA: ocultar la barra de encabezados de fila (Row Headers).
+            // La columna gris izquierda no aporta funcionalidad al flujo y solo
+            // consume espacio visual. Se fija aquí en code-behind (idempotente)
+            // para que el invariante no dependa del archivo Designer.
+            dgvRegistros.RowHeadersVisible = false;
+
+            // PAGINACIÓN DINÁMICA: al cambiar la altura del DataGridView (ventana
+            // o splitter) se recalcula cuántas filas caben por página y se vuelve
+            // a la página 1 (ver CalcularTamanoPagina / Resize).
+            dgvRegistros.Resize += DgvRegistros_Resize;
         }
 
         /// <summary>
@@ -234,6 +245,50 @@ namespace BibliotecaApp
             }
         }
 
+        /// <summary>
+        /// PAGINACIÓN DINÁMICA: calcula cuántas filas caben realmente en el
+        /// DataGridView y lo asigna a tamanoPagina:
+        ///   (altura del control − altura del encabezado) / alto de fila − 1
+        /// El "-1" deja una fila de margen inferior. Mínimo 1 fila por página.
+        /// Devuelve true si el tamaño de página cambió respecto al anterior
+        /// (el llamador decide si reiniciar la página y recargar).
+        /// </summary>
+        private bool CalcularTamanoPagina()
+        {
+            // Sin layout todavía (control oculto o recién creado): conservar tamaño actual
+            int altura = dgvRegistros.Height;
+            if (altura <= 0) return false;
+
+            int altoFila = dgvRegistros.RowTemplate.Height > 0
+                ? dgvRegistros.RowTemplate.Height
+                : 20; // fallback si el alto de fila aún no está definido
+
+            int disponibles = altura - dgvRegistros.ColumnHeadersHeight;
+            int filas = (disponibles / altoFila) - 1; // −1: margen inferior solicitado
+
+            int nuevoTamano = Math.Max(1, filas);     // nunca menos de 1 fila por página
+            if (nuevoTamano == tamanoPagina) return false;
+
+            tamanoPagina = nuevoTamano;
+            return true;
+        }
+
+        /// <summary>
+        /// Resize del DataGridView (ventana o splitter): recalcula el tamaño de
+        /// página, vuelve a la página 1 y recarga los datos con el LIMIT/OFFSET
+        /// actualizado. Solo recarga si la capacidad de filas cambió: durante el
+        /// arrastre del resize se disparan decenas de eventos y recargar en cada
+        /// uno golpearía la BD sin necesidad.
+        /// </summary>
+        private void DgvRegistros_Resize(object? sender, EventArgs e)
+        {
+            if (IsDisposed || Disposing) return;
+            if (!CalcularTamanoPagina()) return;
+
+            paginaActual = 1;
+            CargarRegistros();
+        }
+
         private void UcControlSala_VisibleChanged(object? sender, EventArgs e)
         {
             // Solo al hacerse visible (VisibleChanged también dispara al ocultarse)
@@ -245,6 +300,7 @@ namespace BibliotecaApp
         {
             dtpFecha.Value = DateTime.Today;
             CargarTitulosDeLibros();
+            CalcularTamanoPagina(); // Paginación dinámica: filas que caben en la altura real
             CargarRegistros();
             ConfigurarEventosGrid();
             ConfigurarDragScroll(); // ← Habilita arrastre vertical con cursor
@@ -262,7 +318,9 @@ namespace BibliotecaApp
             {
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var comando = conexion.CreateCommand();
-                comando.CommandText = "SELECT Titulo FROM Libros ORDER BY Titulo;";
+                // Opción B (B-1): solo títulos con ejemplares 'Disponible';
+                // quedan fuera 'Prestado' (a domicilio) y 'En Sala' (en lectura).
+                comando.CommandText = "SELECT Titulo FROM Libros WHERE Disponibilidad = 'Disponible' ORDER BY Titulo;";
 
                 object? guardado = cboLibro.SelectedItem;
                 cboLibro.Items.Clear();
@@ -364,11 +422,16 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Evento CellFormatting: aplica colores a la columna Estado según su valor.
-        /// Estilo idéntico a UcPrestamosExternos: selección con versión oscura del color de fondo y texto blanco.
+        /// Selección uniforme: en fila seleccionada TODA celda adopta el azul oscuro
+        /// institucional con texto blanco, ignorando el color propio del Estado.
         /// </summary>
         private void DgvRegistros_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            // OVERRIDE UNIFORME DE SELECCIÓN (antes de aplicar los colores por estado):
+            e.CellStyle.SelectionBackColor = dgvRegistros.DefaultCellStyle.SelectionBackColor;
+            e.CellStyle.SelectionForeColor = Color.White;
 
             // Solo formatear la columna Estado
             if (dgvRegistros.Columns[e.ColumnIndex].Name != "Estado") return;
@@ -393,15 +456,9 @@ namespace BibliotecaApp
                 return; // Sin color para estados no reconocidos
             }
 
+            // Solo el color de reposo; la selección queda uniforme en azul (arriba).
             e.CellStyle.BackColor = colorFondo;
             e.CellStyle.ForeColor = colorTexto;
-
-            // Selección: versión oscura del color de fondo (igual que UcPrestamosExternos) con texto blanco
-            e.CellStyle.SelectionBackColor = Color.FromArgb(
-                Math.Max(0, colorFondo.R - 30),
-                Math.Max(0, colorFondo.G - 30),
-                Math.Max(0, colorFondo.B - 30));
-            e.CellStyle.SelectionForeColor = Color.White;
         }
 
         /// <summary>
@@ -468,33 +525,123 @@ namespace BibliotecaApp
         // ------------------------------------------------------------------
         //  Check-in: registrar entrada a leer
         // ------------------------------------------------------------------
+
+        /// <summary>
+        /// CHECK-OUT compartido (Opción B — Libros es la única fuente de verdad):
+        /// libera UN ejemplar del título ('En Sala' → 'Disponible') con la
+        /// subquery indicada. Idempotente: si no hay ejemplares 'En Sala' de ese
+        /// título (p. ej. registros legados anteriores a la sincronización), la
+        /// subquery devuelve NULL y no se modifica nada. Debe ejecutarse dentro
+        /// de la transacción indicada.
+        /// </summary>
+        private static void LiberarEjemplarEnSala(SqliteConnection conexion, SqliteTransaction transaccion, string titulo)
+        {
+            using var cmd = conexion.CreateCommand();
+            cmd.Transaction = transaccion;
+            cmd.CommandText = @"
+                UPDATE Libros SET Disponibilidad = 'Disponible'
+                WHERE Codigo = (
+                    SELECT Codigo FROM Libros
+                    WHERE Titulo = @titulo AND Disponibilidad = 'En Sala'
+                    LIMIT 1);";
+            cmd.Parameters.AddWithValue("@titulo", titulo);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// CHECK-IN (Opción B): registra la lectura tomando UN ejemplar del
+        /// inventario ('Disponible' → 'En Sala') dentro de la MISMA transacción
+        /// que el INSERT. La tabla de la sala no guarda CodigoLibro, por lo que
+        /// el ejemplar se resuelve por título.
+        /// </summary>
         private void btnRegistrar_Click(object sender, EventArgs e)
         {
             if (!ValidarFormulario()) return;
 
+            string titulo = cboLibro.Text.Trim();
+
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
-                using var comando = conexion.CreateCommand();
-                comando.CommandText = @"
-                    INSERT INTO ControlUsuariosSala
-                        (Fecha, NombreUsuario, Genero, Edad, TituloLibro,
-                         HoraEntrega, HoraRecibido, PersonalTurno, Estado)
-                    VALUES
-                        ($fecha, $nombre, $genero, $edad, $libro,
-                         $horaEntrega, $horaRecibido, $personal, $estado);";
+                using var transaccion = conexion.BeginTransaction();
+                try
+                {
+                    // 1) Resolver un ejemplar disponible del título
+                    string? codigo;
+                    using (var cmdCodigo = conexion.CreateCommand())
+                    {
+                        cmdCodigo.Transaction = transaccion;
+                        cmdCodigo.CommandText = @"
+                            SELECT Codigo FROM Libros
+                            WHERE Titulo = @titulo AND Disponibilidad = 'Disponible'
+                            LIMIT 1;";
+                        cmdCodigo.Parameters.AddWithValue("@titulo", titulo);
+                        codigo = cmdCodigo.ExecuteScalar()?.ToString();
+                    }
 
-                comando.Parameters.AddWithValue("$fecha", dtpFecha.Value.ToString("yyyy-MM-dd"));
-                comando.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
-                comando.Parameters.AddWithValue("$genero", cboGenero.SelectedItem?.ToString() ?? (object)DBNull.Value);
-                comando.Parameters.AddWithValue("$edad", (int)numEdad.Value);
-                comando.Parameters.AddWithValue("$libro", cboLibro.Text.Trim());
-                comando.Parameters.AddWithValue("$horaEntrega", DateTime.Now.ToString("HH:mm:ss"));
-                comando.Parameters.AddWithValue("$horaRecibido", EstadoEnLectura);
-                comando.Parameters.AddWithValue("$personal", txtPersonal.Text.Trim());
-                comando.Parameters.AddWithValue("$estado", EstadoPendiente);
+                    if (string.IsNullOrEmpty(codigo))
+                    {
+                        transaccion.Rollback();
+                        MessageBox.Show(
+                            $"No hay ejemplares disponibles de \"{titulo}\" en el inventario.",
+                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
 
-                comando.ExecuteNonQuery();
+                    // 2) Marcar el ejemplar como 'En Sala' (guard de estado incluido)
+                    using (var cmdTomar = conexion.CreateCommand())
+                    {
+                        cmdTomar.Transaction = transaccion;
+                        cmdTomar.CommandText = @"
+                            UPDATE Libros SET Disponibilidad = 'En Sala'
+                            WHERE Codigo = @codigo AND Disponibilidad = 'Disponible';";
+                        cmdTomar.Parameters.AddWithValue("@codigo", codigo);
+
+                        if (cmdTomar.ExecuteNonQuery() == 0)
+                        {
+                            transaccion.Rollback();
+                            MessageBox.Show(
+                                "El ejemplar dejó de estar disponible en este instante. Intente de nuevo.",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+
+                    // 3) INSERT original de la sala
+                    using (var insertar = conexion.CreateCommand())
+                    {
+                        insertar.Transaction = transaccion;
+                        insertar.CommandText = @"
+                            INSERT INTO ControlUsuariosSala
+                                (Fecha, NombreUsuario, Genero, Edad, TituloLibro,
+                                 HoraEntrega, HoraRecibido, PersonalTurno, Estado)
+                            VALUES
+                                ($fecha, $nombre, $genero, $edad, $libro,
+                                 $horaEntrega, $horaRecibido, $personal, $estado);";
+
+                        insertar.Parameters.AddWithValue("$fecha", dtpFecha.Value.ToString("yyyy-MM-dd"));
+                        insertar.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
+                        insertar.Parameters.AddWithValue("$genero", cboGenero.SelectedItem?.ToString() ?? (object)DBNull.Value);
+                        insertar.Parameters.AddWithValue("$edad", (int)numEdad.Value);
+                        insertar.Parameters.AddWithValue("$libro", titulo);
+                        insertar.Parameters.AddWithValue("$horaEntrega", DateTime.Now.ToString("HH:mm:ss"));
+                        insertar.Parameters.AddWithValue("$horaRecibido", EstadoEnLectura);
+                        insertar.Parameters.AddWithValue("$personal", txtPersonal.Text.Trim());
+                        insertar.Parameters.AddWithValue("$estado", EstadoPendiente);
+
+                        insertar.ExecuteNonQuery();
+                    }
+
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw; // el catch exterior muestra el mensaje unificado
+                }
+
+                // Refrescar combo: el título ocupado ya no debe ofrecerse
+                CargarTitulosDeLibros();
 
                 MessageBox.Show("Lectura registrada. El estado quedó como '" + EstadoPendiente + "'.",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -511,6 +658,12 @@ namespace BibliotecaApp
         // ------------------------------------------------------------------
         //  Check-out: marcar devolución del libro
         // ------------------------------------------------------------------
+        /// <summary>
+        /// CHECK-OUT (Opción B): registra la devolución en sala y libera UN
+        /// ejemplar del título ('En Sala' → 'Disponible') dentro de la MISMA
+        /// transacción. El guard superior garantiza que solo se libere si el
+        /// registro estaba 'En lectura' (los ya entregados no liberan de nuevo).
+        /// </summary>
         private void btnMarcarDevolucion_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
@@ -525,22 +678,46 @@ namespace BibliotecaApp
                 return;
             }
 
+            string tituloLibro = dgvRegistros.CurrentRow!
+                .Cells["TituloLibro"].Value?.ToString() ?? string.Empty;
+
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
-                using var comando = conexion.CreateCommand();
-                comando.CommandText = @"
-                    UPDATE ControlUsuariosSala
-                    SET HoraRecibido = $hora,
-                        Estado = $estado
-                    WHERE ID = $id;";
-                comando.Parameters.AddWithValue("$hora", DateTime.Now.ToString("HH:mm:ss"));
-                comando.Parameters.AddWithValue("$estado", EstadoEntregado);
-                comando.Parameters.AddWithValue("$id", idSeleccionado);
+                using var transaccion = conexion.BeginTransaction();
+                int afectados;
+                try
+                {
+                    using (var comando = conexion.CreateCommand())
+                    {
+                        comando.Transaction = transaccion;
+                        comando.CommandText = @"
+                            UPDATE ControlUsuariosSala
+                            SET HoraRecibido = $hora,
+                                Estado = $estado
+                            WHERE ID = $id;";
+                        comando.Parameters.AddWithValue("$hora", DateTime.Now.ToString("HH:mm:ss"));
+                        comando.Parameters.AddWithValue("$estado", EstadoEntregado);
+                        comando.Parameters.AddWithValue("$id", idSeleccionado);
 
-                int afectados = comando.ExecuteNonQuery();
+                        afectados = comando.ExecuteNonQuery();
+                    }
+
+                    // Liberar UN ejemplar del título (idempotente si no hay 'En Sala')
+                    if (afectados > 0 && tituloLibro.Length > 0)
+                        LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
+
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw; // el catch exterior muestra el mensaje unificado
+                }
+
                 if (afectados > 0)
                 {
+                    CargarTitulosDeLibros(); // el título liberado vuelve al combo
                     MessageBox.Show("Devolución registrada correctamente. Estado: " + EstadoEntregado,
                         "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     CargarRegistros();
@@ -607,6 +784,23 @@ namespace BibliotecaApp
             if (!HayFilaSeleccionada()) return;
             if (!ValidarFormulario()) return;
 
+            // Opción B: una lectura ACTIVA no puede cambiar de libro (el ejemplar
+            // quedó tomado como 'En Sala' al registrarla). Debe registrarse antes
+            // la devolución. Los registros ya entregados sí pueden cambiar de título.
+            string estadoRegistro = dgvRegistros.CurrentRow?
+                .Cells["HoraRecibido"].Value?.ToString() ?? string.Empty;
+            string tituloEnGrilla = dgvRegistros.CurrentRow?
+                .Cells["TituloLibro"].Value?.ToString() ?? string.Empty;
+
+            if (estadoRegistro.Equals(EstadoEnLectura, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(tituloEnGrilla, cboLibro.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    "No se puede cambiar el libro de una lectura en curso. Registre primero la devolución.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
@@ -659,17 +853,60 @@ namespace BibliotecaApp
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
             }
 
-            // Credenciales correctas: ejecutar DELETE
+            // Credenciales correctas: ejecutar DELETE sincronizado con el inventario
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
-                using var comando = conexion.CreateCommand();
-                comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
-                comando.Parameters.AddWithValue("$id", idSeleccionado);
+                using var transaccion = conexion.BeginTransaction();
+                int afectados;
+                try
+                {
+                    string tituloLibro = string.Empty;
+                    bool estabaEnLectura = false;
 
-                int afectados = comando.ExecuteNonQuery();
+                    // Estado y título autoritativos desde la propia BD
+                    using (var cmdLeer = conexion.CreateCommand())
+                    {
+                        cmdLeer.Transaction = transaccion;
+                        cmdLeer.CommandText =
+                            "SELECT TituloLibro, HoraRecibido FROM ControlUsuariosSala WHERE ID = $id;";
+                        cmdLeer.Parameters.AddWithValue("$id", idSeleccionado);
+
+                        using var lector = cmdLeer.ExecuteReader();
+                        if (lector.Read())
+                        {
+                            tituloLibro = lector["TituloLibro"]?.ToString() ?? string.Empty;
+                            estabaEnLectura = string.Equals(
+                                lector["HoraRecibido"]?.ToString(),
+                                EstadoEnLectura, StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
+
+                    using (var comando = conexion.CreateCommand())
+                    {
+                        comando.Transaction = transaccion;
+                        comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
+                        comando.Parameters.AddWithValue("$id", idSeleccionado);
+
+                        afectados = comando.ExecuteNonQuery();
+                    }
+
+                    // Solo libera si el registro borrado seguía 'En lectura';
+                    // los ya entregados liberaron su ejemplar al devolverlos.
+                    if (afectados > 0 && estabaEnLectura && tituloLibro.Length > 0)
+                        LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
+
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw; // el catch exterior muestra el mensaje unificado
+                }
+
                 if (afectados > 0)
                 {
+                    CargarTitulosDeLibros(); // por si se liberó un ejemplar
                     MessageBox.Show("Registro eliminado correctamente.",
                         "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     CargarRegistros();
