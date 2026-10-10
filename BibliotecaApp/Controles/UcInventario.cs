@@ -15,12 +15,28 @@ namespace BibliotecaApp
     public partial class UcInventario : UserControl
     {
         private const string ColBusqueda = "_BusquedaNormalizada";
+
+        /// <summary>
+        /// Orden físico de la biblioteca: PRIMERO por ubicación (agrupa M1, M2, M3...)
+        /// y SEGUNDO por código del ejemplar. Así los códigos gubernamentales
+        /// (que empiezan por números) no saltan al principio de la lista.
+        /// Se aplica tanto en la carga (SQL) como en el filtrado en tiempo real (DataView).
+        /// </summary>
+        private const string OrdenPorUbicacion = "[Ubicación] ASC, [Código] ASC";
         private DataTable _datosInventario = new();
         private DataView _vistaFiltrada;
 
         // Botones de administración (nivel de clase para control de visibilidad por rol)
         private Button? _btnImportarCSV;
         private Button? _btnVaciarInventario;
+
+        // Filtro desplegable de Ubicación (estilo Excel, generado en code-behind)
+        private ComboBox? _cmbFiltroUbicacion;
+        private Label? _lblFiltroUbicacion;
+        private bool _cargandoFiltroUbicacion; // evita reentrancia al repoblar el combo
+
+        /// <summary>Primer ítem del ComboBox: desactiva el filtro de ubicación.</summary>
+        private const string FiltroTodasUbicaciones = "Todas las ubicaciones";
 
         public UcInventario()
         {
@@ -39,6 +55,9 @@ namespace BibliotecaApp
             dgvInventario.CellFormatting += dgvInventario_CellFormatting;
 
             _vistaFiltrada = new DataView(_datosInventario);
+
+            // Filtro desplegable de Ubicación (estilo Excel) en panelBusqueda
+            CrearFiltroUbicacion();
 
             // Agregar botones de administración en panelEncabezado, alineados a la par del título
             int btnWidth = 130;
@@ -139,7 +158,7 @@ namespace BibliotecaApp
                            Ubicacion AS Ubicación,
                            Disponibilidad
                     FROM Libros
-                    ORDER BY Titulo;";
+                    ORDER BY Ubicacion ASC, Codigo ASC;";
 
                 var tabla = new DataTable();
                 using (var lector = comando.ExecuteReader())
@@ -163,11 +182,18 @@ namespace BibliotecaApp
 
                 _datosInventario = tabla;
                 _vistaFiltrada = new DataView(_datosInventario);
+                // Orden físico garantizado también a nivel de vista
+                // (misma cláusula que el ORDER BY de la consulta SQL).
+                _vistaFiltrada.Sort = OrdenPorUbicacion;
 
                 dgvInventario.DataSource = _vistaFiltrada;
                 OcultarColumnaBusqueda();
                 AjustarColumnas();
                 lblContador.Text = $"{_vistaFiltrada.Count:N0} libro(s)";
+
+                // Repoblar el ComboBox con las ubicaciones únicas del DataTable
+                // recién cargado (conserva la selección si el valor sigue existiendo).
+                CargarUbicacionesEnFiltro();
 
                 // Reaplicar filtro activo si se recarga la BD.
                 if (txtBuscar.Text.Length > 0)
@@ -186,11 +212,17 @@ namespace BibliotecaApp
         /// </summary>
         private void AplicarFiltro(string texto)
         {
-            if (texto.Length == 0)
-            {
-                _vistaFiltrada.RowFilter = string.Empty;
-            }
-            else
+            // RowFilter es únicamente la parte WHERE de la consulta: no admite
+            // ORDER BY. El orden se fija en el DataView con la misma cláusula
+            // que la carga principal: Ubicacion ASC, Codigo ASC.
+            _vistaFiltrada.Sort = OrdenPorUbicacion;
+
+            var condiciones = new List<string>();
+
+            // 1) Búsqueda por texto: columna oculta normalizada (Código + Título)
+            //    O Ubicación física en crudo ("M1", "M2"...). El LIKE de DataView
+            //    es insensible a mayúsculas ("m1" = "M1").
+            if (texto.Length > 0)
             {
                 string termino = EstiloUI.RemoverTildes(texto).ToLowerInvariant();
 
@@ -201,11 +233,121 @@ namespace BibliotecaApp
                     .Replace("%", "[%]")
                     .Replace("'", "''");
 
-                _vistaFiltrada.RowFilter =
-                    $"[{ColBusqueda}] LIKE '%{termino}%'";
+                condiciones.Add($"([{ColBusqueda}] LIKE '%{termino}%' OR [Ubicación] LIKE '%{termino}%')");
             }
 
+            // 2) Filtro de MÓDULO del ComboBox (si no es "Todas las ubicaciones"):
+            //    "M1" debe enganchar M1, M1A1, M1B2... → LIKE con comodín final.
+            string moduloSeleccionado = _cmbFiltroUbicacion?.SelectedItem?.ToString() ?? string.Empty;
+            if (moduloSeleccionado.Length > 0 && moduloSeleccionado != FiltroTodasUbicaciones)
+            {
+                // Escapar caracteres especiales del LIKE: el prefijo es literal
+                string prefijo = moduloSeleccionado
+                    .Replace("[", "[[]")
+                    .Replace("*", "[*]")
+                    .Replace("%", "[%]")
+                    .Replace("'", "''");
+                condiciones.Add($"[Ubicación] LIKE '{prefijo}%'");
+            }
+
+            // Ambas condiciones se combinan con AND; sin ninguna, vista completa.
+            _vistaFiltrada.RowFilter = condiciones.Count > 0
+                ? string.Join(" AND ", condiciones)
+                : string.Empty;
+
             lblContador.Text = $"{_vistaFiltrada.Count:N0} libro(s)";
+        }
+
+        /// <summary>
+        /// Crea dinámicamente el ComboBox de filtro por Ubicación (estilo Excel)
+        /// y su etiqueta, en una segunda fila de panelBusqueda alineada con
+        /// txtBuscar (columna de control en x=210). DropDownList para impedir
+        /// texto libre. No se toca UcInventario.Designer.cs.
+        /// </summary>
+        private void CrearFiltroUbicacion()
+        {
+            _lblFiltroUbicacion = new Label
+            {
+                Name = "lblFiltroUbicacion",
+                Text = "Ubicación:",
+                AutoSize = true,
+                Font = EstiloUI.Etiqueta(),
+                ForeColor = Color.FromArgb(43, 45, 66), // #2B2D42, mismo tono del título
+                Location = new Point(16, 56)            // segunda fila, a la izquierda
+            };
+
+            _cmbFiltroUbicacion = new ComboBox
+            {
+                Name = "cmbFiltroUbicacion",
+                Location = new Point(210, 53),          // misma columna que txtBuscar
+                Size = new Size(240, 27),
+                DropDownWidth = 260,                    // popup algo más ancho: se lee completo
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right // escala con la ventana como txtBuscar
+            };
+            EstiloUI.EstilizarEntrada(_cmbFiltroUbicacion); // DropDownList + estilo uniforme de la app
+            _cmbFiltroUbicacion.SelectedIndexChanged += CmbFiltroUbicacion_SelectedIndexChanged;
+
+            // Abrir una segunda fila en el panel para el filtro (fila 1 queda intacta)
+            panelBusqueda.Height = 92;
+
+            panelBusqueda.Controls.Add(_lblFiltroUbicacion);
+            panelBusqueda.Controls.Add(_cmbFiltroUbicacion);
+        }
+
+        /// <summary>
+        /// Llena el ComboBox con los MÓDULOS PRINCIPALES únicos (los 2 primeros
+        /// caracteres de cada Ubicación: "M1A1" → "M1"), en el orden físico del
+        /// DataTable (Ubicación ASC), más "Todas las ubicaciones" en el índice 0.
+        /// Conserva la selección previa si el módulo sigue existiendo; si no,
+        /// vuelve a "Todas". Idempotente y seguro de llamar en cada recarga.
+        /// </summary>
+        private void CargarUbicacionesEnFiltro()
+        {
+            if (_cmbFiltroUbicacion == null) return;
+
+            string seleccionAnterior = _cmbFiltroUbicacion.SelectedItem?.ToString()
+                ?? FiltroTodasUbicaciones;
+
+            _cargandoFiltroUbicacion = true; // SelectedIndexChanged no refiltra mientras se repuebla
+            try
+            {
+                _cmbFiltroUbicacion.Items.Clear();
+                _cmbFiltroUbicacion.Items.Add(FiltroTodasUbicaciones);
+
+                // Solo MÓDULOS: 2 primeros caracteres de cada ubicación.
+                // Null-seguro: ubicaciones vacías o de 1 carácter se ignoran.
+                var modulosVistos = new HashSet<string>(StringComparer.Ordinal);
+                foreach (DataRow fila in _datosInventario.Rows)
+                {
+                    string ubicacion = fila["Ubicación"]?.ToString() ?? "";
+                    if (ubicacion.Length < 2) continue;
+
+                    string modulo = ubicacion.Substring(0, 2);
+                    if (modulosVistos.Add(modulo)) // valores únicos, orden del DataTable
+                        _cmbFiltroUbicacion.Items.Add(modulo);
+                }
+
+                int indice = _cmbFiltroUbicacion.Items.IndexOf(seleccionAnterior);
+                _cmbFiltroUbicacion.SelectedIndex = indice >= 0 ? indice : 0;
+            }
+            finally
+            {
+                _cargandoFiltroUbicacion = false;
+            }
+
+            // Refiltrar con la selección resultante (p. ej. si la ubicación
+            // seleccionada ya no existe y se volvió a "Todas las ubicaciones").
+            AplicarFiltro(txtBuscar.Text.Trim());
+        }
+
+        /// <summary>
+        /// Cambió la ubicación seleccionada en el ComboBox: combinar con el
+        /// texto de txtBuscar vía AND dentro de AplicarFiltro.
+        /// </summary>
+        private void CmbFiltroUbicacion_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (_cargandoFiltroUbicacion) return; // evita ciclos al repoblar el combo
+            AplicarFiltro(txtBuscar.Text.Trim());
         }
 
         private void OcultarColumnaBusqueda()

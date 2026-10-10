@@ -282,6 +282,21 @@ namespace BibliotecaApp
                 agregar.ExecuteNonQuery();
             }
 
+            // Trazabilidad de quién ejecutó cada renovación / devolución
+            if (!columnas.Contains("PersonalRenovo"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN PersonalRenovo TEXT;";
+                agregar.ExecuteNonQuery();
+            }
+
+            if (!columnas.Contains("PersonalDevolvio"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN PersonalDevolvio TEXT;";
+                agregar.ExecuteNonQuery();
+            }
+
             using var indice = conexion.CreateCommand();
             indice.CommandText = "CREATE INDEX IF NOT EXISTS IX_Prestamos_CodigoLibro ON PrestamosExternos(CodigoLibro);";
             indice.ExecuteNonQuery();
@@ -333,7 +348,8 @@ namespace BibliotecaApp
                     PersonalRecibio  TEXT,
                     EstadoLibro      TEXT DEFAULT 'Pendiente',
                     CodigoLibro      TEXT,
-                    FechaDevolucion  TEXT
+                    FechaDevolucion  TEXT,
+                    PersonalDevolvio TEXT
                 );";
 
             const string sqlUsuarios = @"

@@ -17,7 +17,7 @@ namespace BibliotecaApp
         
         // Variables de paginación
         private int paginaActual = 1;
-        private int tamanoPagina = 11; // Definitivo (producción): llena el DataGridView dejando una fila de margen
+        private int tamanoPagina = 11; // Valor inicial/respaldo; CalcularTamanoPagina() lo ajusta a la altura real de pantalla
         private int totalPaginas = 1;
         
         // Botones de paginación (creados dinámicamente para no tocar Designer)
@@ -64,6 +64,16 @@ namespace BibliotecaApp
 
             // Suscribir evento CellFormatting para coloreo dinámico de la columna Estado
             dgvPrestamos.CellFormatting += DgvPrestamos_CellFormatting_Estado;
+
+            // PAGINACIÓN DINÁMICA: al cambiar la altura del DataGridView (ventana,
+            // barra lateral o splitter) se recalcula cuántas filas caben por página
+            // y se vuelve a la página 1 (ver CalcularTamanoPagina / Resize).
+            dgvPrestamos.Resize += DgvPrestamos_Resize;
+
+            // Selección uniforme en TODA fila: azul oscuro institucional + texto blanco.
+            // Es la fuente que consultan los manejadores CellFormatting (override).
+            dgvPrestamos.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
+            dgvPrestamos.DefaultCellStyle.SelectionForeColor = Color.White;
 
             // Crear botones de administración (Eliminar y Limpiar) dinámicamente.
             // Se agregan ANTES que la paginación para que queden junto a "Modificar".
@@ -114,8 +124,8 @@ namespace BibliotecaApp
             // Fecha de Entrega Esperada: nunca menor a la Fecha de Préstamo
             dtpFechaEntrega.MinDate = dtpFechaPrestamo.Value;
 
-            dtpFechaPrestamo.Value = DateTime.Today;
-            dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
+            dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, DateTime.Today);
+            dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, DateTime.Today.AddDays(8));
 
             // Control de visibilidad por rol: ocultar botones destructivos para no administradores
             if (SesionGlobal.HaySesionActiva)
@@ -134,13 +144,50 @@ namespace BibliotecaApp
             // La visibilidad de los botones admin cambia el ancho ocupado: reajustar espaciador
             ActualizarEspaciadorPaginacion();
 
+            // Panel de campos sin scrollbar gris: Panel1 mide lo que realmente necesita
+            AjustarSplitterAContenido();
+
+            // Paginación dinámica: filas que caben en la altura real del control
+            CalcularTamanoPagina();
             CargarPrestamosActivos();
         }
 
         /// <summary>Método público invocado por Form1 al navegar a este apartado.</summary>
         public void Actualizar()
         {
+            // Recalcular por si la ventana cambió mientras el módulo estaba oculto;
+            // si la capacidad de filas cambió, se vuelve a la página 1.
+            if (CalcularTamanoPagina()) paginaActual = 1;
             CargarPrestamosActivos();
+        }
+
+        /// <summary>
+        /// SIN BARRA DE SCROLL GRIS EN EL PANEL DE CAMPOS: splitPrestamos.Panel1
+        /// tiene AutoScroll = true y altura fija (SplitterDistance = 410). Si
+        /// encabezado + campos + botones superan esos 410px (placeholders, DPI
+        /// 125%/150%, fuentes), WinForms pinta un scrollbar vertical en el
+        /// lateral DERECHO de los campos. Este método ajusta la altura del
+        /// panel a lo que realmente necesita para que el scroll nunca aparezca,
+        /// garantizando siempre un mínimo para el grid inferior (Panel2MinSize).
+        /// Idempotente: solo escribe si el valor cambia.
+        /// </summary>
+        private void AjustarSplitterAContenido()
+        {
+            // Forzar layout para leer las alturas actuales de los controles Dock=Top
+            splitPrestamos.Panel1.PerformLayout();
+
+            int altoRequerido = panelEncabezado.Height
+                              + pnlDatos.Height
+                              + pnlBotonesAccion.Height
+                              + 8; // holgura anti-redondeo de píxeles
+
+            int minimo = splitPrestamos.Panel1MinSize; // 25 por defecto
+            int maximo = splitPrestamos.Height - splitPrestamos.SplitterWidth - splitPrestamos.Panel2MinSize;
+            if (maximo < minimo) maximo = minimo; // ventana extremadamente pequeña
+
+            int deseado = Math.Clamp(altoRequerido, minimo, maximo);
+            if (splitPrestamos.SplitterDistance != deseado)
+                splitPrestamos.SplitterDistance = deseado;
         }
 
         // ====================================================================
@@ -339,6 +386,10 @@ namespace BibliotecaApp
                                 ELSE strftime('%d/%m/%Y', FechaRenovacion) END AS FechaRenovacion,
                            strftime('%d/%m/%Y', FechaEntrega)   AS [Entrega Esperada],
                            PersonalPresto,
+                           CASE WHEN IFNULL(PersonalRenovo,'') = '' THEN '-'
+                                ELSE PersonalRenovo END             AS PersonalRenovo,
+                           CASE WHEN IFNULL(PersonalDevolvio,'') = '' THEN '-'
+                                ELSE PersonalDevolvio END           AS PersonalDevolvio,
                            EstadoLibro                          AS Estado,
                            Notificado
                     FROM PrestamosExternos
@@ -377,6 +428,35 @@ namespace BibliotecaApp
                     dgvPrestamos.Columns.Add(colNotificado);
                 }
 
+                // --- Trazabilidad: quién renovó / quién devolvió (columnas por código) ---
+                if (!dgvPrestamos.Columns.Contains("PersonalRenovo"))
+                {
+                    var colPersonalRenovo = new DataGridViewTextBoxColumn
+                    {
+                        Name = "PersonalRenovo",
+                        DataPropertyName = "PersonalRenovo",
+                        HeaderText = "Personal Renovó",
+                        FillWeight = 80F,
+                        MinimumWidth = 95,
+                        SortMode = DataGridViewColumnSortMode.Automatic
+                    };
+                    dgvPrestamos.Columns.Add(colPersonalRenovo);
+                }
+
+                if (!dgvPrestamos.Columns.Contains("PersonalDevolvio"))
+                {
+                    var colPersonalDevolvio = new DataGridViewTextBoxColumn
+                    {
+                        Name = "PersonalDevolvio",
+                        DataPropertyName = "PersonalDevolvio",
+                        HeaderText = "Personal Devolvió",
+                        FillWeight = 80F,
+                        MinimumWidth = 100,
+                        SortMode = DataGridViewColumnSortMode.Automatic
+                    };
+                    dgvPrestamos.Columns.Add(colPersonalDevolvio);
+                }
+
                 // Agregar columna de botón "Notificar" si no existe
                 if (!dgvPrestamos.Columns.Contains("btnMensaje"))
                 {
@@ -391,6 +471,22 @@ namespace BibliotecaApp
                         MinimumWidth = 80
                     };
                     dgvPrestamos.Columns.Add(btnCol);
+                }
+
+                // --- Orden lógico de columnas (code-behind, sin tocar Designer) ---
+                // ... -> Fecha Préstamo -> Personal que Prestó -> Fecha Renovación ->
+                //      Personal Renovó -> Entrega Esperada -> Personal Devolvió -> Estado
+                ReordenarColumnasGrid();
+
+                // --- Columnas de fecha más compactas (evita que la tabla se amontone) ---
+                foreach (var nombreColFecha in new[]
+                         {
+                             "FechaPrestamo", "FechaRenovacion", "Entrega Esperada"
+                         })
+                {
+                    var colFecha = dgvPrestamos.Columns[nombreColFecha];
+                    if (colFecha != null)
+                        colFecha.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
                 }
 
                 // Valor inicial para cada fila del botón y restaurar estado Notificado
@@ -410,8 +506,7 @@ namespace BibliotecaApp
                                 row.Cells["btnMensaje"].Value = "Enviado";
                                 row.Cells["btnMensaje"].Style.BackColor = Color.LightGreen;
                                 row.Cells["btnMensaje"].Style.ForeColor = Color.DarkGreen;
-                                row.Cells["btnMensaje"].Style.SelectionBackColor = Color.LightGreen;
-                                row.Cells["btnMensaje"].Style.SelectionForeColor = Color.DarkGreen;
+                                // Selección: sin override → hereda el azul uniforme del grid
                             }
                         }
                     }
@@ -582,6 +677,73 @@ namespace BibliotecaApp
             catch
             {
                 totalPaginas = 1;
+            }
+        }
+
+        /// <summary>
+        /// PAGINACIÓN DINÁMICA: calcula cuántas filas caben realmente en el
+        /// DataGridView y lo asigna a tamanoPagina:
+        ///   (altura del control − altura del encabezado) / alto de fila − 1
+        /// El "-1" deja una fila de margen inferior. Mínimo 1 fila por página.
+        /// Devuelve true si el tamaño de página cambió respecto al anterior
+        /// (el llamador decide si reiniciar la página y recargar).
+        /// </summary>
+        private bool CalcularTamanoPagina()
+        {
+            // Sin layout todavía (control oculto o recién creado): conservar tamaño actual
+            int altura = dgvPrestamos.Height;
+            if (altura <= 0) return false;
+
+            int altoFila = dgvPrestamos.RowTemplate.Height > 0
+                ? dgvPrestamos.RowTemplate.Height
+                : 20; // fallback si el alto de fila aún no está definido
+
+            int disponibles = altura - dgvPrestamos.ColumnHeadersHeight;
+            int filas = (disponibles / altoFila) - 1; // −1: margen inferior solicitado
+
+            int nuevoTamano = Math.Max(1, filas);     // nunca menos de 1 fila por página
+            if (nuevoTamano == tamanoPagina) return false;
+
+            tamanoPagina = nuevoTamano;
+            return true;
+        }
+
+        /// <summary>
+        /// Resize del DataGridView (ventana, barra lateral o splitter): recalcula
+        /// el tamaño de página, vuelve a la página 1 y recarga los datos con el
+        /// LIMIT/OFFSET actualizado. Solo recarga si la capacidad de filas cambió:
+        /// durante el arrastre del resize se disparan decenas de eventos y
+        /// recargar en cada uno golpearía la BD sin necesidad.
+        /// </summary>
+        private void DgvPrestamos_Resize(object? sender, EventArgs e)
+        {
+            if (IsDisposed || Disposing) return;
+            if (!CalcularTamanoPagina()) return;
+
+            paginaActual = 1;
+            CargarPrestamosActivos();
+        }
+
+        /// <summary>
+        /// Ordena las columnas del DataGridView en el orden lógico de negocio
+        /// (solo por código, sin tocar Designer.cs):
+        /// ... -> Fecha Préstamo -> Personal que Prestó -> Fecha Renovación ->
+        /// Personal Renovó -> Entrega Esperada -> Personal Devolvió -> Estado.
+        /// </summary>
+        private void ReordenarColumnasGrid()
+        {
+            string[] ordenDeseado =
+            {
+                "ID", "Usuario", "DUI", "Correo", "Telefono", "TituloLibro",
+                "FechaPrestamo", "PersonalPresto", "FechaRenovacion", "PersonalRenovo",
+                "Entrega Esperada", "PersonalDevolvio", "Estado", "Notificado", "btnMensaje"
+            };
+
+            for (int i = 0; i < ordenDeseado.Length; i++)
+            {
+                var columna = dgvPrestamos.Columns[ordenDeseado[i]];
+                if (columna != null)
+                    columna.DisplayIndex = i;
             }
         }
 
@@ -760,9 +922,23 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Limpia los campos del formulario dejándolo listo para un nuevo préstamo.
+        /// Acción destructiva (vacía datos en progreso): exige autenticación de
+        /// Administrador mediante FormAutenticacion antes de ejecutarse.
         /// </summary>
         private void btnLimpiar_Click(object? sender, EventArgs e)
         {
+            // --- Autenticación obligatoria (mismo modal que Eliminar/Inventario) ---
+            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
+            {
+                if (frmAuth.ShowDialog(this) != DialogResult.OK)
+                {
+                    MessageBox.Show("Acción cancelada: se requiere autenticación de Administrador.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+            }
+
+            // Solo llega aquí con autenticación aprobada (DialogResult.OK)
             LimpiarParaNuevo();
         }
 
@@ -806,8 +982,7 @@ namespace BibliotecaApp
                         celdaBtn.Value = "Entregado";
                         celdaBtn.Style.BackColor = Color.FromArgb(204, 255, 204);
                         celdaBtn.Style.ForeColor = Color.DarkGreen;
-                        celdaBtn.Style.SelectionBackColor = Color.FromArgb(204, 255, 204);
-                        celdaBtn.Style.SelectionForeColor = Color.DarkGreen;
+                        // Selección: sin override → hereda el azul uniforme del grid
                     }
                     else if (celdaBtn.Value?.ToString() == "Entregado")
                     {
@@ -829,6 +1004,12 @@ namespace BibliotecaApp
         {
             if (e.RowIndex < 0) return;
 
+            // OVERRIDE UNIFORME DE SELECCIÓN: toda celda de la fila seleccionada
+            // adopta el azul oscuro del grid con texto blanco, ignorando el color
+            // personalizado de la celda (Estado, botón Notificar, etc.).
+            e.CellStyle.SelectionBackColor = dgvPrestamos.DefaultCellStyle.SelectionBackColor;
+            e.CellStyle.SelectionForeColor = Color.White;
+
             var col = dgvPrestamos.Columns[e.ColumnIndex];
 
             // La columna Estado la pinta DgvPrestamos_CellFormatting_Estado
@@ -837,9 +1018,8 @@ namespace BibliotecaApp
             // El botón "Notificar" conserva sus colores propios (Enviado / Entregado)
             if (col.Name == "btnMensaje") return;
 
-            // Resto de la fila: siempre fondo blanco
+            // Resto de la fila: siempre fondo blanco (la selección ya quedó fijada arriba)
             e.CellStyle.BackColor = Color.White;
-            e.CellStyle.SelectionBackColor = EstiloUI.Acento;
         }
 
         /// <summary>
@@ -850,6 +1030,12 @@ namespace BibliotecaApp
         private void DgvPrestamos_CellFormatting_Estado(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.RowIndex < 0) return;
+
+            // OVERRIDE UNIFORME DE SELECCIÓN (antes de los colores por estado):
+            // en selección, la celda "Estado" ignora su color propio y adopta
+            // el azul oscuro de la fila con texto blanco → legibilidad garantizada.
+            e.CellStyle.SelectionBackColor = dgvPrestamos.DefaultCellStyle.SelectionBackColor;
+            e.CellStyle.SelectionForeColor = Color.White;
 
             var colEstado = dgvPrestamos.Columns["Estado"];
             if (colEstado == null || e.ColumnIndex != colEstado.Index) return;
@@ -872,11 +1058,8 @@ namespace BibliotecaApp
                     return; // Sin color para estados no reconocidos
             }
 
+            // Solo el color de reposo; la selección queda uniforme en azul (arriba).
             e.CellStyle.BackColor = colorFondo;
-            e.CellStyle.SelectionBackColor = Color.FromArgb(
-                Math.Max(0, colorFondo.R - 30),
-                Math.Max(0, colorFondo.G - 30),
-                Math.Max(0, colorFondo.B - 30));
         }
 
         /// <summary>
@@ -927,8 +1110,7 @@ namespace BibliotecaApp
                 celda.Value = "Enviado";
                 celda.Style.BackColor = Color.LightGreen;
                 celda.Style.ForeColor = Color.DarkGreen;
-                celda.Style.SelectionBackColor = Color.LightGreen;
-                celda.Style.SelectionForeColor = Color.DarkGreen;
+                // Selección: sin override → hereda el azul uniforme del grid
 
                 // Persistir en BD: Notificado = 1
                 int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
@@ -1129,7 +1311,12 @@ namespace BibliotecaApp
                     using var transaccion = conexion.BeginTransaction();
                     try
                     {
-                        RenovarPrestamo(conexion, transaccion, id, DateTime.Now, "");
+                        // Trazabilidad: en modo edición no hay popup, se registra
+                        // el usuario en sesión como responsable de la renovación.
+                        RenovarPrestamo(conexion, transaccion, id, DateTime.Now,
+                            string.IsNullOrWhiteSpace(SesionGlobal.NombreUsuario)
+                                ? "Sistema"
+                                : SesionGlobal.NombreUsuario);
                         transaccion.Commit();
                     }
                     catch
@@ -1361,7 +1548,8 @@ namespace BibliotecaApp
                             UPDATE PrestamosExternos
                             SET EstadoLibro    = 'Entregado',
                                 FechaDevolucion = $hoy,
-                                PersonalRecibio = $personal
+                                PersonalRecibio = $personal,
+                                PersonalDevolvio = $personal
                             WHERE ID = $id
                               AND EstadoLibro IN ('Pendiente', 'Renovado');";
                         actualizar.Parameters.AddWithValue("$hoy", fechaDevolucion.ToString("yyyy-MM-dd"));
@@ -1593,15 +1781,17 @@ namespace BibliotecaApp
                 string tituloLibro = fila["TituloLibro"]?.ToString() ?? "";
                 string codigoLibro = fila["CodigoLibro"]?.ToString() ?? "";
 
+                // Fechas desde la BD protegidas con FechaSegura: la BD puede contener
+                // fechas no inicializadas (0001-01-01) que el control no admite.
                 if (DateTime.TryParse(fila["FechaPrestamo"]?.ToString(), out var fp))
-                    dtpFechaPrestamo.Value = fp;
+                    dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, fp);
 
                 txtPersonalPresto.Text = fila["PersonalPresto"]?.ToString() ?? "";
 
                 txtEstado.Text = fila["EstadoLibro"]?.ToString() ?? "Pendiente";
 
                 if (DateTime.TryParse(fila["FechaEntrega"]?.ToString(), out var fe))
-                    dtpFechaEntrega.Value = fe;
+                    dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, fe);
 
                 // Seleccionar el título en el ComboBox (por texto).
                 txtTituloLibro.Text = tituloLibro;
@@ -1658,6 +1848,34 @@ namespace BibliotecaApp
         }
 
         /// <summary>
+        /// Fecha mínima que admite un DateTimePicker (límite nativo del control).
+        /// Asignaciones por debajo de esta fecha lanzan ArgumentOutOfRangeException
+        /// con el mensaje "DateTimePicker no admite fechas anteriores a 1/1/1753".
+        /// </summary>
+        private static readonly DateTime MinFechaSoportada = new DateTime(1753, 1, 1);
+
+        /// <summary>
+        /// Devuelve <paramref name="valor"/> si el control la admite; si no,
+        /// un valor de rescate seguro (DateTime.Now, nunca por debajo del mínimo
+        /// admisible). Evita ArgumentOutOfRangeException al asignar DateTimePicker.Value.
+        /// </summary>
+        private static DateTime FechaSegura(DateTimePicker control, DateTime valor)
+        {
+            // Piso real: el mayor entre el límite nativo (1753) y el MinDate
+            // dinámico actual del control (p. ej. "entrega ≥ préstamo").
+            DateTime piso = control.MinDate > MinFechaSoportada ? control.MinDate : MinFechaSoportada;
+
+            if (valor >= piso && valor <= control.MaxDate)
+                return valor;
+
+            // Valor de rescate seguro
+            DateTime rescate = DateTime.Now;
+            if (rescate < piso) rescate = piso;
+            if (rescate > control.MaxDate) rescate = control.MaxDate;
+            return rescate;
+        }
+
+        /// <summary>
         /// Autocompletado inteligente: al elegir la fecha de préstamo, sugiere
         /// la entrega esperada sumando exactamente 8 días. El control
         /// dtpFechaEntrega permanece habilitado para ajuste manual.
@@ -1667,11 +1885,20 @@ namespace BibliotecaApp
         private void dtpFechaPrestamo_ValueChanged(object? sender, EventArgs e)
         {
             dtpFechaEntrega.MinDate = dtpFechaPrestamo.Value;
-            dtpFechaEntrega.Value = dtpFechaPrestamo.Value.AddDays(8);
+            dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, dtpFechaPrestamo.Value.AddDays(8));
         }
 
+        /// <summary>
+        /// Vacia todos los campos del formulario a su estado inicial seguro:
+        /// TextBox, DateTimePickers, estado 'Pendiente', código del ejemplar
+        /// (variable de selección equivalente) y desbloqueo de campos.
+        /// No dispara búsquedas en BD: no existe ningún TextChanged en el módulo
+        /// y txtCodigoLibro_KeyPress solo reacciona a la tecla Enter.
+        /// </summary>
         private void LimpiarCampos()
         {
+            // Todos los TextBox del formulario (DUI, Nombre, Teléfono, Correo,
+            // Dirección, Personal que Prestó y Título):
             foreach (var caja in new[] { txtNombre, txtCorreo, txtDui, txtTelefono,
                      txtDireccion, txtPersonalPresto })
             {
@@ -1684,15 +1911,31 @@ namespace BibliotecaApp
             // (p. ej. 'Entregado') y el formulario quedaba engañoso.
             txtEstado.Text = "Pendiente";
 
-            dtpFechaPrestamo.Value = DateTime.Today;
-            dtpFechaEntrega.Value = DateTime.Today.AddDays(8);
+            // DateTimePickers a su valor predeterminado seguro (mismo que UcPrestamosExternos_Load).
+            // Reset de MinDate al límite NATIVO admitido por el control (1/1/1753).
+            // CORRECCIÓN QA: antes se usaba DateTime.MinValue, que lanzaba
+            // ArgumentOutOfRangeException al pulsar "Actualizar Préstamo":
+            // "DateTimePicker no admite fechas anteriores a 1/1/1753 (value = 1/1/0001)".
+            dtpFechaEntrega.MinDate = MinFechaSoportada;
+            dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, DateTime.Today);   // dispara ValueChanged → recalcula entrega
+            dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, DateTime.Today.AddDays(8));
+            // Restaurar la invariante "entrega ≥ préstamo" aunque ValueChanged
+            // no se haya disparado (el valor de préstamo no había cambiado).
+            dtpFechaEntrega.MinDate = dtpFechaPrestamo.Value;
+
+            // Código del ejemplar: limpia el campo, borra el aviso y desbloquea
+            // los campos de libro (equivalente a reiniciar 'codigoEjemplarSeleccionado').
             LimpiarEstadoCodigo();
         }
 
         private void LimpiarParaNuevo()
         {
             LimpiarCampos();
+
+            // Reinicio de la variable de selección: sale del modo edición
+            // (equivalente a 'idPrestamoSeleccionado = 0').
             _prstamoEditandoId = null;
+
             btnRegistrar.Text = "Registrar Préstamo";
             EstiloUI.EstilizarBotonPrimario(btnRegistrar);
             txtNombre.Focus();
