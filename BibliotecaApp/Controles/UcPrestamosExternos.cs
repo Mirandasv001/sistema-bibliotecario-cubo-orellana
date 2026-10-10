@@ -32,6 +32,11 @@ namespace BibliotecaApp
         // Espaciador invisible que empuja la paginación al extremo derecho de flpBotones
         private Control? _espaciadorPaginacion;
 
+        // Campo Género (creado dinámicamente para no tocar Designer).
+        // null! en la declaración: la asignación real ocurre en CrearCampoGenero(),
+        // invocado desde el constructor, para no emitir CS8618.
+        private ComboBox cmbGeneroPrestamo = null!;
+
         public UcPrestamosExternos()
         {
             InitializeComponent();
@@ -82,6 +87,9 @@ namespace BibliotecaApp
             // Crear botones de paginación dinámicamente (sin tocar Designer).
             // Van al FINAL de la fila y un espaciador los empuja al extremo derecho.
             CrearBotonesPaginacion();
+
+            // Campo Género (Label + ComboBox) en code-behind: fila libre 8 de tlpCampos
+            CrearCampoGenero();
 
             // Asegurar que la columna Notificado exista en la BD
             AsegurarColumnaNotificado();
@@ -323,6 +331,33 @@ namespace BibliotecaApp
             EstiloUI.EstablecerPlaceholder(txtTelefono, "Ej: 2222-2222");
         }
 
+        /// <summary>
+        /// Crea el campo Género (Label + ComboBox) en code-behind y lo coloca en
+        /// la MISMA fila que "Fecha de Entrega Esperada", columnas 2 y 3 (libres),
+        /// alineado justo debajo de "Personal que Prestó". Sin crear filas nuevas
+        /// ni modificar el archivo .Designer.cs.
+        /// </summary>
+        private void CrearCampoGenero()
+        {
+            // Estilo idéntico al de las etiquetas del Designer (CrearEtiqueta)
+            var lblGenero = EstiloUI.CrearEtiqueta("Género:");
+            lblGenero.Name = "lblGenero";
+
+            cmbGeneroPrestamo = new ComboBox
+            {
+                Name = "cmbGeneroPrestamo",
+                Dock = DockStyle.Fill
+            };
+            cmbGeneroPrestamo.Items.AddRange(new object[] { "Masculino", "Femenino" });
+            EstiloUI.EstilizarEntrada(cmbGeneroPrestamo); // DropDownList + Flat + márgenes uniformes
+            cmbGeneroPrestamo.Margin = new Padding(3, 0, 15, 4); // mismo margen que el resto de campos
+
+            // Fila de "Fecha de Entrega Esperada" (dtpFechaEntrega), columnas 2 y 3
+            int filaEntrega = tlpCampos.GetRow(dtpFechaEntrega);
+            tlpCampos.Controls.Add(lblGenero, 2, filaEntrega);
+            tlpCampos.Controls.Add(cmbGeneroPrestamo, 3, filaEntrega);
+        }
+
         // ====================================================================
         //  CONSULTA DE CÓDIGOS — resolver ejemplar físico desde el título
         // ====================================================================
@@ -380,6 +415,8 @@ namespace BibliotecaApp
                            DUI,
                            Correo,
                            Telefono,
+                           CASE WHEN IFNULL(Genero,'') = '' THEN '-'
+                                ELSE Genero END                 AS Genero,
                            TituloLibro,
                            strftime('%d/%m/%Y', FechaPrestamo)  AS FechaPrestamo,
                            CASE WHEN IFNULL(FechaRenovacion,'') = '' THEN '-'
@@ -455,6 +492,23 @@ namespace BibliotecaApp
                         SortMode = DataGridViewColumnSortMode.Automatic
                     };
                     dgvPrestamos.Columns.Add(colPersonalDevolvio);
+                }
+
+                if (!dgvPrestamos.Columns.Contains("Genero"))
+                {
+                    var colGenero = new DataGridViewTextBoxColumn
+                    {
+                        Name = "Genero",
+                        DataPropertyName = "Genero",
+                        HeaderText = "Género",
+                        FillWeight = 70F,
+                        MinimumWidth = 85,
+                        SortMode = DataGridViewColumnSortMode.Automatic
+                    };
+                    // Inserción forzada justo después de "Telefono" (antes de
+                    // "TituloLibro") en lugar de añadirla al final del grid.
+                    int index = dgvPrestamos.Columns["Telefono"]?.Index ?? dgvPrestamos.Columns.Count - 1;
+                    dgvPrestamos.Columns.Insert(index + 1, colGenero);
                 }
 
                 // Agregar columna de botón "Notificar" si no existe
@@ -734,7 +788,7 @@ namespace BibliotecaApp
         {
             string[] ordenDeseado =
             {
-                "ID", "Usuario", "DUI", "Correo", "Telefono", "TituloLibro",
+                "ID", "Usuario", "DUI", "Correo", "Telefono", "Genero", "TituloLibro",
                 "FechaPrestamo", "PersonalPresto", "FechaRenovacion", "PersonalRenovo",
                 "Entrega Esperada", "PersonalDevolvio", "Estado", "Notificado", "btnMensaje"
             };
@@ -772,7 +826,7 @@ namespace BibliotecaApp
             btnLimpiar = new Button
             {
                 Name = "btnLimpiar",
-                Text = "Limpiar campos",
+                Text = "Eliminar página",
                 AutoSize = true,
                 Margin = new Padding(5, 0, 5, 5),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
@@ -921,25 +975,101 @@ namespace BibliotecaApp
         }
 
         /// <summary>
-        /// Limpia los campos del formulario dejándolo listo para un nuevo préstamo.
-        /// Acción destructiva (vacía datos en progreso): exige autenticación de
-        /// Administrador mediante FormAutenticacion antes de ejecutarse.
+        /// Elimina de la BD todos los préstamos mostrados en la página ACTIVA del
+        /// grid. Exige autenticación de Administrador (mismo modal que "Eliminar
+        /// préstamo"); si el modal no devuelve DialogResult.OK (credenciales
+        /// incorrectas o cierre del diálogo), se aborta sin ejecutar nada.
         /// </summary>
         private void btnLimpiar_Click(object? sender, EventArgs e)
         {
-            // --- Autenticación obligatoria (mismo modal que Eliminar/Inventario) ---
+            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK)
-                {
-                    MessageBox.Show("Acción cancelada: se requiere autenticación de Administrador.",
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
             }
 
             // Solo llega aquí con autenticación aprobada (DialogResult.OK)
-            LimpiarParaNuevo();
+            EliminarPaginaActual();
+        }
+
+        /// <summary>
+        /// Elimina en bloque (DELETE parametrizado + transacción) los registros de
+        /// la página visible y recarga el grid. Si la página eliminada era la
+        /// última, CargarPrestamosActivos() regresa a la nueva última página.
+        /// </summary>
+        private void EliminarPaginaActual()
+        {
+            // 1) Instantánea de los IDs de la página activa ANTES de tocar la BD
+            var idsPagina = new List<long>();
+            foreach (DataGridViewRow fila in dgvPrestamos.Rows)
+            {
+                if (fila.IsNewRow) continue;
+
+                object? valorId = fila.Cells["ID"].Value;
+                if (valorId != null && valorId != DBNull.Value
+                    && long.TryParse(valorId.ToString(), out long id))
+                {
+                    idsPagina.Add(id);
+                }
+            }
+
+            if (idsPagina.Count == 0)
+            {
+                MessageBox.Show("La página actual no tiene registros para eliminar.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // 2) Confirmación (la eliminación es definitiva)
+            DialogResult confirmar = MessageBox.Show(
+                $"Se eliminarán {idsPagina.Count} registro(s) de la página actual.\n" +
+                "Esta acción no se puede deshacer. ¿Continuar?",
+                "Biblioteca CUBO", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (confirmar != DialogResult.Yes) return;
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var transaccion = conexion.BeginTransaction();
+                int eliminados;
+                try
+                {
+                    // DELETE parametrizado reutilizando un único parámetro
+                    using var comando = conexion.CreateCommand();
+                    comando.Transaction = transaccion;
+                    comando.CommandText = "DELETE FROM PrestamosExternos WHERE ID = $id;";
+
+                    var parametro = comando.CreateParameter();
+                    parametro.ParameterName = "$id";
+                    comando.Parameters.Add(parametro);
+
+                    eliminados = 0;
+                    foreach (long id in idsPagina)
+                    {
+                        parametro.Value = id;
+                        eliminados += comando.ExecuteNonQuery();
+                    }
+
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw; // el catch exterior muestra el error unificado
+                }
+
+                MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar la página: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            // 3) Recargar: recalcula totalPaginas y acomoda paginaActual si era la última
+            CargarPrestamosActivos();
         }
 
         // ====================================================================
@@ -1204,16 +1334,17 @@ namespace BibliotecaApp
                         insertar.Transaction = transaccion;
                         insertar.CommandText = @"
                             INSERT INTO PrestamosExternos
-                                (NombreUsuario, Correo, DUI, Telefono, Direccion, TituloLibro,
+                                (NombreUsuario, Correo, DUI, Telefono, Genero, Direccion, TituloLibro,
                                  FechaPrestamo, PersonalPresto, FechaEntrega, EstadoLibro, CodigoLibro)
                             VALUES
-                                ($nombre, $correo, $dui, $telefono, $direccion, $titulo,
+                                ($nombre, $correo, $dui, $telefono, $genero, $direccion, $titulo,
                                  $fechaPrestamo, $personalPresto, $fechaEntrega, $estado, $codigo);";
 
                         insertar.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
                         insertar.Parameters.AddWithValue("$correo", txtCorreo.Text.Trim());
                         insertar.Parameters.AddWithValue("$dui", txtDui.Text.Trim());
                         insertar.Parameters.AddWithValue("$telefono", txtTelefono.Text.Trim());
+                        insertar.Parameters.AddWithValue("$genero", cmbGeneroPrestamo.Text.Trim());
                         insertar.Parameters.AddWithValue("$direccion", txtDireccion.Text.Trim());
                         insertar.Parameters.AddWithValue("$titulo", titulo);
                         insertar.Parameters.AddWithValue("$fechaPrestamo", dtpFechaPrestamo.Value.ToString("yyyy-MM-dd"));
@@ -1446,6 +1577,7 @@ namespace BibliotecaApp
                     Correo          = $correo,
                     DUI             = $dui,
                     Telefono        = $telefono,
+                    Genero          = $genero,
                     Direccion       = $direccion,
                     TituloLibro     = $titulo,
                     FechaPrestamo   = $fechaPrestamo,
@@ -1458,6 +1590,7 @@ namespace BibliotecaApp
             cmd.Parameters.AddWithValue("$correo", txtCorreo.Text.Trim());
             cmd.Parameters.AddWithValue("$dui", txtDui.Text.Trim());
             cmd.Parameters.AddWithValue("$telefono", txtTelefono.Text.Trim());
+            cmd.Parameters.AddWithValue("$genero", cmbGeneroPrestamo.Text.Trim());
             cmd.Parameters.AddWithValue("$direccion", txtDireccion.Text.Trim());
             cmd.Parameters.AddWithValue("$titulo", txtTituloLibro.Text.Trim());
             cmd.Parameters.AddWithValue("$fechaPrestamo", dtpFechaPrestamo.Value.ToString("yyyy-MM-dd"));
@@ -1778,6 +1911,14 @@ namespace BibliotecaApp
                 txtTelefono.Text = fila["Telefono"]?.ToString() ?? "";
                 txtDireccion.Text = fila["Direccion"]?.ToString() ?? "";
 
+                // Género: seleccionar del combo si coincide; si está vacío o es
+                // desconocido (registros previos a la columna), queda sin selección.
+                string generoFila = fila["Genero"]?.ToString() ?? "";
+                cmbGeneroPrestamo.SelectedIndex = -1;
+                int indiceGenero = cmbGeneroPrestamo.FindStringExact(generoFila);
+                if (indiceGenero >= 0)
+                    cmbGeneroPrestamo.SelectedIndex = indiceGenero;
+
                 string tituloLibro = fila["TituloLibro"]?.ToString() ?? "";
                 string codigoLibro = fila["CodigoLibro"]?.ToString() ?? "";
 
@@ -1910,6 +2051,9 @@ namespace BibliotecaApp
             // seguía mostrando el estado de la última fila cargada con "Modificar"
             // (p. ej. 'Entregado') y el formulario quedaba engañoso.
             txtEstado.Text = "Pendiente";
+
+            // Género: sin selección (campo opcional) para el próximo préstamo
+            cmbGeneroPrestamo.SelectedIndex = -1;
 
             // DateTimePickers a su valor predeterminado seguro (mismo que UcPrestamosExternos_Load).
             // Reset de MinDate al límite NATIVO admitido por el control (1/1/1753).

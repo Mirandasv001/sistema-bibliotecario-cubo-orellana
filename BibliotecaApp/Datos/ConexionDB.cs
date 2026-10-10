@@ -297,6 +297,14 @@ namespace BibliotecaApp
                 agregar.ExecuteNonQuery();
             }
 
+            // Género del usuario (campo opcional del formulario de préstamo)
+            if (!columnas.Contains("Genero"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN Genero TEXT DEFAULT '';";
+                agregar.ExecuteNonQuery();
+            }
+
             using var indice = conexion.CreateCommand();
             indice.CommandText = "CREATE INDEX IF NOT EXISTS IX_Prestamos_CodigoLibro ON PrestamosExternos(CodigoLibro);";
             indice.ExecuteNonQuery();
@@ -349,7 +357,8 @@ namespace BibliotecaApp
                     EstadoLibro      TEXT DEFAULT 'Pendiente',
                     CodigoLibro      TEXT,
                     FechaDevolucion  TEXT,
-                    PersonalDevolvio TEXT
+                    PersonalDevolvio TEXT,
+                    Genero          TEXT DEFAULT ''
                 );";
 
             const string sqlUsuarios = @"
