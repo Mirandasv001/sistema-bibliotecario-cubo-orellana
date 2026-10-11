@@ -428,7 +428,7 @@ namespace BibliotecaApp
                            CASE WHEN IFNULL(PersonalDevolvio,'') = '' THEN '-'
                                 ELSE PersonalDevolvio END           AS PersonalDevolvio,
                            EstadoLibro                          AS Estado,
-                           Notificado
+                           CorreoBienvenidaEnviado
                     FROM PrestamosExternos
                     WHERE EstadoLibro IN ('Pendiente', 'Renovado', 'Entregado')
                     ORDER BY ID DESC
@@ -452,14 +452,14 @@ namespace BibliotecaApp
                 // El texto de lblPagina es AutoSize y cambia de ancho: reajustar espaciador
                 ActualizarEspaciadorPaginacion();
 
-                // Asegurar que la columna Notificado exista en el grid (AutoGenerateColumns = false)
-                if (!dgvPrestamos.Columns.Contains("Notificado"))
+                // Asegurar que la columna CorreoBienvenidaEnviado exista en el grid (AutoGenerateColumns = false)
+                if (!dgvPrestamos.Columns.Contains("CorreoBienvenidaEnviado"))
                 {
                     var colNotificado = new DataGridViewTextBoxColumn
                     {
-                        Name = "Notificado",
-                        DataPropertyName = "Notificado",
-                        HeaderText = "Notificado",
+                        Name = "CorreoBienvenidaEnviado",
+                        DataPropertyName = "CorreoBienvenidaEnviado",
+                        HeaderText = "CorreoBienvenidaEnviado",
                         Visible = false // Oculta para el usuario
                     };
                     dgvPrestamos.Columns.Add(colNotificado);
@@ -551,8 +551,8 @@ namespace BibliotecaApp
                         // Valor por defecto
                         row.Cells["btnMensaje"].Value = "Enviar";
 
-                        // Si Notificado == 1, mostrar estado "Enviado" con color verde
-                        var notificadoObj = row.Cells["Notificado"].Value;
+                        // Si CorreoBienvenidaEnviado == 1, mostrar estado "Enviado" con color verde
+                        var notificadoObj = row.Cells["CorreoBienvenidaEnviado"].Value;
                         if (notificadoObj != null && notificadoObj != DBNull.Value)
                         {
                             if (Convert.ToInt32(notificadoObj) == 1)
@@ -790,7 +790,7 @@ namespace BibliotecaApp
             {
                 "ID", "Usuario", "DUI", "Correo", "Telefono", "Genero", "TituloLibro",
                 "FechaPrestamo", "PersonalPresto", "FechaRenovacion", "PersonalRenovo",
-                "Entrega Esperada", "PersonalDevolvio", "Estado", "Notificado", "btnMensaje"
+                "Entrega Esperada", "PersonalDevolvio", "Estado", "CorreoBienvenidaEnviado", "btnMensaje"
             };
 
             for (int i = 0; i < ordenDeseado.Length; i++)
@@ -1242,12 +1242,12 @@ namespace BibliotecaApp
                 celda.Style.ForeColor = Color.DarkGreen;
                 // Selección: sin override → hereda el azul uniforme del grid
 
-                // Persistir en BD: Notificado = 1
+                // Persistir en BD: CorreoBienvenidaEnviado = 1 (solo bienvenida; no toca alertas)
                 int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
                 using (var conexion = ConexionDB.ObtenerConexion())
                 using (var updateCmd = conexion.CreateCommand())
                 {
-                    updateCmd.CommandText = "UPDATE PrestamosExternos SET Notificado = 1 WHERE ID = @id;";
+                    updateCmd.CommandText = "UPDATE PrestamosExternos SET CorreoBienvenidaEnviado = 1 WHERE ID = @id;";
                     updateCmd.Parameters.AddWithValue("@id", idPrestamo);
                     updateCmd.ExecuteNonQuery();
                 }

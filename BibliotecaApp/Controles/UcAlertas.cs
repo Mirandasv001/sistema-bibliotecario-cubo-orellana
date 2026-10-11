@@ -42,11 +42,40 @@ namespace BibliotecaApp
 
             // Suscribir evento de clic en botones de la grilla
             dgvAlertas.CellContentClick += DgvAlertas_CellContentClick;
+
+            // Estado vacío: "No hay usuarios morosos" dibujado con GDI+ cuando no hay filas
+            dgvAlertas.Paint += DgvAlertas_Paint;
         }
 
         private void UcAlertas_Load(object sender, EventArgs e)
         {
             CargarMorosos();
+        }
+
+        /// <summary>
+        /// Estado vacío (Empty State) dibujado con GDI+: si la grilla no tiene filas,
+        /// pinta "No hay usuarios morosos" centrado (texto gris, cursiva, 14 pt, al
+        /// estilo del módulo de Estadísticas). Desaparece solo al llenarse la grilla.
+        /// </summary>
+        private void DgvAlertas_Paint(object? sender, PaintEventArgs e)
+        {
+            if (dgvAlertas.Rows.Count > 0) return; // hay datos: nada que pintar
+
+            using var formato = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            };
+
+            using var fuente = new Font("Segoe UI", 14F, FontStyle.Italic);
+            var area = e.ClipRectangle;
+
+            e.Graphics.DrawString(
+                "No hay usuarios morosos",
+                fuente,
+                Brushes.Gray,
+                new RectangleF(area.X, area.Y, area.Width, area.Height),
+                formato);
         }
 
         /// <summary>Método público invocado por Form1 al navegar a este apartado.</summary>
@@ -92,7 +121,7 @@ namespace BibliotecaApp
                            strftime('%d/%m/%Y', FechaEntrega)     AS [Entrega Esperada],
                            CAST(julianday('now') - julianday(FechaEntrega) AS INTEGER)
                                                                    AS [Días de Retraso],
-                           Notificado
+                           CorreoAlertaEnviado
                     FROM PrestamosExternos
                     WHERE EstadoLibro IN ('Pendiente', 'Renovado')
                       AND date(FechaEntrega) < date('now', 'localtime')
@@ -109,14 +138,14 @@ namespace BibliotecaApp
                 if (dgvAlertas.Columns["ID"] != null)
                     dgvAlertas.Columns["ID"]!.Visible = false;
 
-                // Mapear columna Notificado (oculta) para persistencia
-                if (!dgvAlertas.Columns.Contains("Notificado"))
+                // Mapear columna CorreoAlertaEnviado (oculta) para persistencia
+                if (!dgvAlertas.Columns.Contains("CorreoAlertaEnviado"))
                 {
                     var colNotificado = new DataGridViewTextBoxColumn
                     {
-                        Name = "Notificado",
-                        DataPropertyName = "Notificado",
-                        HeaderText = "Notificado",
+                        Name = "CorreoAlertaEnviado",
+                        DataPropertyName = "CorreoAlertaEnviado",
+                        HeaderText = "CorreoAlertaEnviado",
                         Visible = false
                     };
                     dgvAlertas.Columns.Add(colNotificado);
@@ -146,8 +175,8 @@ namespace BibliotecaApp
                         // Valor por defecto
                         row.Cells["btnNotificarIndividual"].Value = "Enviar";
 
-                        // Si Notificado == 1, mostrar estado "Enviado" con color verde
-                        var notificadoObj = row.Cells["Notificado"].Value;
+                        // Si CorreoAlertaEnviado == 1, mostrar estado "Enviado" con color verde
+                        var notificadoObj = row.Cells["CorreoAlertaEnviado"].Value;
                         if (notificadoObj != null && notificadoObj != DBNull.Value)
                         {
                             if (Convert.ToInt32(notificadoObj) == 1)
@@ -326,12 +355,12 @@ namespace BibliotecaApp
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
                 Process.Start(psi);
 
-                // Persistir en BD: Notificado = 1
+                // Persistir en BD: CorreoAlertaEnviado = 1 (solo alerta de retraso; no toca bienvenida)
                 int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
                 using (var conexion = ConexionDB.ObtenerConexion())
                 using (var updateCmd = conexion.CreateCommand())
                 {
-                    updateCmd.CommandText = "UPDATE PrestamosExternos SET Notificado = 1 WHERE ID = @id;";
+                    updateCmd.CommandText = "UPDATE PrestamosExternos SET CorreoAlertaEnviado = 1 WHERE ID = @id;";
                     updateCmd.Parameters.AddWithValue("@id", idPrestamo);
                     updateCmd.ExecuteNonQuery();
                 }
