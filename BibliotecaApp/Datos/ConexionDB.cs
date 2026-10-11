@@ -305,6 +305,22 @@ namespace BibliotecaApp
                 agregar.ExecuteNonQuery();
             }
 
+            // Estados de correo separados: bienvenida (préstamo) y alerta de retraso (vencidos).
+            // Antes compartían una sola columna "Notificado", lo que cruzaba los estados entre módulos.
+            if (!columnas.Contains("CorreoBienvenidaEnviado"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN CorreoBienvenidaEnviado INTEGER DEFAULT 0;";
+                agregar.ExecuteNonQuery();
+            }
+
+            if (!columnas.Contains("CorreoAlertaEnviado"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE PrestamosExternos ADD COLUMN CorreoAlertaEnviado INTEGER DEFAULT 0;";
+                agregar.ExecuteNonQuery();
+            }
+
             using var indice = conexion.CreateCommand();
             indice.CommandText = "CREATE INDEX IF NOT EXISTS IX_Prestamos_CodigoLibro ON PrestamosExternos(CodigoLibro);";
             indice.ExecuteNonQuery();
@@ -358,7 +374,9 @@ namespace BibliotecaApp
                     CodigoLibro      TEXT,
                     FechaDevolucion  TEXT,
                     PersonalDevolvio TEXT,
-                    Genero          TEXT DEFAULT ''
+                    Genero          TEXT DEFAULT '',
+                    CorreoBienvenidaEnviado INTEGER DEFAULT 0,
+                    CorreoAlertaEnviado     INTEGER DEFAULT 0
                 );";
 
             const string sqlUsuarios = @"
@@ -379,15 +397,42 @@ namespace BibliotecaApp
                     Valor TEXT
                 );";
 
+            // Catálogo de módulos del filtro de Inventario: el combo se llena desde
+            // aquí (no desde Libros) y el admin puede agregar/eliminar módulos.
+            const string sqlUbicacionesConfig = @"
+                CREATE TABLE IF NOT EXISTS UbicacionesConfig (
+                    NombreUbicacion TEXT PRIMARY KEY
+                );";
+
             using (var cmd = conexion.CreateCommand())
             {
-                cmd.CommandText = sqlLibros + sqlSala + sqlPrestamos + sqlUsuarios + sqlConfiguracion;
+                cmd.CommandText = sqlLibros + sqlSala + sqlPrestamos + sqlUsuarios
+                    + sqlConfiguracion + sqlUbicacionesConfig;
                 cmd.ExecuteNonQuery();
             }
 
             using var indice = conexion.CreateCommand();
             indice.CommandText = "CREATE INDEX IF NOT EXISTS IX_Libros_Titulo ON Libros(Titulo);";
             indice.ExecuteNonQuery();
+
+            // Semilla de UbicacionesConfig: módulos por defecto (M1..M5) solo si está vacía
+            using (var cmdConteo = conexion.CreateCommand())
+            {
+                cmdConteo.CommandText = "SELECT COUNT(*) FROM UbicacionesConfig;";
+                long total = Convert.ToInt64(cmdConteo.ExecuteScalar());
+
+                if (total == 0)
+                {
+                    foreach (string modulo in new[] { "M1", "M2", "M3", "M4", "M5" })
+                    {
+                        using var cmdSemilla = conexion.CreateCommand();
+                        cmdSemilla.CommandText =
+                            "INSERT INTO UbicacionesConfig (NombreUbicacion) VALUES (@nombre);";
+                        cmdSemilla.Parameters.AddWithValue("@nombre", modulo);
+                        cmdSemilla.ExecuteNonQuery();
+                    }
+                }
+            }
         }
 
         // ------------------------------------------------------------------

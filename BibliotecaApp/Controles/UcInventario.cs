@@ -35,8 +35,20 @@ namespace BibliotecaApp
         private Label? _lblFiltroUbicacion;
         private bool _cargandoFiltroUbicacion; // evita reentrancia al repoblar el combo
 
+        // Botón "Agregar Libro" (code-behind) — abre el modal de alta de ejemplares
+        // (vive en panelEncabezado, a la derecha de "Vaciar Inventario")
+        private Button? btnAgregarLibro;
+
+        // Botón "Eliminar Libro (fila)" (code-behind) — borra el registro seleccionado con auth
+        // (misma fila, tamaño y estilo que "Vaciar Inventario")
+        private Button? btnEliminarLibro;
+
         /// <summary>Primer ítem del ComboBox: desactiva el filtro de ubicación.</summary>
         private const string FiltroTodasUbicaciones = "Todas las ubicaciones";
+
+        // Opciones especiales al final del combo de Ubicación (catálogo configurable)
+        private const string ItemAgregarNueva = "+ Agregar nueva";
+        private const string ItemEliminarUbicacion = "- Eliminar ubicación";
 
         public UcInventario()
         {
@@ -55,6 +67,25 @@ namespace BibliotecaApp
             dgvInventario.CellFormatting += dgvInventario_CellFormatting;
 
             _vistaFiltrada = new DataView(_datosInventario);
+
+            // Etiqueta "Buscar:" de la fila 1: el Designer la declara pero nunca
+            // la instancia, así que se crea aquí en code-behind con el mismo
+            // estilo que "Ubicación:" y alineada en X con ella (columna 16).
+            lblBuscar = new Label
+            {
+                Name = "lblBuscar",
+                Text = "Buscar:",
+                AutoSize = true,
+                Font = EstiloUI.Etiqueta(),               // misma fuente que "Ubicación:"
+                ForeColor = Color.FromArgb(43, 45, 66),   // #2B2D42, idéntico a su par
+                Location = new Point(16, txtBuscar.Location.Y + 3) // misma X; vertical con la fila 1 (13 + 3 = 16)
+            };
+            panelBusqueda.Controls.Add(lblBuscar);
+
+            // txtBuscar arranca en la misma columna de controles que el combo (210),
+            // de modo que ambos quedan a la misma distancia de su etiqueta.
+            txtBuscar.Location = new Point(210, txtBuscar.Location.Y);
+            txtBuscar.Width += 20; // +20 px de aire: el texto de búsqueda se lee completo
 
             // Filtro desplegable de Ubicación (estilo Excel) en panelBusqueda
             CrearFiltroUbicacion();
@@ -95,6 +126,37 @@ namespace BibliotecaApp
             _btnVaciarInventario.Click += BtnVaciarInventario_Click;
             panelEncabezado.Controls.Add(_btnVaciarInventario);
 
+            // --- Botones de acciones de libros: mismo contenedor, tamaño y estilo que Vaciar ---
+            btnAgregarLibro = new Button
+            {
+                Name = "btnAgregarLibro",
+                Text = "Agregar Libro",
+                FlatStyle = FlatStyle.Flat,
+                Size = _btnVaciarInventario.Size,          // copia el tamaño del botón de referencia
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Cursor = Cursors.Hand
+            };
+            btnAgregarLibro.FlatAppearance.BorderSize = 0;
+            btnAgregarLibro.BackColor = EstiloUI.FondoOscuro; // azul oscuro institucional (#1B2B42), paleta del proyecto
+            btnAgregarLibro.ForeColor = Color.White;
+            btnAgregarLibro.Click += btnAgregarLibro_Click;
+            panelEncabezado.Controls.Add(btnAgregarLibro);
+
+            btnEliminarLibro = new Button
+            {
+                Name = "btnEliminarLibro",
+                Text = "Eliminar Libro (fila)",
+                FlatStyle = FlatStyle.Flat,
+                Size = _btnVaciarInventario.Size,          // copia el tamaño del botón de referencia
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Cursor = Cursors.Hand
+            };
+            btnEliminarLibro.FlatAppearance.BorderSize = 0;
+            btnEliminarLibro.BackColor = _btnVaciarInventario.BackColor; // IndianRed (idéntico)
+            btnEliminarLibro.ForeColor = _btnVaciarInventario.ForeColor; // White (idéntico)
+            btnEliminarLibro.Click += btnEliminarLibro_Click;
+            panelEncabezado.Controls.Add(btnEliminarLibro);
+
             // Posicionar botones y aplicar visibilidad por rol después de que el layout esté listo
             this.Load += (s, e) =>
             {
@@ -113,13 +175,23 @@ namespace BibliotecaApp
                 int posXVaciar = _btnImportarCSV.Right + espaciadoEntreBotones;
                 _btnVaciarInventario!.Location = new Point(posXVaciar, posY);
 
+                // Botones de libros: misma fila que Vaciar, a su derecha (+15 entre cada uno)
+                btnAgregarLibro!.Top = _btnVaciarInventario.Top;
+                btnAgregarLibro.Left = _btnVaciarInventario.Right + 15;
+                btnEliminarLibro!.Top = _btnVaciarInventario.Top;
+                btnEliminarLibro.Left = btnAgregarLibro.Right + 15;
+
                 _btnImportarCSV.BringToFront();
                 _btnVaciarInventario.BringToFront();
+                btnAgregarLibro.BringToFront();
+                btnEliminarLibro.BringToFront();
 
                 // Visibilidad por rol: solo Administradores
                 bool esAdmin = SesionGlobal.EsAdmin;
                 _btnImportarCSV.Visible = esAdmin;
                 _btnVaciarInventario.Visible = esAdmin;
+                btnAgregarLibro.Visible = esAdmin;
+                btnEliminarLibro.Visible = esAdmin;
             };
         }
 
@@ -266,6 +338,10 @@ namespace BibliotecaApp
         /// </summary>
         private void CrearFiltroUbicacion()
         {
+            // Columnas alineadas de panelBusqueda (fila 1 y fila 2 comparten X)
+            const int colEtiquetas = 16;   // "Buscar:" y "Ubicación:" (mismo eje X)
+            const int colControles = 210;  // txtBuscar y combo: misma distancia a su etiqueta
+
             _lblFiltroUbicacion = new Label
             {
                 Name = "lblFiltroUbicacion",
@@ -273,25 +349,202 @@ namespace BibliotecaApp
                 AutoSize = true,
                 Font = EstiloUI.Etiqueta(),
                 ForeColor = Color.FromArgb(43, 45, 66), // #2B2D42, mismo tono del título
-                Location = new Point(16, 56)            // segunda fila, a la izquierda
+                Location = new Point(colEtiquetas, 56)  // misma columna de etiquetas que "Buscar:"
             };
 
             _cmbFiltroUbicacion = new ComboBox
             {
                 Name = "cmbFiltroUbicacion",
-                Location = new Point(210, 53),          // misma columna que txtBuscar
-                Size = new Size(240, 27),
-                DropDownWidth = 260,                    // popup algo más ancho: se lee completo
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right // escala con la ventana como txtBuscar
+                Location = new Point(colControles, 53), // misma columna que txtBuscar
+                Width = 195,                             // 180 + 15px extra: el texto "Todas las ubicaciones" encaja completo
+                DropDownWidth = 260                      // popup algo más ancho: se lee completo
             };
             EstiloUI.EstilizarEntrada(_cmbFiltroUbicacion); // DropDownList + estilo uniforme de la app
             _cmbFiltroUbicacion.SelectedIndexChanged += CmbFiltroUbicacion_SelectedIndexChanged;
 
             // Abrir una segunda fila en el panel para el filtro (fila 1 queda intacta)
-            panelBusqueda.Height = 92;
+            // 107 = 92 + 15px: aire extra para que dgvInventario (Dock=Fill) respire
+            // respecto a los filtros — el dock recalcula solo su Top y Height.
+            panelBusqueda.Height = 107;
 
             panelBusqueda.Controls.Add(_lblFiltroUbicacion);
             panelBusqueda.Controls.Add(_cmbFiltroUbicacion);
+        }
+
+        /// <summary>
+        /// Abre el modal dinámico de alta de ejemplar y, si se guardó (OK),
+        /// recarga el inventario para mostrar el libro nuevo.
+        /// </summary>
+        private void btnAgregarLibro_Click(object? sender, EventArgs e)
+        {
+            using var modal = CrearFormularioAgregarLibro();
+            if (modal.ShowDialog(this) == DialogResult.OK)
+                CargarInventario();
+        }
+
+        /// <summary>
+        /// Crea en code-behind el formulario modal "Agregar Nuevo Libro"
+        /// (Código, Título, Autor, Editorial, Estado, Ubicación) con su INSERT
+        /// parametrizado en la tabla Libros. Disponibilidad se inserta fija
+        /// como 'Disponible' (regla de negocio: no se pregunta al usuario).
+        /// No se toca UcInventario.Designer.cs.
+        /// </summary>
+        private Form CrearFormularioAgregarLibro()
+        {
+            var modal = new Form
+            {
+                Text = "Agregar Nuevo Libro",
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false
+            };
+
+            // Una fila por campo: etiqueta (columna 20) + TextBox (columna 120)
+            string[] etiquetas = { "Código:", "Título:", "Autor:", "Editorial:", "Estado:", "Ubicación:" };
+            var cajas = new TextBox[etiquetas.Length];
+
+            for (int i = 0; i < etiquetas.Length; i++)
+            {
+                var lbl = EstiloUI.CrearEtiqueta(etiquetas[i]); // mismo estilo que las etiquetas de la app
+                lbl.Location = new Point(20, 20 + i * 34);
+
+                cajas[i] = new TextBox
+                {
+                    Location = new Point(120, 17 + i * 34),
+                    Width = 270
+                };
+                EstiloUI.EstilizarEntrada(cajas[i]);
+
+                modal.Controls.AddRange(new Control[] { lbl, cajas[i] });
+            }
+
+            var txtCodigo = cajas[0];
+            var txtTitulo = cajas[1];
+            var txtAutor = cajas[2];
+            var txtEditorial = cajas[3];
+            var txtEstado = cajas[4];
+            var txtUbicacion = cajas[5];
+
+            var btnGuardar = new Button
+            {
+                Name = "btnGuardar",
+                Text = "Guardar",
+                Size = new Size(120, 38),
+                Location = new Point(270, 17 + etiquetas.Length * 34 + 8),
+                Cursor = Cursors.Hand
+            };
+            EstiloUI.EstilizarBotonPrimario(btnGuardar);
+
+            btnGuardar.Click += (_, _) =>
+            {
+                // Validación: todos los campos son obligatorios
+                if (cajas.Any(c => string.IsNullOrWhiteSpace(c.Text)))
+                {
+                    MessageBox.Show("Complete todos los campos antes de guardar.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                try
+                {
+                    using var conexion = ConexionDB.ObtenerConexion();
+                    using var cmd = conexion.CreateCommand();
+                    cmd.CommandText = @"
+                        INSERT INTO Libros (Codigo, Titulo, Autor, Editorial, Estado, Ubicacion, Disponibilidad)
+                        VALUES (@codigo, @titulo, @autor, @editorial, @estado, @ubicacion, 'Disponible');";
+
+                    cmd.Parameters.AddWithValue("@codigo", txtCodigo.Text.Trim());
+                    cmd.Parameters.AddWithValue("@titulo", txtTitulo.Text.Trim());
+                    cmd.Parameters.AddWithValue("@autor", txtAutor.Text.Trim());
+                    cmd.Parameters.AddWithValue("@editorial", txtEditorial.Text.Trim());
+                    cmd.Parameters.AddWithValue("@estado", txtEstado.Text.Trim());
+                    cmd.Parameters.AddWithValue("@ubicacion", txtUbicacion.Text.Trim());
+                    cmd.ExecuteNonQuery();
+
+                    MessageBox.Show("Libro registrado correctamente.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    modal.DialogResult = DialogResult.OK; // el llamador recarga el inventario
+                    modal.Close();
+                }
+                catch (Exception ex)
+                {
+                    // Causa habitual: Código duplicado (PRIMARY KEY de Libros)
+                    MessageBox.Show("No se pudo guardar el libro: " + ex.Message,
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
+
+            modal.Controls.Add(btnGuardar);
+            modal.AcceptButton = btnGuardar; // Enter también guarda
+            modal.ClientSize = new Size(420, btnGuardar.Bottom + 20);
+
+            return modal;
+        }
+
+        /// <summary>
+        /// Elimina físicamente el libro seleccionado en el grid.
+        /// Seguridad: pide autenticación con FormAutenticacion (AdminCubo / Admin123$)
+        /// y solo si el modal devuelve OK ejecuta el DELETE, dentro de una
+        /// transacción (Commit/Rollback) y con parámetro SQLite.
+        /// </summary>
+        private void btnEliminarLibro_Click(object? sender, EventArgs e)
+        {
+            // Codigo del libro seleccionado en el grid (columna autogenerada "Código")
+            object? valorCodigo = dgvInventario.CurrentRow?.Cells["Código"]?.Value;
+            string codigo = valorCodigo?.ToString() ?? string.Empty;
+            if (codigo.Length == 0)
+            {
+                MessageBox.Show("Seleccione un libro de la lista para eliminar.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // --- Autenticación de seguridad (mismo modal que Préstamos: AdminCubo / Admin123$) ---
+            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
+            {
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
+            }
+
+            var resultado = MessageBox.Show(
+                $"¿Está seguro de que desea ELIMINAR el libro \"{codigo}\" definitivamente?\n\nEsta acción no se puede deshacer.",
+                "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (resultado != DialogResult.Yes) return;
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+
+                // DELETE como unidad transaccional: o se borra completo o no se borra nada
+                using var transaccion = conexion.BeginTransaction();
+                try
+                {
+                    using var cmd = conexion.CreateCommand();
+                    cmd.Transaction = transaccion;
+                    cmd.CommandText = "DELETE FROM Libros WHERE Codigo = @codigo;";
+                    cmd.Parameters.AddWithValue("@codigo", codigo);
+                    cmd.ExecuteNonQuery();
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw;
+                }
+
+                MessageBox.Show("Libro eliminado correctamente.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                CargarInventario(); // refresca el DataGridView
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar el libro: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         /// <summary>
@@ -308,24 +561,44 @@ namespace BibliotecaApp
             string seleccionAnterior = _cmbFiltroUbicacion.SelectedItem?.ToString()
                 ?? FiltroTodasUbicaciones;
 
+            // Las opciones especiales jamás valen como "selección previa"
+            if (seleccionAnterior == ItemAgregarNueva || seleccionAnterior == ItemEliminarUbicacion)
+                seleccionAnterior = FiltroTodasUbicaciones;
+
+            // Módulos configurables: se leen de UbicacionesConfig (no de Libros),
+            // así el admin controla qué módulos existen en este centro.
+            var modulos = new List<string>();
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var cmd = conexion.CreateCommand();
+                cmd.CommandText =
+                    "SELECT NombreUbicacion FROM UbicacionesConfig ORDER BY NombreUbicacion ASC;";
+                using var lector = cmd.ExecuteReader();
+                while (lector.Read())
+                {
+                    string modulo = lector.IsDBNull(0) ? "" : lector.GetString(0).Trim();
+                    if (modulo.Length > 0) modulos.Add(modulo);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al leer las ubicaciones: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
             _cargandoFiltroUbicacion = true; // SelectedIndexChanged no refiltra mientras se repuebla
             try
             {
                 _cmbFiltroUbicacion.Items.Clear();
                 _cmbFiltroUbicacion.Items.Add(FiltroTodasUbicaciones);
 
-                // Solo MÓDULOS: 2 primeros caracteres de cada ubicación.
-                // Null-seguro: ubicaciones vacías o de 1 carácter se ignoran.
-                var modulosVistos = new HashSet<string>(StringComparer.Ordinal);
-                foreach (DataRow fila in _datosInventario.Rows)
-                {
-                    string ubicacion = fila["Ubicación"]?.ToString() ?? "";
-                    if (ubicacion.Length < 2) continue;
+                foreach (string modulo in modulos)
+                    _cmbFiltroUbicacion.Items.Add(modulo);
 
-                    string modulo = ubicacion.Substring(0, 2);
-                    if (modulosVistos.Add(modulo)) // valores únicos, orden del DataTable
-                        _cmbFiltroUbicacion.Items.Add(modulo);
-                }
+                // Opciones especiales SIEMPRE al final (sin importar el contenido de la BD)
+                _cmbFiltroUbicacion.Items.Add(ItemEliminarUbicacion);
+                _cmbFiltroUbicacion.Items.Add(ItemAgregarNueva);
 
                 int indice = _cmbFiltroUbicacion.Items.IndexOf(seleccionAnterior);
                 _cmbFiltroUbicacion.SelectedIndex = indice >= 0 ? indice : 0;
@@ -347,6 +620,167 @@ namespace BibliotecaApp
         private void CmbFiltroUbicacion_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (_cargandoFiltroUbicacion) return; // evita ciclos al repoblar el combo
+
+            string? seleccionado = _cmbFiltroUbicacion?.SelectedItem?.ToString();
+
+            if (seleccionado == ItemAgregarNueva) // registrar ubicación nueva
+            {
+                RegistrarNuevaUbicacion();
+                return;
+            }
+
+            if (seleccionado == ItemEliminarUbicacion) // quitar módulo del catálogo
+            {
+                EliminarUbicacionExistente();
+                return;
+            }
+
+            AplicarFiltro(txtBuscar.Text.Trim());
+        }
+
+        /// <summary>
+        /// Mini modal dinámico (TextBox + Aceptar/Cancelar) para pedir una ubicación.
+        /// Devuelve el texto recortado o null si se canceló / quedó vacío.
+        /// </summary>
+        private string? PedirUbicacion(string mensaje)
+        {
+            using var modal = new Form
+            {
+                Text = "Ubicación",
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ShowInTaskbar = false,
+                ClientSize = new Size(340, 130)
+            };
+
+            var lblTexto = new Label
+            {
+                Text = mensaje,
+                AutoSize = true,
+                Location = new Point(15, 15)
+            };
+
+            var txtValor = new TextBox { Location = new Point(15, 45), Width = 310 };
+            EstiloUI.EstilizarEntrada(txtValor); // mismo estilo de entradas de la app
+
+            var btnAceptar = new Button
+            {
+                Text = "Aceptar",
+                DialogResult = DialogResult.OK,
+                Location = new Point(160, 85),
+                Size = new Size(80, 28)
+            };
+            var btnCancelar = new Button
+            {
+                Text = "Cancelar",
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(245, 85),
+                Size = new Size(80, 28)
+            };
+
+            modal.Controls.AddRange(new Control[] { lblTexto, txtValor, btnAceptar, btnCancelar });
+            modal.AcceptButton = btnAceptar;   // Enter acepta
+            modal.CancelButton = btnCancelar;  // Esc cancela
+
+            return modal.ShowDialog(this) == DialogResult.OK
+                ? txtValor.Text.Trim()
+                : null;
+        }
+
+        /// <summary>
+        /// Persiste la ubicación nueva en UbicacionesConfig (INSERT parametrizado),
+        /// recarga el combo y la deja seleccionada. Si se cancela o se deja vacío,
+        /// vuelve a "Todas las ubicaciones".
+        /// </summary>
+        private void RegistrarNuevaUbicacion()
+        {
+            string? nueva = PedirUbicacion("Ingrese la nueva ubicación (Ej: M6):");
+
+            if (string.IsNullOrWhiteSpace(nueva))
+            {
+                VolverATodasLasUbicaciones();
+                return;
+            }
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var cmd = conexion.CreateCommand();
+                cmd.CommandText = "INSERT INTO UbicacionesConfig (NombreUbicacion) VALUES (@nombre);";
+                cmd.Parameters.AddWithValue("@nombre", nueva);
+                cmd.ExecuteNonQuery();
+            }
+            catch (SqliteException)
+            {
+                // Ya existía (PRIMARY KEY): no es error, solo se recarga y selecciona
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al guardar la ubicación: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                VolverATodasLasUbicaciones();
+                return;
+            }
+
+            CargarUbicacionesEnFiltro(); // recarga desde la BD (incluye el nuevo módulo)
+            SeleccionarUbicacion(nueva); // la deja seleccionada y refiltra
+        }
+
+        /// <summary>
+        /// Elimina una ubicación del catálogo (DELETE parametrizado en UbicacionesConfig)
+        /// y recarga el combo. Valida que no sea vacía ni "Todas las ubicaciones".
+        /// </summary>
+        private void EliminarUbicacionExistente()
+        {
+            string? nombre = PedirUbicacion("Ingrese la ubicación a eliminar (Ej: M5):");
+
+            if (string.IsNullOrWhiteSpace(nombre) ||
+                nombre == FiltroTodasUbicaciones ||
+                nombre == ItemAgregarNueva ||
+                nombre == ItemEliminarUbicacion)
+            {
+                VolverATodasLasUbicaciones(); // cancelado, vacío o valor inválido
+                return;
+            }
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var cmd = conexion.CreateCommand();
+                cmd.CommandText = "DELETE FROM UbicacionesConfig WHERE NombreUbicacion = @nombre;";
+                cmd.Parameters.AddWithValue("@nombre", nombre);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar la ubicación: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            CargarUbicacionesEnFiltro(); // sin la ubicación; vuelve a "Todas" si ya no existía
+        }
+
+        /// <summary>Fija el índice 0 ("Todas las ubicaciones") y refiltra.</summary>
+        private void VolverATodasLasUbicaciones()
+        {
+            _cargandoFiltroUbicacion = true;
+            try { _cmbFiltroUbicacion!.SelectedIndex = 0; }
+            finally { _cargandoFiltroUbicacion = false; }
+            AplicarFiltro(txtBuscar.Text.Trim());
+        }
+
+        /// <summary>Selecciona una ubicación concreta del combo y refiltra (o "Todas").</summary>
+        private void SeleccionarUbicacion(string ubicacion)
+        {
+            _cargandoFiltroUbicacion = true;
+            try
+            {
+                int indice = _cmbFiltroUbicacion!.Items.IndexOf(ubicacion);
+                _cmbFiltroUbicacion.SelectedIndex = indice >= 0 ? indice : 0;
+            }
+            finally { _cargandoFiltroUbicacion = false; }
             AplicarFiltro(txtBuscar.Text.Trim());
         }
 
