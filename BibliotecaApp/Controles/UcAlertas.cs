@@ -67,7 +67,7 @@ namespace BibliotecaApp
                 LineAlignment = StringAlignment.Center
             };
 
-            using var fuente = new Font("Segoe UI", 14F, FontStyle.Italic);
+            var fuente = EstiloUI.FuenteVacia; // A-0x: instancia cacheada (no Dispose: es compartida)
             var area = e.ClipRectangle;
 
             e.Graphics.DrawString(
@@ -245,7 +245,7 @@ namespace BibliotecaApp
             try
             {
                 string tempPath = Path.GetTempPath();
-                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
                 csvPath = Path.Combine(tempPath, $"Morosos_Notificados_{timestamp}.csv");
 
                 var sb = new StringBuilder();

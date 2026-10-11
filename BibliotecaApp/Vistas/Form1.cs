@@ -84,10 +84,17 @@ namespace BibliotecaApp
         {
             try
             {
-                string rutaLogo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Recursos", "Logo de inicio.jpg");
+                // C-03/C-04: ruta fija junto al .exe y lectura vía MemoryStream
+                // (Image.FromFile bloquearía el archivo en disco)
+                string rutaLogo = Path.Combine(AppContext.BaseDirectory, "Recursos", "Logo de inicio.jpg");
                 if (File.Exists(rutaLogo))
                 {
-                    pictureBoxLogo.Image = Image.FromFile(rutaLogo);
+                    byte[] imageBytes = File.ReadAllBytes(rutaLogo);
+                    using var ms = new MemoryStream(imageBytes);
+                    // Deep copy: el Bitmap copia los píxeles al heap y no depende del
+                    // stream, que se libera al salir del using sin bloquear el .jpg.
+                    using var imgOriginal = Image.FromStream(ms);
+                    pictureBoxLogo.Image = new Bitmap(imgOriginal);
                 }
             }
             catch (Exception ex)

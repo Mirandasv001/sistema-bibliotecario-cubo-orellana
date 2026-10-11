@@ -120,7 +120,7 @@ namespace BibliotecaApp
             _dtpDesde = new DateTimePicker
             {
                 Format = DateTimePickerFormat.Short,
-                Font = new Font(EstiloUI.FuenteBase, 10F),
+                Font = EstiloUI.FuenteNormal,
                 Location = new Point(75, 16),
                 Width = 130,
                 Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)
@@ -139,7 +139,7 @@ namespace BibliotecaApp
             _dtpHasta = new DateTimePicker
             {
                 Format = DateTimePickerFormat.Short,
-                Font = new Font(EstiloUI.FuenteBase, 10F),
+                Font = EstiloUI.FuenteNormal,
                 Location = new Point(275, 16),
                 Width = 130,
                 Value = DateTime.Today
@@ -246,7 +246,7 @@ namespace BibliotecaApp
             lblTitulo = new Label
             {
                 Text = titulo,
-                Font = new Font(EstiloUI.FuenteBase, 9F, FontStyle.Bold),
+                Font = EstiloUI.FuenteTituloTarjeta,
                 ForeColor = Color.FromArgb(120, 130, 140),
                 AutoSize = true,
                 Location = new Point(15, 15)
@@ -255,7 +255,7 @@ namespace BibliotecaApp
             lblValor = new Label
             {
                 Text = valorInicial,
-                Font = new Font(EstiloUI.FuenteBase, 28F, FontStyle.Bold),
+                Font = EstiloUI.FuenteCifraGrande,
                 ForeColor = EstiloUI.TextoOscuro,
                 AutoSize = true,
                 Location = new Point(15, 40)
@@ -495,11 +495,12 @@ namespace BibliotecaApp
             Color colorTexto = EstiloUI.TextoOscuro;
             Color colorTextoSecundario = Color.FromArgb(120, 130, 140);
 
-            // Fuentes
-            using var fontValor = new Font(EstiloUI.FuenteBase, 11F, FontStyle.Bold);
-            using var fontCategoria = new Font(EstiloUI.FuenteBase, 10F, FontStyle.Bold);
-            using var fontTitulo = new Font(EstiloUI.FuenteBase, 12F, FontStyle.Bold);
-            using var fontNoDatos = new Font(EstiloUI.FuenteBase, 11F, FontStyle.Italic);
+            // Fuentes cacheadas en EstiloUI (A-0x: sin crear Font por repintado;
+            // no se hacen Dispose porque son instancias compartidas)
+            var fontValor = EstiloUI.FuenteGraficaValor;
+            var fontCategoria = EstiloUI.FuenteGraficaCategoria;
+            var fontTitulo = EstiloUI.FuenteGraficaTitulo;
+            var fontNoDatos = EstiloUI.FuenteSinDatos;
 
             // Pinceles
             using var brushTexto = new SolidBrush(colorTexto);
