@@ -30,6 +30,11 @@
     <None Update="images (2).jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Recursos gráficos: se copian junto al .exe preservando la subcarpeta Recursos\,
+         porque las rutas de logo ahora son fijas (sin búsquedas ascendentes) -->
+    <None Update="Recursos\*.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
