@@ -826,6 +826,7 @@ namespace BibliotecaApp
         /// <summary>
         /// Formato condicional para la columna Disponibilidad:
         /// - "Prestado" → fondo rosa suave (LightPink) y texto rojo oscuro (DarkRed)
+        /// - "En Sala" → fondo amarillo suave (LemonChiffon) y texto gris oscuro (legible)
         /// - "Disponible" u otros → estilo por defecto (sin cambios)
         /// </summary>
         private void dgvInventario_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
@@ -840,6 +841,12 @@ namespace BibliotecaApp
             {
                 e.CellStyle.BackColor = Color.LightPink;
                 e.CellStyle.ForeColor = Color.DarkRed;
+            }
+            else if (string.Equals(valor, "En Sala", StringComparison.OrdinalIgnoreCase))
+            {
+                // Amarillo suave LemonChiffon con texto casi negro: contraste sin agredir la vista
+                e.CellStyle.BackColor = Color.FromArgb(255, 250, 205);
+                e.CellStyle.ForeColor = Color.FromArgb(45, 45, 45);
             }
             // Para "Disponible" o cualquier otro valor, no modificamos el estilo
             // y el DataGridView usa su estilo por defecto
