@@ -14,66 +14,23 @@ namespace BibliotecaApp
         {
             try
             {
-                string nombreArchivo = "Logo de inicio";
-                string[] extensiones = { ".jpg", ".png", ".jpeg" };
-                string[] candidatos = extensiones.Select(ext => nombreArchivo + ext).ToArray();
-
-                string? ruta = BuscarArchivoLogo(candidatos);
-                if (ruta == null) return;
-
-                byte[] bytes = File.ReadAllBytes(ruta);
-                using var stream = new MemoryStream(bytes);
-                pictureBoxLogo.Image = Image.FromStream(stream);
+                // C-03/C-04: ruta fija junto al .exe (sin búsquedas ascendentes) y
+                // lectura vía MemoryStream para no bloquear el archivo en disco.
+                string rutaLogo = Path.Combine(AppContext.BaseDirectory, "Recursos", "Logo de inicio.jpg");
+                if (File.Exists(rutaLogo))
+                {
+                    byte[] imageBytes = File.ReadAllBytes(rutaLogo);
+                    using var ms = new MemoryStream(imageBytes);
+                    // Deep copy: el Bitmap copia los píxeles al heap y no depende del
+                    // stream, que se libera al salir del using sin bloquear el .jpg.
+                    using var imgOriginal = Image.FromStream(ms);
+                    pictureBoxLogo.Image = new Bitmap(imgOriginal);
+                }
             }
             catch
             {
                 // Si no se carga el logo, la interfaz funciona igualmente.
             }
-        }
-
-        private static string? BuscarArchivoLogo(string[] nombresArchivos)
-        {
-            // 1. Buscar en la carpeta Recursos (nueva ubicación)
-            string rutaRecursos = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Recursos");
-            string? ruta = BuscarEnDirectorio(rutaRecursos, nombresArchivos);
-            if (ruta != null) return ruta;
-
-            // 2. Buscar en Application.StartupPath (bin\Debug o publicación)
-            ruta = BuscarEnDirectorio(AppDomain.CurrentDomain.BaseDirectory, nombresArchivos);
-            if (ruta != null) return ruta;
-
-            // 3. Subir en el árbol de directorios hasta 5 niveles hacia la raíz del proyecto
-            DirectoryInfo? dir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory);
-            int niveles = 0;
-
-            while (dir != null && niveles < 5)
-            {
-                ruta = BuscarEnDirectorio(dir.FullName, nombresArchivos);
-                if (ruta != null) return ruta;
-
-                // También buscar en Recursos de cada nivel
-                string rutaRecursosNivel = Path.Combine(dir.FullName, "Recursos");
-                ruta = BuscarEnDirectorio(rutaRecursosNivel, nombresArchivos);
-                if (ruta != null) return ruta;
-
-                dir = Directory.GetParent(dir.FullName);
-                niveles++;
-            }
-
-            return null;
-        }
-
-        private static string? BuscarEnDirectorio(string directorio, string[] nombresArchivos)
-        {
-            if (!Directory.Exists(directorio)) return null;
-
-            foreach (string nombre in nombresArchivos)
-            {
-                string rutaCompleta = Path.Combine(directorio, nombre);
-                if (File.Exists(rutaCompleta))
-                    return rutaCompleta;
-            }
-            return null;
         }
 
         private void btnTogglePassword_Click(object sender, EventArgs e)

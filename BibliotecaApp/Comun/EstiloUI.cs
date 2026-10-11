@@ -57,20 +57,64 @@ namespace BibliotecaApp
         /// <summary>Familia base: Segoe UI (requerido por diseño corporativo).</summary>
         public const string FuenteBase = "Segoe UI";
 
-        /// <summary>Título de sección — 14 pt, Bold, Segoe UI.</summary>
-        public static Font TituloSeccion() => new Font(FuenteBase, 14f, FontStyle.Bold, GraphicsUnit.Point);
+        // ═══════════════════════════════════════════════════════════════════
+        // A-01/A-02/A-03: TIPOGRAFÍAS CACHEADAS A NIVEL DE PROCESO
+        // Compartir estas instancias evita agotar los handles GDI+ que producía
+        // crear una nueva Font en cada estilo o repintado. No se hacen Dispose:
+        // viven mientras viva la aplicación (verificado: Control.Dispose en
+        // WinForms .NET no dispone la Font asignada a un control).
+        // ═══════════════════════════════════════════════════════════════════
 
-        /// <summary>Subtítulo — 11 pt, SemiBold (Bold en WinForms), Segoe UI.</summary>
-        public static Font Subtitulo() => new Font(FuenteBase, 11f, FontStyle.Bold, GraphicsUnit.Point);
+        /// <summary>Normal — 10 pt, Regular, Segoe UI.</summary>
+        public static readonly Font FuenteNormal = new Font(FuenteBase, 10f, FontStyle.Regular, GraphicsUnit.Point);
+
+        /// <summary>Título de sección — 14 pt, Bold, Segoe UI.</summary>
+        public static readonly Font FuenteTitulo = new Font(FuenteBase, 14f, FontStyle.Bold, GraphicsUnit.Point);
+
+        /// <summary>Subtítulo — 11 pt, Bold, Segoe UI.</summary>
+        public static readonly Font FuenteSubtitulo = new Font(FuenteBase, 11f, FontStyle.Bold, GraphicsUnit.Point);
 
         /// <summary>Etiquetas de campo — 9.5 pt, Regular, Segoe UI (más legible).</summary>
-        public static Font Etiqueta() => new Font(FuenteBase, 9.5f, FontStyle.Regular, GraphicsUnit.Point);
+        public static readonly Font FuenteEtiqueta = new Font(FuenteBase, 9.5f, FontStyle.Regular, GraphicsUnit.Point);
 
-        /// <summary>Botones de menú lateral — 10 pt, Bold, Segoe UI.</summary>
-        public static Font BotonMenu() => new Font(FuenteBase, 10f, FontStyle.Bold, GraphicsUnit.Point);
+        /// <summary>Botones (menú lateral y primarios) — 10 pt, Bold, Segoe UI.</summary>
+        public static readonly Font FuenteBoton = new Font(FuenteBase, 10f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Botón principal — 10 pt, Bold, Segoe UI.</summary>
-        public static Font BotonPrincipal() => new Font(FuenteBase, 10f, FontStyle.Bold, GraphicsUnit.Point);
+        /// <summary>Tarjetas de resumen: título — 9 pt, Bold.</summary>
+        public static readonly Font FuenteTituloTarjeta = new Font(FuenteBase, 9f, FontStyle.Bold, GraphicsUnit.Point);
+
+        /// <summary>Tarjetas de resumen: cifra grande — 28 pt, Bold.</summary>
+        public static readonly Font FuenteCifraGrande = new Font(FuenteBase, 28f, FontStyle.Bold, GraphicsUnit.Point);
+
+        /// <summary>Gráficas: valores — 11 pt, Bold.</summary>
+        public static readonly Font FuenteGraficaValor = new Font(FuenteBase, 11f, FontStyle.Bold, GraphicsUnit.Point);
+
+        /// <summary>Gráficas: categorías del eje — 10 pt, Bold.</summary>
+        public static readonly Font FuenteGraficaCategoria = new Font(FuenteBase, 10f, FontStyle.Bold, GraphicsUnit.Point);
+
+        /// <summary>Gráficas: título — 12 pt, Bold.</summary>
+        public static readonly Font FuenteGraficaTitulo = new Font(FuenteBase, 12f, FontStyle.Bold, GraphicsUnit.Point);
+
+        /// <summary>Gráficas: mensaje "No hay registros" — 11 pt, Italic.</summary>
+        public static readonly Font FuenteSinDatos = new Font(FuenteBase, 11f, FontStyle.Italic, GraphicsUnit.Point);
+
+        /// <summary>Estado vacío de grillas (UcAlertas) — 14 pt, Italic.</summary>
+        public static readonly Font FuenteVacia = new Font(FuenteBase, 14f, FontStyle.Italic, GraphicsUnit.Point);
+
+        /// <summary>Título de sección — instancia cacheada <see cref="FuenteTitulo"/>.</summary>
+        public static Font TituloSeccion() => FuenteTitulo;
+
+        /// <summary>Subtítulo — instancia cacheada <see cref="FuenteSubtitulo"/>.</summary>
+        public static Font Subtitulo() => FuenteSubtitulo;
+
+        /// <summary>Etiquetas de campo — instancia cacheada <see cref="FuenteEtiqueta"/>.</summary>
+        public static Font Etiqueta() => FuenteEtiqueta;
+
+        /// <summary>Botones de menú lateral — instancia cacheada <see cref="FuenteBoton"/>.</summary>
+        public static Font BotonMenu() => FuenteBoton;
+
+        /// <summary>Botón principal — instancia cacheada <see cref="FuenteBoton"/>.</summary>
+        public static Font BotonPrincipal() => FuenteBoton;
 
 
         // ═══════════════════════════════════════════════════════════════════
@@ -168,7 +212,7 @@ namespace BibliotecaApp
         {
             if (control == null) return;
 
-            control.Font = new Font(FuenteBase, 10f, FontStyle.Regular, GraphicsUnit.Point); // 10 pt, Segoe UI
+            control.Font = FuenteNormal; // A-0x: instancia cacheada (10 pt, Segoe UI)
             control.ForeColor = TextoOscuro;                                                 // #2B2D42
             control.BackColor = Blanco;
             control.Margin = new Padding(3, 0, 12, 6);

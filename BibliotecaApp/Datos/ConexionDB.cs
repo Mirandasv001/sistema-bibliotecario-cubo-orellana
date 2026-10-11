@@ -11,8 +11,22 @@ namespace BibliotecaApp
     {
         private const string NombreBaseDatos = "biblioteca.db";
 
-        public static string RutaBaseDatos =>
-            Path.Combine(AppContext.BaseDirectory, NombreBaseDatos);
+        // C-01: carpeta de datos en %APPDATA%, escribible por usuarios sin privilegios
+        // (a diferencia de Program Files, donde el instalador coloca el .exe).
+        private static readonly string CarpetaDatos =
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "BibliotecaCUBO");
+
+        public static string RutaBaseDatos
+        {
+            get
+            {
+                // Garantiza que la carpeta exista antes de devolver la ruta (idempotente)
+                Directory.CreateDirectory(CarpetaDatos);
+                return Path.Combine(CarpetaDatos, NombreBaseDatos);
+            }
+        }
 
         public static string CadenaConexion =>
             new SqliteConnectionStringBuilder
@@ -35,15 +49,30 @@ namespace BibliotecaApp
             return conexion;
         }
 
-        /// <summary>Inicializa la base de datos: tablas + importación del catálogo.</summary>
+        /// <summary>
+        /// Inicializa la base de datos: tablas + importación del catálogo.
+        /// C-02: todo el proceso secuencial corre dentro de UNA sola transacción;
+        /// si cualquier paso falla se revierte el conjunto completo para no
+        /// dejar la BD a medias (schema + datos).
+        /// </summary>
         public static void Inicializar()
         {
             using var conexion = ObtenerConexion();
-            CrearTablas(conexion);
-            MigrarEsquemaControlSala(conexion);
-            MigrarEsquemaPrestamos(conexion);
-            ImportarCatalogoDesdeCsv(conexion);
-            SeedUsuarios(conexion);
+            using var transaccion = conexion.BeginTransaction();
+            try
+            {
+                CrearTablas(conexion);
+                MigrarEsquemaControlSala(conexion, transaccion);
+                MigrarEsquemaPrestamos(conexion);
+                ImportarCatalogoDesdeCsv(conexion, transaccion);
+                SeedUsuarios(conexion);
+                transaccion.Commit();
+            }
+            catch
+            {
+                transaccion.Rollback();
+                throw;
+            }
         }
 
         /// <summary>
@@ -77,7 +106,7 @@ namespace BibliotecaApp
         /// ControlUsuariosSala aún tiene la columna 'Taller', la elimina
         /// preservando todas las filas. Además, añade la columna 'Estado' si no existe.
         /// </summary>
-        private static void MigrarEsquemaControlSala(SqliteConnection conexion)
+        private static void MigrarEsquemaControlSala(SqliteConnection conexion, SqliteTransaction transaccion)
         {
             var columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using (var info = conexion.CreateCommand())
@@ -101,66 +130,56 @@ namespace BibliotecaApp
                 }
                 catch (SqliteException)
                 {
-                    // Plan B para versiones antiguas de SQLite: reconstruir la tabla.
-                    using var transaccion = conexion.BeginTransaction();
-                    try
+                    // Plan B para versiones antiguas de SQLite: reconstruir la tabla
+                    // dentro de la transacción global (C-02: sin transacción propia).
+                    const string nuevaTabla = @"
+                        CREATE TABLE ControlUsuariosSala_Nueva (
+                            ID             INTEGER PRIMARY KEY AUTOINCREMENT,
+                            Fecha          TEXT,
+                            NombreUsuario  TEXT,
+                            Genero         TEXT,
+                            Edad           INTEGER,
+                            TituloLibro    TEXT,
+                            HoraEntrega    TEXT,
+                            HoraRecibido   TEXT,
+                            PersonalTurno  TEXT,
+                            Estado         TEXT DEFAULT 'Pendiente'
+                        );";
+
+                    using (var crear = conexion.CreateCommand())
                     {
-                        const string nuevaTabla = @"
-                            CREATE TABLE ControlUsuariosSala_Nueva (
-                                ID             INTEGER PRIMARY KEY AUTOINCREMENT,
-                                Fecha          TEXT,
-                                NombreUsuario  TEXT,
-                                Genero         TEXT,
-                                Edad           INTEGER,
-                                TituloLibro    TEXT,
-                                HoraEntrega    TEXT,
-                                HoraRecibido   TEXT,
-                                PersonalTurno  TEXT,
-                                Estado         TEXT DEFAULT 'Pendiente'
-                            );";
-
-                        using (var crear = conexion.CreateCommand())
-                        {
-                            crear.Transaction = transaccion;
-                            crear.CommandText = nuevaTabla;
-                            crear.ExecuteNonQuery();
-                        }
-
-                        using (var copiar = conexion.CreateCommand())
-                        {
-                            copiar.Transaction = transaccion;
-                            copiar.CommandText = @"
-                                INSERT INTO ControlUsuariosSala_Nueva
-                                    (ID, Fecha, NombreUsuario, Genero, Edad,
-                                     TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno, Estado)
-                                SELECT ID, Fecha, NombreUsuario, Genero, Edad,
-                                       TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno,
-                                       CASE WHEN HoraRecibido = 'En lectura' THEN 'Pendiente' ELSE 'Entregado' END
-                                FROM ControlUsuariosSala;";
-                            copiar.ExecuteNonQuery();
-                        }
-
-                        using (var borrarVieja = conexion.CreateCommand())
-                        {
-                            borrarVieja.Transaction = transaccion;
-                            borrarVieja.CommandText = "DROP TABLE ControlUsuariosSala;";
-                            borrarVieja.ExecuteNonQuery();
-                        }
-
-                        using (var renombrar = conexion.CreateCommand())
-                        {
-                            renombrar.Transaction = transaccion;
-                            renombrar.CommandText =
-                                "ALTER TABLE ControlUsuariosSala_Nueva RENAME TO ControlUsuariosSala;";
-                            renombrar.ExecuteNonQuery();
-                        }
-
-                        transaccion.Commit();
+                        crear.Transaction = transaccion;
+                        crear.CommandText = nuevaTabla;
+                        crear.ExecuteNonQuery();
                     }
-                    catch
+
+                    using (var copiar = conexion.CreateCommand())
                     {
-                        transaccion.Rollback();
-                        throw;
+                        copiar.Transaction = transaccion;
+                        copiar.CommandText = @"
+                            INSERT INTO ControlUsuariosSala_Nueva
+                                (ID, Fecha, NombreUsuario, Genero, Edad,
+                                 TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno, Estado)
+                            SELECT ID, Fecha, NombreUsuario, Genero, Edad,
+                                   TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno,
+                                   CASE WHEN HoraRecibido = 'En lectura' THEN 'Pendiente' ELSE 'Entregado' END
+                            FROM ControlUsuariosSala;";
+                        copiar.ExecuteNonQuery();
+                    }
+
+                    using (var borrarVieja = conexion.CreateCommand())
+                    {
+                        borrarVieja.Transaction = transaccion;
+                        borrarVieja.CommandText = "DROP TABLE ControlUsuariosSala;";
+                        borrarVieja.ExecuteNonQuery();
+                    }
+
+                    using (var renombrar = conexion.CreateCommand())
+                    {
+                        renombrar.Transaction = transaccion;
+                        renombrar.CommandText =
+                            "ALTER TABLE ControlUsuariosSala_Nueva RENAME TO ControlUsuariosSala;";
+                        renombrar.ExecuteNonQuery();
                     }
                 }
             }
@@ -188,65 +207,55 @@ namespace BibliotecaApp
                 catch (SqliteException)
                 {
                     // Si falla ALTER TABLE (SQLite muy antiguo), reconstruir tabla completa
-                    using var transaccion = conexion.BeginTransaction();
-                    try
+                    // dentro de la transacción global (C-02: sin transacción propia).
+                    const string nuevaTabla = @"
+                        CREATE TABLE ControlUsuariosSala_Nueva (
+                            ID             INTEGER PRIMARY KEY AUTOINCREMENT,
+                            Fecha          TEXT,
+                            NombreUsuario  TEXT,
+                            Genero         TEXT,
+                            Edad           INTEGER,
+                            TituloLibro    TEXT,
+                            HoraEntrega    TEXT,
+                            HoraRecibido   TEXT,
+                            PersonalTurno  TEXT,
+                            Estado         TEXT DEFAULT 'Pendiente'
+                        );";
+
+                    using (var crear = conexion.CreateCommand())
                     {
-                        const string nuevaTabla = @"
-                            CREATE TABLE ControlUsuariosSala_Nueva (
-                                ID             INTEGER PRIMARY KEY AUTOINCREMENT,
-                                Fecha          TEXT,
-                                NombreUsuario  TEXT,
-                                Genero         TEXT,
-                                Edad           INTEGER,
-                                TituloLibro    TEXT,
-                                HoraEntrega    TEXT,
-                                HoraRecibido   TEXT,
-                                PersonalTurno  TEXT,
-                                Estado         TEXT DEFAULT 'Pendiente'
-                            );";
-
-                        using (var crear = conexion.CreateCommand())
-                        {
-                            crear.Transaction = transaccion;
-                            crear.CommandText = nuevaTabla;
-                            crear.ExecuteNonQuery();
-                        }
-
-                        using (var copiar = conexion.CreateCommand())
-                        {
-                            copiar.Transaction = transaccion;
-                            copiar.CommandText = @"
-                                INSERT INTO ControlUsuariosSala_Nueva
-                                    (ID, Fecha, NombreUsuario, Genero, Edad,
-                                     TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno, Estado)
-                                SELECT ID, Fecha, NombreUsuario, Genero, Edad,
-                                       TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno,
-                                       CASE WHEN HoraRecibido = 'En lectura' THEN 'Pendiente' ELSE 'Entregado' END
-                                FROM ControlUsuariosSala;";
-                            copiar.ExecuteNonQuery();
-                        }
-
-                        using (var borrarVieja = conexion.CreateCommand())
-                        {
-                            borrarVieja.Transaction = transaccion;
-                            borrarVieja.CommandText = "DROP TABLE ControlUsuariosSala;";
-                            borrarVieja.ExecuteNonQuery();
-                        }
-
-                        using (var renombrar = conexion.CreateCommand())
-                        {
-                            renombrar.Transaction = transaccion;
-                            renombrar.CommandText =
-                                "ALTER TABLE ControlUsuariosSala_Nueva RENAME TO ControlUsuariosSala;";
-                            renombrar.ExecuteNonQuery();
-                        }
-
-                        transaccion.Commit();
+                        crear.Transaction = transaccion;
+                        crear.CommandText = nuevaTabla;
+                        crear.ExecuteNonQuery();
                     }
-                    catch
+
+                    using (var copiar = conexion.CreateCommand())
                     {
-                        transaccion.Rollback();
-                        throw;
+                        copiar.Transaction = transaccion;
+                        copiar.CommandText = @"
+                            INSERT INTO ControlUsuariosSala_Nueva
+                                (ID, Fecha, NombreUsuario, Genero, Edad,
+                                 TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno, Estado)
+                            SELECT ID, Fecha, NombreUsuario, Genero, Edad,
+                                   TituloLibro, HoraEntrega, HoraRecibido, PersonalTurno,
+                                   CASE WHEN HoraRecibido = 'En lectura' THEN 'Pendiente' ELSE 'Entregado' END
+                            FROM ControlUsuariosSala;";
+                        copiar.ExecuteNonQuery();
+                    }
+
+                    using (var borrarVieja = conexion.CreateCommand())
+                    {
+                        borrarVieja.Transaction = transaccion;
+                        borrarVieja.CommandText = "DROP TABLE ControlUsuariosSala;";
+                        borrarVieja.ExecuteNonQuery();
+                    }
+
+                    using (var renombrar = conexion.CreateCommand())
+                    {
+                        renombrar.Transaction = transaccion;
+                        renombrar.CommandText =
+                            "ALTER TABLE ControlUsuariosSala_Nueva RENAME TO ControlUsuariosSala;";
+                        renombrar.ExecuteNonQuery();
                     }
                 }
             }
@@ -469,7 +478,7 @@ namespace BibliotecaApp
         // ------------------------------------------------------------------
         //  Importación del catálogo CSV
         // ------------------------------------------------------------------
-        private static void ImportarCatalogoDesdeCsv(SqliteConnection conexion)
+        private static void ImportarCatalogoDesdeCsv(SqliteConnection conexion, SqliteTransaction transaccion)
         {
             // Si el administrador vació el inventario explícitamente, NO se
             // repuebla desde el CSV: el vaciado debe sobrevivir al reinicio.
@@ -482,51 +491,48 @@ namespace BibliotecaApp
             var filas = LectorCsv.Leer(rutaCsv);
             if (filas.Count == 0) return;
 
-            using var transaccion = conexion.BeginTransaction();
-            try
+            // C-02: se ejecuta dentro de la transacción global de Inicializar
+            // (el Commit / Rollback lo gestiona Inicializar; aquí no se crea
+            // una transacción propia porque SQLite admite una por conexión).
+            using var comando = conexion.CreateCommand();
+            comando.Transaction = transaccion;
+            comando.CommandText = @"
+                INSERT OR IGNORE INTO Libros (Codigo, Titulo, Autor, Editorial, Estado, Ubicacion)
+                VALUES ($codigo, $titulo, $autor, $editorial, $estado, $ubicacion);";
+
+            var pCodigo = comando.Parameters.Add("$codigo", SqliteType.Text);
+            var pTitulo = comando.Parameters.Add("$titulo", SqliteType.Text);
+            var pAutor = comando.Parameters.Add("$autor", SqliteType.Text);
+            var pEditorial = comando.Parameters.Add("$editorial", SqliteType.Text);
+            var pEstado = comando.Parameters.Add("$estado", SqliteType.Text);
+            var pUbicacion = comando.Parameters.Add("$ubicacion", SqliteType.Text);
+
+            int insertados = 0;
+            foreach (var fila in filas)
             {
-                using var comando = conexion.CreateCommand();
-                comando.Transaction = transaccion;
-                comando.CommandText = @"
-                    INSERT OR IGNORE INTO Libros (Codigo, Titulo, Autor, Editorial, Estado, Ubicacion)
-                    VALUES ($codigo, $titulo, $autor, $editorial, $estado, $ubicacion);";
+                // Omite encabezado y filas incompletas o sin código.
+                if (fila.Length < 6) continue;
+                if (fila[0].Equals("CODIGO", StringComparison.OrdinalIgnoreCase)) continue;
 
-                var pCodigo = comando.Parameters.Add("$codigo", SqliteType.Text);
-                var pTitulo = comando.Parameters.Add("$titulo", SqliteType.Text);
-                var pAutor = comando.Parameters.Add("$autor", SqliteType.Text);
-                var pEditorial = comando.Parameters.Add("$editorial", SqliteType.Text);
-                var pEstado = comando.Parameters.Add("$estado", SqliteType.Text);
-                var pUbicacion = comando.Parameters.Add("$ubicacion", SqliteType.Text);
+                string codigo = fila[0].Trim();
+                if (codigo.Length == 0) continue;
 
-                int insertados = 0;
-                foreach (var fila in filas)
-                {
-                    // Omite encabezado y filas incompletas o sin código.
-                    if (fila.Length < 6) continue;
-                    if (fila[0].Equals("CODIGO", StringComparison.OrdinalIgnoreCase)) continue;
+                pCodigo.Value = codigo;
+                pTitulo.Value = fila[1];
+                pAutor.Value = fila[2];
+                pEditorial.Value = fila[3];
+                pEstado.Value = fila[4];
+                pUbicacion.Value = fila[5];
 
-                    string codigo = fila[0].Trim();
-                    if (codigo.Length == 0) continue;
-
-                    pCodigo.Value = codigo;
-                    pTitulo.Value = fila[1];
-                    pAutor.Value = fila[2];
-                    pEditorial.Value = fila[3];
-                    pEstado.Value = fila[4];
-                    pUbicacion.Value = fila[5];
-
-                    insertados += comando.ExecuteNonQuery();
-                }
-
-                transaccion.Commit();
-                System.Diagnostics.Debug.WriteLine($"Catálogo CUBO: {insertados} libros insertados desde CSV.");
+                insertados += comando.ExecuteNonQuery();
             }
-            catch
-            {
-                transaccion.Rollback();
-                throw;
-            }
+
+            System.Diagnostics.Debug.WriteLine($"Catálogo CUBO: {insertados} libros insertados desde CSV.");
         }
+
+        // C-03: nombre real del archivo de catálogo (se copia junto al .exe vía csproj)
+        private const string NombreCatalogoCsv =
+            "CATÁLOGO BIBLIOTECA CUBO SITIO DEL NIÑO - ORIGINAL-2026 .xlsx - INVENTARIO TOTAL (1).csv";
 
         private static string? BuscarArchivoCsv()
         {
@@ -534,19 +540,9 @@ namespace BibliotecaApp
             if (!string.IsNullOrWhiteSpace(CatalogoCsvPath) && File.Exists(CatalogoCsvPath))
                 return CatalogoCsvPath;
 
-            // Prioridad 2 - Búsqueda automática (legacy): sube hasta 6 niveles
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            for (int i = 0; i < 6 && dir != null; i++, dir = dir.Parent!)
-            {
-                string? ruta = Directory
-                    .EnumerateFiles(dir.FullName, "*.csv")
-                    .FirstOrDefault(f => Path.GetFileName(f)
-                        .Contains("INVENTARIO", StringComparison.OrdinalIgnoreCase))
-                    ?? Directory.EnumerateFiles(dir.FullName, "*.csv").FirstOrDefault();
-
-                if (ruta != null) return ruta;
-            }
-            return null;
+            // C-03: Prioridad 2 - Ruta fija junto al .exe, sin búsquedas ascendentes
+            string ruta = Path.Combine(AppContext.BaseDirectory, NombreCatalogoCsv);
+            return File.Exists(ruta) ? ruta : null;
         }
     }
 }
