@@ -172,7 +172,7 @@ namespace BibliotecaApp
             };
 
             // --- Mitad IZQUIERDA: Control de Sala (3 tarjetas) ---
-            var cardTotal = CrearTarjetaResumen("Total Visitas", "0", ColorTotal, out _lblTotalVisitasTitulo, out _lblTotalVisitasValor);
+            var cardTotal = CrearTarjetaResumen("Total de lectores en sala", "0", ColorTotal, out _lblTotalVisitasTitulo, out _lblTotalVisitasValor);
             var cardGenero1 = CrearTarjetaResumen(_nombreGenero1, "0", ColorGenero1, out _lblGenero1Titulo, out _lblGenero1Valor);
             var cardGenero2 = CrearTarjetaResumen(_nombreGenero2, "0", ColorGenero2, out _lblGenero2Titulo, out _lblGenero2Valor);
 
