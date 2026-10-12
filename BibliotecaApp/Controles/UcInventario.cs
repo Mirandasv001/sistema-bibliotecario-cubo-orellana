@@ -42,6 +42,7 @@ namespace BibliotecaApp
         // Botón "Eliminar Libro (fila)" (code-behind) — borra el registro seleccionado con auth
         // (misma fila, tamaño y estilo que "Vaciar Inventario")
         private Button? btnEliminarLibro;
+        private Button? btnEditarLibro;
 
         /// <summary>Primer ítem del ComboBox: desactiva el filtro de ubicación.</summary>
         private const string FiltroTodasUbicaciones = "Todas las ubicaciones";
@@ -82,13 +83,36 @@ namespace BibliotecaApp
             };
             panelBusqueda.Controls.Add(lblBuscar);
 
-            // txtBuscar arranca en la misma columna de controles que el combo (210),
-            // de modo que ambos quedan a la misma distancia de su etiqueta.
-            txtBuscar.Location = new Point(210, txtBuscar.Location.Y);
+            // Filtro desplegable de Ubicación (estilo Excel) en panelBusqueda.
+            // Se crea ANTES de posicionar la barra: devuelve la columna X
+            // compartida que usan la barra y el combo (misma línea vertical).
+            int colControles = CrearFiltroUbicacion();
+
+            // ══ ALINEACIÓN Y GROSOR: barra y combo en la misma columna X ══
+
+            // 1) Placeholder nuevo solicitado (sobrescribe el del Designer)
+            txtBuscar.PlaceholderText = "Búsqueda de libros...";
+
+            // 2) Barra de búsqueda: 5 px más alta que el original (27 → 32)
+            txtBuscar.AutoSize = false;
+            txtBuscar.Height += 5;
             txtBuscar.Width += 20; // +20 px de aire: el texto de búsqueda se lee completo
 
-            // Filtro desplegable de Ubicación (estilo Excel) en panelBusqueda
-            CrearFiltroUbicacion();
+            // 3) Misma X exacta que el combo, conservando el borde derecho
+            //    de la barra (junto al contador de libros)
+            int bordeDerechoBarra = txtBuscar.Location.X + txtBuscar.Width;
+            txtBuscar.Location = new Point(colControles, txtBuscar.Location.Y);
+            txtBuscar.Width = bordeDerechoBarra - txtBuscar.Location.X;
+
+            // 4) Centro visual de la fila 1: barra, "Buscar:" y "N libro(s)"
+            //    comparten eje Y (contador: Y=18, alto preferido → centro 28)
+            Size tamLblBuscar = lblBuscar.GetPreferredSize(Size.Empty);
+            int centroFila1 = lblContador.Location.Y
+                             + lblContador.GetPreferredSize(Size.Empty).Height / 2;
+            txtBuscar.Location = new Point(txtBuscar.Location.X,
+                                            centroFila1 - txtBuscar.Height / 2);
+            lblBuscar.Location = new Point(lblBuscar.Left,
+                                            centroFila1 - tamLblBuscar.Height / 2);
 
             // Agregar botones de administración en panelEncabezado, alineados a la par del título
             int btnWidth = 130;
@@ -148,6 +172,7 @@ namespace BibliotecaApp
                 Text = "Eliminar Libro (fila)",
                 FlatStyle = FlatStyle.Flat,
                 Size = _btnVaciarInventario.Size,          // copia el tamaño del botón de referencia
+                Width = _btnVaciarInventario.Width + 20,   // +20 px para que el nuevo texto encaje con holgura
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
                 Cursor = Cursors.Hand
             };
@@ -156,6 +181,23 @@ namespace BibliotecaApp
             btnEliminarLibro.ForeColor = _btnVaciarInventario.ForeColor; // White (idéntico)
             btnEliminarLibro.Click += btnEliminarLibro_Click;
             panelEncabezado.Controls.Add(btnEliminarLibro);
+
+            // --- Botón Editar: a la derecha de Eliminar, estilo acento (no destructivo) ---
+            btnEditarLibro = new Button
+            {
+                Name = "btnEditarLibro",
+                Text = "Editar Libro (fila)",
+                FlatStyle = FlatStyle.Flat,
+                Size = _btnVaciarInventario.Size,          // copia el tamaño del botón de referencia
+                Width = _btnVaciarInventario.Width + 20,   // holgura para el texto
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Cursor = Cursors.Hand
+            };
+            btnEditarLibro.FlatAppearance.BorderSize = 0;
+            btnEditarLibro.BackColor = EstiloUI.Acento;   // azul acento (#3A506B), paleta del proyecto
+            btnEditarLibro.ForeColor = Color.White;
+            btnEditarLibro.Click += btnEditarLibro_Click;
+            panelEncabezado.Controls.Add(btnEditarLibro);
 
             // Posicionar botones y aplicar visibilidad por rol después de que el layout esté listo
             this.Load += (s, e) =>
@@ -180,11 +222,14 @@ namespace BibliotecaApp
                 btnAgregarLibro.Left = _btnVaciarInventario.Right + 15;
                 btnEliminarLibro!.Top = _btnVaciarInventario.Top;
                 btnEliminarLibro.Left = btnAgregarLibro.Right + 15;
+                btnEditarLibro!.Top = _btnVaciarInventario.Top;
+                btnEditarLibro.Left = btnEliminarLibro.Right + 15;
 
                 _btnImportarCSV.BringToFront();
                 _btnVaciarInventario.BringToFront();
                 btnAgregarLibro.BringToFront();
                 btnEliminarLibro.BringToFront();
+                btnEditarLibro.BringToFront();
 
                 // Visibilidad por rol: solo Administradores
                 bool esAdmin = SesionGlobal.EsAdmin;
@@ -192,6 +237,7 @@ namespace BibliotecaApp
                 _btnVaciarInventario.Visible = esAdmin;
                 btnAgregarLibro.Visible = esAdmin;
                 btnEliminarLibro.Visible = esAdmin;
+                btnEditarLibro.Visible = esAdmin;
             };
         }
 
@@ -332,15 +378,17 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Crea dinámicamente el ComboBox de filtro por Ubicación (estilo Excel)
-        /// y su etiqueta, en una segunda fila de panelBusqueda alineada con
-        /// txtBuscar (columna de control en x=210). DropDownList para impedir
-        /// texto libre. No se toca UcInventario.Designer.cs.
+        /// y su etiqueta, en una segunda fila de panelBusqueda. Devuelve la
+        /// columna X compartida (10 px después de la etiqueta más ancha) que
+        /// usan el combo y la barra de búsqueda, para que ambos empiecen en la
+        /// misma línea vertical. DropDownList para impedir texto libre.
+        /// No se toca UcInventario.Designer.cs.
         /// </summary>
-        private void CrearFiltroUbicacion()
+        private int CrearFiltroUbicacion()
         {
-            // Columnas alineadas de panelBusqueda (fila 1 y fila 2 comparten X)
+            // Columna de etiquetas de panelBusqueda (fila 1 y fila 2 comparten X)
             const int colEtiquetas = 16;   // "Buscar:" y "Ubicación:" (mismo eje X)
-            const int colControles = 210;  // txtBuscar y combo: misma distancia a su etiqueta
+            const int margenEtiqueta = 10; // gap estético etiqueta → control
 
             _lblFiltroUbicacion = new Label
             {
@@ -355,7 +403,7 @@ namespace BibliotecaApp
             _cmbFiltroUbicacion = new ComboBox
             {
                 Name = "cmbFiltroUbicacion",
-                Location = new Point(colControles, 53), // misma columna que txtBuscar
+                Location = new Point(colEtiquetas, 53), // X definitivo: columna compartida, más abajo
                 Width = 195,                             // 180 + 15px extra: el texto "Todas las ubicaciones" encaja completo
                 DropDownWidth = 260                      // popup algo más ancho: se lee completo
             };
@@ -369,6 +417,16 @@ namespace BibliotecaApp
 
             panelBusqueda.Controls.Add(_lblFiltroUbicacion);
             panelBusqueda.Controls.Add(_cmbFiltroUbicacion);
+
+            // Columna X compartida: barra y combo empiezan en la misma línea
+            // vertical, 10 px después de la etiqueta MÁS ancha de la cabecera
+            int colControles = Math.Max(
+                lblBuscar.Left + lblBuscar.GetPreferredSize(Size.Empty).Width,
+                _lblFiltroUbicacion.Left + _lblFiltroUbicacion.GetPreferredSize(Size.Empty).Width)
+                + margenEtiqueta;
+
+            _cmbFiltroUbicacion.Location = new Point(colControles, _cmbFiltroUbicacion.Location.Y);
+            return colControles;
         }
 
         /// <summary>
@@ -383,17 +441,60 @@ namespace BibliotecaApp
         }
 
         /// <summary>
+        /// Abre el modal en modo EDICIÓN precargado con la fila seleccionada
+        /// en el grid. Valida que exista selección y que la fila tenga código
+        /// (Primary Key de Libros).
+        /// </summary>
+        private void btnEditarLibro_Click(object? sender, EventArgs e)
+        {
+            // Validar que haya una fila seleccionada en el grid
+            if (dgvInventario.CurrentRow == null || dgvInventario.CurrentRow.IsNewRow)
+            {
+                MessageBox.Show("Seleccione el libro a editar en la tabla.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var fila = dgvInventario.CurrentRow;
+            string[] datosFila =
+            {
+                fila.Cells["Código"]?.Value?.ToString() ?? "",      // [0] Código (PK, bloqueada en el modal)
+                fila.Cells["Título"]?.Value?.ToString() ?? "",      // [1]
+                fila.Cells["Autor"]?.Value?.ToString() ?? "",       // [2]
+                fila.Cells["Editorial"]?.Value?.ToString() ?? "",   // [3]
+                fila.Cells["Estado"]?.Value?.ToString() ?? "",      // [4]
+                fila.Cells["Ubicación"]?.Value?.ToString() ?? ""    // [5]
+            };
+
+            if (datosFila[0].Length == 0)
+            {
+                MessageBox.Show("La fila seleccionada no tiene código de libro.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using var modal = CrearFormularioAgregarLibro(datosFila);
+            if (modal.ShowDialog(this) == DialogResult.OK)
+                CargarInventario();
+        }
+
+        /// <summary>
         /// Crea en code-behind el formulario modal "Agregar Nuevo Libro"
         /// (Código, Título, Autor, Editorial, Estado, Ubicación) con su INSERT
         /// parametrizado en la tabla Libros. Disponibilidad se inserta fija
         /// como 'Disponible' (regla de negocio: no se pregunta al usuario).
-        /// No se toca UcInventario.Designer.cs.
+        /// Modo edición: al pasar los datos de la fila (datosFilaEditar) el
+        /// modal se transforma en "Editar Libro" — campos precargados, Código
+        /// bloqueado (Primary Key), botón "Guardar cambios" + "Cancelar" y
+        /// UPDATE parametrizado por Codigo. No se toca UcInventario.Designer.cs.
         /// </summary>
-        private Form CrearFormularioAgregarLibro()
+        private Form CrearFormularioAgregarLibro(string[]? datosFilaEditar = null)
         {
+            bool enModoEdicion = datosFilaEditar != null;
+
             var modal = new Form
             {
-                Text = "Agregar Nuevo Libro",
+                Text = enModoEdicion ? "Editar Libro" : "Agregar Nuevo Libro",
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -417,6 +518,10 @@ namespace BibliotecaApp
                 };
                 EstiloUI.EstilizarEntrada(cajas[i]);
 
+                // Modo edición: precarga el dato de la fila seleccionada
+                if (enModoEdicion)
+                    cajas[i].Text = datosFilaEditar![i];
+
                 modal.Controls.AddRange(new Control[] { lbl, cajas[i] });
             }
 
@@ -427,12 +532,21 @@ namespace BibliotecaApp
             var txtEstado = cajas[4];
             var txtUbicacion = cajas[5];
 
+            // Modo edición: el Código es la Primary Key, se protege contra cambios
+            if (enModoEdicion)
+            {
+                txtCodigo.ReadOnly = true;
+                txtCodigo.BackColor = Color.FromArgb(238, 238, 238); // gris suave: solo lectura
+            }
+
+            int yBotones = 17 + etiquetas.Length * 34 + 8;
+
             var btnGuardar = new Button
             {
                 Name = "btnGuardar",
-                Text = "Guardar",
-                Size = new Size(120, 38),
-                Location = new Point(270, 17 + etiquetas.Length * 34 + 8),
+                Text = enModoEdicion ? "Guardar cambios" : "Guardar",
+                Size = new Size(enModoEdicion ? 150 : 120, 38),
+                Location = new Point(enModoEdicion ? 245 : 270, yBotones),
                 Cursor = Cursors.Hand
             };
             EstiloUI.EstilizarBotonPrimario(btnGuardar);
@@ -451,9 +565,26 @@ namespace BibliotecaApp
                 {
                     using var conexion = ConexionDB.ObtenerConexion();
                     using var cmd = conexion.CreateCommand();
-                    cmd.CommandText = @"
-                        INSERT INTO Libros (Codigo, Titulo, Autor, Editorial, Estado, Ubicacion, Disponibilidad)
-                        VALUES (@codigo, @titulo, @autor, @editorial, @estado, @ubicacion, 'Disponible');";
+
+                    if (enModoEdicion)
+                    {
+                        // UPDATE parametrizado: el filtro es la Primary Key (Codigo).
+                        // Disponibilidad NO se toca: el estado del ejemplar
+                        // (Disponible/Prestado/En Sala) lo gestionan los préstamos.
+                        cmd.CommandText = @"
+                            UPDATE Libros SET Titulo   = @titulo,
+                                              Autor    = @autor,
+                                              Editorial = @editorial,
+                                              Estado   = @estado,
+                                              Ubicacion = @ubicacion
+                            WHERE Codigo = @codigo;";
+                    }
+                    else
+                    {
+                        cmd.CommandText = @"
+                            INSERT INTO Libros (Codigo, Titulo, Autor, Editorial, Estado, Ubicacion, Disponibilidad)
+                            VALUES (@codigo, @titulo, @autor, @editorial, @estado, @ubicacion, 'Disponible');";
+                    }
 
                     cmd.Parameters.AddWithValue("@codigo", txtCodigo.Text.Trim());
                     cmd.Parameters.AddWithValue("@titulo", txtTitulo.Text.Trim());
@@ -463,7 +594,8 @@ namespace BibliotecaApp
                     cmd.Parameters.AddWithValue("@ubicacion", txtUbicacion.Text.Trim());
                     cmd.ExecuteNonQuery();
 
-                    MessageBox.Show("Libro registrado correctamente.",
+                    MessageBox.Show(enModoEdicion ? "Libro actualizado correctamente."
+                                                  : "Libro registrado correctamente.",
                         "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     modal.DialogResult = DialogResult.OK; // el llamador recarga el inventario
@@ -471,7 +603,7 @@ namespace BibliotecaApp
                 }
                 catch (Exception ex)
                 {
-                    // Causa habitual: Código duplicado (PRIMARY KEY de Libros)
+                    // Causa habitual del INSERT: Código duplicado (PRIMARY KEY de Libros)
                     MessageBox.Show("No se pudo guardar el libro: " + ex.Message,
                         "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
@@ -479,6 +611,23 @@ namespace BibliotecaApp
 
             modal.Controls.Add(btnGuardar);
             modal.AcceptButton = btnGuardar; // Enter también guarda
+
+            if (enModoEdicion)
+            {
+                var btnCancelar = new Button
+                {
+                    Name = "btnCancelar",
+                    Text = "Cancelar",
+                    Size = new Size(120, 38),
+                    Location = new Point(105, yBotones),
+                    Cursor = Cursors.Hand,
+                    DialogResult = DialogResult.Cancel
+                };
+                EstiloUI.EstilizarBotonSecundario(btnCancelar);
+                modal.Controls.Add(btnCancelar);
+                modal.CancelButton = btnCancelar; // Esc cierra sin guardar
+            }
+
             modal.ClientSize = new Size(420, btnGuardar.Bottom + 20);
 
             return modal;
