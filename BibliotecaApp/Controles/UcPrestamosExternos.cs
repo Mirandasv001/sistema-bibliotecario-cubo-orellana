@@ -58,7 +58,20 @@ namespace BibliotecaApp
             pnlDatos.Dock = DockStyle.Top;
             pnlBotonesAccion.Dock = DockStyle.Top;
             pnlContenedorGrid.Dock = DockStyle.Fill;
-            dgvPrestamos.Dock = DockStyle.Fill;
+
+            // LAYOUT RESPONSIVO: el grid debe llegar hasta el borde inferior del
+            // UserControl (sin espacio en blanco debajo). Se sustituye el Dock por
+            // Anchor completo + altura manual calculada sobre su contenedor
+            // (equivalente a this.ClientSize.Height - dgv.Location.Y, adaptado al
+            // anidamiento real: el grid vive dentro de pnlContenedorGrid, dentro
+            // de splitPrestamos.Panel2). La paginación no se toca: el evento
+            // SizeChanged → RecalcularTamanoPagina se sigue disparando al estirarse.
+            dgvPrestamos.Dock = DockStyle.None;
+            dgvPrestamos.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dgvPrestamos.Location = new Point(0, 0);
+            dgvPrestamos.Size = new Size(
+                pnlContenedorGrid.ClientSize.Width,
+                pnlContenedorGrid.ClientSize.Height);
             dgvPrestamos.ScrollBars = ScrollBars.Both;
 
             // Suscribir evento de clic en botones de la grilla
@@ -70,10 +83,12 @@ namespace BibliotecaApp
             // Suscribir evento CellFormatting para coloreo dinámico de la columna Estado
             dgvPrestamos.CellFormatting += DgvPrestamos_CellFormatting_Estado;
 
-            // PAGINACIÓN DINÁMICA: al cambiar la altura del DataGridView (ventana,
-            // barra lateral o splitter) se recalcula cuántas filas caben por página
-            // y se vuelve a la página 1 (ver CalcularTamanoPagina / Resize).
-            dgvPrestamos.Resize += DgvPrestamos_Resize;
+            // PAGINACIÓN DINÁMICA: al cambiar el tamaño del DataGridView (ventana,
+            // barra lateral o splitter) se recalcula el tamaño de página con la
+            // altura real y se recarga la página actual; si paginaActual queda
+            // fuera del nuevo total, CargarPrestamosActivos retrocede sola a la
+            // última página válida.
+            dgvPrestamos.SizeChanged += DgvPrestamos_SizeChanged;
 
             // Selección uniforme en TODA fila: azul oscuro institucional + texto blanco.
             // Es la fuente que consultan los manejadores CellFormatting (override).
@@ -155,8 +170,10 @@ namespace BibliotecaApp
             // Panel de campos sin scrollbar gris: Panel1 mide lo que realmente necesita
             AjustarSplitterAContenido();
 
-            // Paginación dinámica: filas que caben en la altura real del control
-            CalcularTamanoPagina();
+            // Paginación dinámica: recálculo con la altura real del control,
+            // justo antes de cargar los datos de la primera página
+            // (sin forzar página 1: aún no hay datos cargados).
+            RecalcularTamanoPagina();
             CargarPrestamosActivos();
         }
 
@@ -736,46 +753,57 @@ namespace BibliotecaApp
 
         /// <summary>
         /// PAGINACIÓN DINÁMICA: calcula cuántas filas caben realmente en el
-        /// DataGridView y lo asigna a tamanoPagina:
-        ///   (altura del control − altura del encabezado) / alto de fila − 1
-        /// El "-1" deja una fila de margen inferior. Mínimo 1 fila por página.
-        /// Devuelve true si el tamaño de página cambió respecto al anterior
-        /// (el llamador decide si reiniciar la página y recargar).
+        /// DataGridView con la altura real disponible en pantalla:
+        ///   filasPosibles = (altura cliente − altura encabezado) / alto de fila
+        ///   tamanoPagina  = Math.Max(1, filasPosibles)
+        /// Sin margen inferior: la última fila visible llega al borde inferior
+        /// del grid (elimina el espacio en blanco de la parte inferior).
+        /// Seguro: si el control aún no tiene layout conserva el tamaño actual,
+        /// y RowTemplate.Height tiene fallback si aún no está definido.
         /// </summary>
-        private bool CalcularTamanoPagina()
+        private void RecalcularTamanoPagina()
         {
-            // Sin layout todavía (control oculto o recién creado): conservar tamaño actual
-            int altura = dgvPrestamos.Height;
-            if (altura <= 0) return false;
-
             int altoFila = dgvPrestamos.RowTemplate.Height > 0
                 ? dgvPrestamos.RowTemplate.Height
                 : 20; // fallback si el alto de fila aún no está definido
 
-            int disponibles = altura - dgvPrestamos.ColumnHeadersHeight;
-            int filas = (disponibles / altoFila) - 1; // −1: margen inferior solicitado
+            int disponibles = dgvPrestamos.ClientSize.Height - dgvPrestamos.ColumnHeadersHeight;
+            if (disponibles <= 0) return; // sin layout todavía: conservar tamaño actual
 
-            int nuevoTamano = Math.Max(1, filas);     // nunca menos de 1 fila por página
-            if (nuevoTamano == tamanoPagina) return false;
-
-            tamanoPagina = nuevoTamano;
-            return true;
+            int filasPosibles = disponibles / altoFila;
+            tamanoPagina = Math.Max(1, filasPosibles); // nunca menos de 1 fila por página
         }
 
         /// <summary>
-        /// Resize del DataGridView (ventana, barra lateral o splitter): recalcula
-        /// el tamaño de página, vuelve a la página 1 y recarga los datos con el
-        /// LIMIT/OFFSET actualizado. Solo recarga si la capacidad de filas cambió:
-        /// durante el arrastre del resize se disparan decenas de eventos y
-        /// recargar en cada uno golpearía la BD sin necesidad.
+        /// Devuelve true si el tamaño de página cambió respecto al anterior
+        /// (el llamador decide si reiniciar la página y recargar).
+        /// Delega en RecalcularTamanoPagina para usar una única fórmula.
         /// </summary>
-        private void DgvPrestamos_Resize(object? sender, EventArgs e)
+        private bool CalcularTamanoPagina()
+        {
+            int anterior = tamanoPagina;
+            RecalcularTamanoPagina();
+            return tamanoPagina != anterior;
+        }
+
+        /// <summary>
+        /// SizeChanged del DataGridView (ventana, barra lateral o splitter):
+        /// recalcula el tamaño de página con la altura real y recarga la página
+        /// actual. No se fuerza la página 1: CargarPrestamosActivos ya acomoda
+        /// paginaActual a la última página válida si supera el nuevo total.
+        /// Solo recarga si la capacidad de filas cambió: durante el arrastre del
+        /// resize se disparan decenas de eventos y recargar en cada uno
+        /// golpearía la BD sin necesidad.
+        /// </summary>
+        private void DgvPrestamos_SizeChanged(object? sender, EventArgs e)
         {
             if (IsDisposed || Disposing) return;
-            if (!CalcularTamanoPagina()) return;
 
-            paginaActual = 1;
-            CargarPrestamosActivos();
+            int anterior = tamanoPagina;
+            RecalcularTamanoPagina();
+            if (tamanoPagina == anterior) return; // sin cambio de capacidad: nada que recargar
+
+            CargarPrestamosActivos(); // recalcula totalPaginas y acomoda paginaActual
         }
 
         /// <summary>

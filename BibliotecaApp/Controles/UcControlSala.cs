@@ -36,6 +36,15 @@ namespace BibliotecaApp
         {
             InitializeComponent();
 
+            // Género: únicamente "Masculino" y "Femenino" (se elimina la opción "Otro").
+            // Se limpian y repueblan los ítems en code-behind para sobreescribir
+            // cualquier cosa que venga del diseñador, sin tocar el .Designer.cs.
+            // SelectedIndex -1: sin preselección, la validación pide elegir género.
+            cboGenero.Items.Clear();
+            cboGenero.Items.Add("Masculino");
+            cboGenero.Items.Add("Femenino");
+            cboGenero.SelectedIndex = -1;
+
             // El ComboBox de títulos debe reflejar siempre la BD real: otros
             // módulos (p. ej. "Vaciar Inventario" en UcInventario) pueden borrar
             // libros mientras esta pantalla está oculta. Al volver a mostrarla se
@@ -76,10 +85,11 @@ namespace BibliotecaApp
             // para que el invariante no dependa del archivo Designer.
             dgvRegistros.RowHeadersVisible = false;
 
-            // PAGINACIÓN DINÁMICA: al cambiar la altura del DataGridView (ventana
-            // o splitter) se recalcula cuántas filas caben por página y se vuelve
-            // a la página 1 (ver CalcularTamanoPagina / Resize).
-            dgvRegistros.Resize += DgvRegistros_Resize;
+            // PAGINACIÓN DINÁMICA: al cambiar el tamaño del DataGridView (ventana
+            // o splitter) se recalcula el tamaño de página con la altura real y se
+            // recarga la página actual; si paginaActual queda fuera del nuevo
+            // total, CargarRegistros retrocede sola a la última página válida.
+            dgvRegistros.SizeChanged += DgvRegistros_SizeChanged;
         }
 
         /// <summary>
@@ -247,46 +257,56 @@ namespace BibliotecaApp
 
         /// <summary>
         /// PAGINACIÓN DINÁMICA: calcula cuántas filas caben realmente en el
-        /// DataGridView y lo asigna a tamanoPagina:
-        ///   (altura del control − altura del encabezado) / alto de fila − 1
-        /// El "-1" deja una fila de margen inferior. Mínimo 1 fila por página.
-        /// Devuelve true si el tamaño de página cambió respecto al anterior
-        /// (el llamador decide si reiniciar la página y recargar).
+        /// DataGridView con la altura real disponible en pantalla:
+        ///   filasPosibles = (altura cliente − altura encabezado) / alto de fila
+        ///   tamanoPagina  = Math.Max(1, filasPosibles)
+        /// Sin margen inferior: la última fila visible llega al borde inferior
+        /// del grid (elimina el espacio en blanco de la parte inferior).
+        /// Seguro: si el control aún no tiene layout conserva el tamaño actual,
+        /// y RowTemplate.Height tiene fallback si aún no está definido.
         /// </summary>
-        private bool CalcularTamanoPagina()
+        private void RecalcularTamanoPagina()
         {
-            // Sin layout todavía (control oculto o recién creado): conservar tamaño actual
-            int altura = dgvRegistros.Height;
-            if (altura <= 0) return false;
-
             int altoFila = dgvRegistros.RowTemplate.Height > 0
                 ? dgvRegistros.RowTemplate.Height
                 : 20; // fallback si el alto de fila aún no está definido
 
-            int disponibles = altura - dgvRegistros.ColumnHeadersHeight;
-            int filas = (disponibles / altoFila) - 1; // −1: margen inferior solicitado
+            int disponibles = dgvRegistros.ClientSize.Height - dgvRegistros.ColumnHeadersHeight;
+            if (disponibles <= 0) return; // sin layout todavía: conservar tamaño actual
 
-            int nuevoTamano = Math.Max(1, filas);     // nunca menos de 1 fila por página
-            if (nuevoTamano == tamanoPagina) return false;
-
-            tamanoPagina = nuevoTamano;
-            return true;
+            int filasPosibles = disponibles / altoFila;
+            tamanoPagina = Math.Max(1, filasPosibles); // nunca menos de 1 fila por página
         }
 
         /// <summary>
-        /// Resize del DataGridView (ventana o splitter): recalcula el tamaño de
-        /// página, vuelve a la página 1 y recarga los datos con el LIMIT/OFFSET
-        /// actualizado. Solo recarga si la capacidad de filas cambió: durante el
-        /// arrastre del resize se disparan decenas de eventos y recargar en cada
-        /// uno golpearía la BD sin necesidad.
+        /// Devuelve true si el tamaño de página cambió respecto al anterior
+        /// (el llamador decide si reiniciar la página y recargar).
+        /// Delega en RecalcularTamanoPagina para usar una única fórmula.
         /// </summary>
-        private void DgvRegistros_Resize(object? sender, EventArgs e)
+        private bool CalcularTamanoPagina()
+        {
+            int anterior = tamanoPagina;
+            RecalcularTamanoPagina();
+            return tamanoPagina != anterior;
+        }
+
+        /// <summary>
+        /// SizeChanged del DataGridView (ventana o splitter): recalcula el
+        /// tamaño de página con la altura real y recarga la página actual. No se
+        /// fuerza la página 1: CargarRegistros ya acomoda paginaActual a la
+        /// última página válida si supera el nuevo total. Solo recarga si la
+        /// capacidad de filas cambió: durante el arrastre del resize se disparan
+        /// decenas de eventos y recargar en cada uno golpearía la BD sin necesidad.
+        /// </summary>
+        private void DgvRegistros_SizeChanged(object? sender, EventArgs e)
         {
             if (IsDisposed || Disposing) return;
-            if (!CalcularTamanoPagina()) return;
 
-            paginaActual = 1;
-            CargarRegistros();
+            int anterior = tamanoPagina;
+            RecalcularTamanoPagina();
+            if (tamanoPagina == anterior) return; // sin cambio de capacidad: nada que recargar
+
+            CargarRegistros(); // recalcula totalPaginas y acomoda paginaActual
         }
 
         private void UcControlSala_VisibleChanged(object? sender, EventArgs e)
@@ -300,7 +320,10 @@ namespace BibliotecaApp
         {
             dtpFecha.Value = DateTime.Today;
             CargarTitulosDeLibros();
-            CalcularTamanoPagina(); // Paginación dinámica: filas que caben en la altura real
+            // Paginación dinámica: recálculo con la altura real del control,
+            // justo antes de cargar los datos de la primera página
+            // (sin forzar página 1: aún no hay datos cargados).
+            RecalcularTamanoPagina();
             CargarRegistros();
             ConfigurarEventosGrid();
             ConfigurarDragScroll(); // ← Habilita arrastre vertical con cursor
