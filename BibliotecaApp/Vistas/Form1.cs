@@ -39,9 +39,9 @@ namespace BibliotecaApp
             ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
             ConfigurarBotonMenu(btnEstadisticas, "Estadísticas");
 
-            // Botón Gestión de Usuarios (solo para Admin)
+            // Botón Cambiar Contraseña (antes "Gestión de Usuarios", solo para Admin)
             _btnGestionUsuarios = new Button();
-            ConfigurarBotonMenu(_btnGestionUsuarios, "Gestión de Usuarios");
+            ConfigurarBotonMenu(_btnGestionUsuarios, "Cambiar Contraseña");
             _btnGestionUsuarios.Click += (_, _) => MostrarGestionUsuarios();
             panelNav.Controls.Add(_btnGestionUsuarios);
             _btnGestionUsuarios.BringToFront(); // Lo coloca al final (arriba de Cerrar Sesión)
@@ -348,10 +348,84 @@ namespace BibliotecaApp
         }
 
         // ====================================================================
-        //  GESTIÓN DE USUARIOS (Solo Admin)
+        //  CAMBIAR CONTRASEÑA (antes Gestión de Usuarios, Solo Admin)
         // ====================================================================
         private void MostrarGestionUsuarios()
         {
+            // Validación previa por texto: evita abrir el formulario por accidente.
+            // Mini-modal code-behind (450x240, CenterParent) que exige escribir
+            // exactamente "cambiar contraseña" antes de continuar.
+            using (var confirmacion = new Form
+            {
+                Text = "Confirmación",
+                ClientSize = new Size(450, 240),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false
+            })
+            {
+                var lblAviso = new Label
+                {
+                    Text = "¿Desea cambiar la contraseña?\nEscriba 'cambiar contraseña' para continuar:",
+                    Location = new Point(30, 30),
+                    Size = new Size(390, 45),
+                    Font = EstiloUI.Etiqueta()
+                };
+
+                var txtFrase = new TextBox
+                {
+                    Location = new Point(30, 90),
+                    Width = 390,
+                    Font = EstiloUI.FuenteNormal
+                };
+                EstiloUI.EstilizarEntrada(txtFrase);
+
+                var btnContinuar = new Button
+                {
+                    Text = "Continuar",
+                    Size = new Size(120, 44),
+                    Location = new Point(180, 165),
+                    Cursor = Cursors.Hand
+                };
+                EstiloUI.EstilizarBotonPrimario(btnContinuar);
+
+                var btnCancelar = new Button
+                {
+                    Text = "Cancelar",
+                    Size = new Size(120, 44),
+                    Location = new Point(310, 165),
+                    Cursor = Cursors.Hand,
+                    DialogResult = DialogResult.Cancel
+                };
+                EstiloUI.EstilizarBotonSecundario(btnCancelar);
+
+                btnContinuar.Click += (_, _) =>
+                {
+                    // La frase se compara sin espacios exteriores y en minúsculas
+                    string texto = txtFrase.Text.Trim().ToLowerInvariant();
+                    if (texto == "cambiar contraseña")
+                    {
+                        confirmacion.DialogResult = DialogResult.OK; // cierra el mini-modal
+                    }
+                    else
+                    {
+                        MessageBox.Show("Texto incorrecto. Escriba 'cambiar contraseña' para continuar.",
+                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        // El mini-modal permanece abierto para reintentar
+                    }
+                };
+
+                confirmacion.Controls.AddRange(new Control[] { lblAviso, txtFrase, btnContinuar, btnCancelar });
+                confirmacion.AcceptButton = btnContinuar; // Enter valida
+                confirmacion.CancelButton = btnCancelar;  // Esc cancela
+
+                // SOLO con la frase correcta se procede al formulario original
+                if (confirmacion.ShowDialog(this) != DialogResult.OK)
+                    return;
+            }
+
             using var frm = new FormGestionUsuarios();
             frm.ShowDialog(this);
         }
