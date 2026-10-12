@@ -47,6 +47,16 @@ namespace BibliotecaApp
                 tlpCampos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
 
+            // TÍTULO DEL MÓDULO: texto conciso y fuente cacheada de 11pt
+            // (EstiloUI.FuenteSubtitulo en lugar de la fuente grande de
+            // TituloSeccion), centrado verticalmente en panelEncabezado (35 px)
+            // para no quedar flotando respecto a los controles colindantes.
+            lblSubtitulo.Text = "Control de Préstamos y Devoluciones";
+            lblSubtitulo.Font = EstiloUI.FuenteSubtitulo;
+            Size tamSubtitulo = lblSubtitulo.GetPreferredSize(Size.Empty);
+            lblSubtitulo.Location = new Point(16,
+                (panelEncabezado.Height - tamSubtitulo.Height) / 2);
+
             splitPrestamos.Dock = DockStyle.Fill;
             splitPrestamos.Orientation = Orientation.Horizontal;
 
