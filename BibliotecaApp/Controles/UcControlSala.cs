@@ -126,6 +126,16 @@ namespace BibliotecaApp
             btnEliminarPagina.Location = new Point(btnEliminar.Right + 8, btnEliminar.Top);
             panelBotones.Controls.Add(btnEliminarPagina);
             btnEliminarPagina.BringToFront();
+
+            // =================================================================
+            // PERMISOS DE INTERFAZ (RBAC): los controles de eliminación solo se
+            // exponen cuando la sesión activa es de Administrador. La visibilidad
+            // queda estrictamente igual al booleano de sesión (SesionGlobal.EsAdmin):
+            // un Operador nunca ve "Eliminar (fila)" ni "Eliminar página".
+            // =================================================================
+            bool esAdmin = SesionGlobal.EsAdmin;
+            btnEliminar.Visible = esAdmin;
+            btnEliminarPagina.Visible = esAdmin;
         }
 
         /// <summary>
