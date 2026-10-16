@@ -30,6 +30,7 @@ namespace BibliotecaApp
             try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { /* sin consola adjunta */ }
 
             InitializeComponent();
+            AsignarIconoAplicacion();
 
             // Configuración de UI dinámica
             ConfigurarBotonMenu(btnSala, "Control de Sala");
@@ -58,6 +59,33 @@ namespace BibliotecaApp
             // Timer de notificaciones: consulta los morosos al arrancar y cada intervalo.
             _timerAlertas = new System.Windows.Forms.Timer { Interval = 30000 };
             _timerAlertas.Tick += (_, _) => ActualizarContadorAlertas();
+        }
+
+        /// <summary>
+        /// Asigna el icono institucional CUBO a la barra de título con fallback seguro.
+        /// </summary>
+        private void AsignarIconoAplicacion()
+        {
+            try
+            {
+                // Prioridad 1: extraer el icono embebido en el .exe (ApplicationIcon del csproj).
+                this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            }
+            catch
+            {
+                try
+                {
+                    // Prioridad 2: cargar desde Recursos\app.ico junto al .exe.
+                    string rutaIcono = Path.Combine(AppContext.BaseDirectory, "Recursos", "app.ico");
+                    if (File.Exists(rutaIcono))
+                        this.Icon = new Icon(rutaIcono);
+                }
+                catch
+                {
+                    // Fallback: icono por defecto del sistema (no crashea).
+                    this.Icon = SystemIcons.Application;
+                }
+            }
         }
 
         // ------------------------------------------------------------------
