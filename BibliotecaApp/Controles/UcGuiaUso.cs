@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -56,8 +57,99 @@ namespace BibliotecaApp
                 ScrollBarsEnabled = true
             };
 
+            // Enlaces externos (http/https): se interceptan y abren en el
+            // navegador predeterminado del sistema, nunca dentro del formulario.
+            webBrowserManual.Navigating += WebBrowserManual_Navigating;
+            webBrowserManual.NewWindow += WebBrowserManual_NewWindow;
+            webBrowserManual.DocumentCompleted += WebBrowserManual_DocumentCompleted;
+
             Controls.Add(webBrowserManual);
             webBrowserManual.BringToFront();
+        }
+
+        /// <summary>
+        /// Abre una URL en el navegador externo predeterminado del sistema
+        /// (Chrome/Edge) mediante ShellExecute, exigido en .NET 5+.
+        /// </summary>
+        private static void AbrirEnNavegadorExterno(string url)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url)
+                {
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GuiaUso] No se pudo abrir el enlace externo: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Intercepta la navegación del propio control: cualquier enlace http/https
+        /// se cancela aquí y se deriva al navegador externo del usuario.
+        /// </summary>
+        private void WebBrowserManual_Navigating(object? sender, WebBrowserNavigatingEventArgs e)
+        {
+            string url = e.Url?.AbsoluteUri ?? string.Empty;
+            if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                e.Cancel = true;
+                AbrirEnNavegadorExterno(url);
+            }
+        }
+
+        /// <summary>
+        /// Los enlaces con target='_blank' solicitan una ventana nueva (evento
+        /// NewWindow, cuyo delegate solo expone CancelEventArgs): se cancela la
+        /// ventana interna y la apertura externa la resuelve el Click de cada
+        /// enlace capturado en DocumentCompleted.
+        /// </summary>
+        private void WebBrowserManual_NewWindow(object? sender, CancelEventArgs e)
+        {
+            e.Cancel = true;
+        }
+
+        /// <summary>
+        /// Al terminar de cargar el manual se suscribe el Click de cada enlace
+        /// del DOM para abrirlo en el navegador externo (los href son absolutos).
+        /// Se resta antes de sumar para evitar suscripciones dobles si el
+        /// documento se recarga (Load/Actualizar).
+        /// </summary>
+        private void WebBrowserManual_DocumentCompleted(object? sender, WebBrowserDocumentCompletedEventArgs e)
+        {
+            try
+            {
+                if (webBrowserManual?.Document == null) return;
+
+                foreach (HtmlElement enlace in webBrowserManual.Document.Links)
+                {
+                    enlace.Click -= EnlaceManual_Click;
+                    enlace.Click += EnlaceManual_Click;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GuiaUso] Error enlazando hipervínculos: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Clic en un enlace del manual: si es http/https, se abre directamente
+        /// en el navegador predeterminado del sistema (Chrome/Edge).
+        /// </summary>
+        private void EnlaceManual_Click(object? sender, EventArgs e)
+        {
+            if (sender is not HtmlElement enlace) return;
+
+            string href = enlace.GetAttribute("href") ?? string.Empty;
+            if (href.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                href.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                AbrirEnNavegadorExterno(href);
+            }
         }
 
         /// <summary>
@@ -160,6 +252,20 @@ namespace BibliotecaApp
         /* Ajuste de imagen más pequeña y centrada */
         .img-container {{ text-align: center; margin: 30px 0; }}
         img {{ max-width: 55%; height: auto; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px; }}
+        .firma-dev {{
+            text-align: center;
+            font-size: 11px;
+            color: #94a3b8; /* Gris intermedio: discreto pero legible */
+            margin-top: 80px;
+            padding-bottom: 10px;
+        }}
+        .firma-dev a {{
+            color: #94a3b8;
+            text-decoration: none;
+        }}
+        .firma-dev a:hover {{
+            color: #64748b; /* El cursor lo oscurece para dar retroalimentación */
+        }}
     </style>
 </head>
 <body>
@@ -259,6 +365,13 @@ namespace BibliotecaApp
     <p>Panel de control general. Usa los calendarios para seleccionar una fecha de ""Desde"" y ""Hasta"", presiona ""Filtrar"" y el sistema generará gráficas exactas mostrando cuántos hombres y mujeres visitaron la sala o se llevaron libros en ese periodo de tiempo. Ideal para los reportes mensuales de gestión.</p>
     <div class='img-container'>
         <img src='{uriImgEstadistica7}' alt='Pantalla de Estadísticas' style='max-width: 90%; margin-top: 10px;' />
+    </div>
+
+    <h3>4.6. Cambiar Contraseña</h3>
+    <p>Módulo para actualizar la credencial de acceso del sistema. Como medida de protección contra modificaciones accidentales, se mostrará una ventana de confirmación donde es obligatorio escribir la frase <b>'cambiar contraseña'</b> para poder habilitar el botón Continuar y proceder con el cambio.</p>
+
+    <div class='firma-dev'>
+        dev by <a href='https://github.com/Mirandasv001' target='_blank'>Erick Miranda</a> | ig: <a href='https://www.instagram.com/erick_miranda006' target='_blank'>@erick_miranda006</a>
     </div>
 
 </body>
