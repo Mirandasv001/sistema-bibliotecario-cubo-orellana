@@ -32,6 +32,9 @@ namespace BibliotecaApp
         // Espaciador invisible que empuja la paginación al extremo derecho del FlowLayoutPanel
         private Control? _espaciadorPaginacion;
 
+        // Botón "Eliminar página" (code-behind, misma lógica que UcPrestamosExternos)
+        private Button? btnEliminarPagina;
+
         public UcControlSala()
         {
             InitializeComponent();
@@ -90,6 +93,39 @@ namespace BibliotecaApp
             // recarga la página actual; si paginaActual queda fuera del nuevo
             // total, CargarRegistros retrocede sola a la última página válida.
             dgvRegistros.SizeChanged += DgvRegistros_SizeChanged;
+
+            // =================================================================
+            // BOTONES DE ELIMINACIÓN (code-behind, sin tocar el Designer)
+            // Textos y anchos forzados DESPUÉS de crear y estilizar: "Eliminar
+            // (fila)" 135 px y "Eliminar página" 160 px (más ancho, con aire
+            // para el rótulo), con 8 px de margen entre ambos y altura idéntica
+            // a btnEliminar (40 px). Verificado en el archivo: no hay
+            // AplicarPermisos()/ActualizarBotones()/Load que reasigne Text o
+            // Width de estos botones (solo se configuran aquí). Fila completa:
+            // 14..854, dentro de los 880 px de ancho comprobados visibles en
+            // panelBotones.
+            // =================================================================
+            btnRegistrar.Location = new Point(14, 8);           // 14..184
+            btnMarcarDevolucion.Location = new Point(208, 8);   // 208..383
+            btnModificar.Location = new Point(407, 8);          // 407..527
+
+            btnEliminar.Text = "Eliminar (fila)";
+            btnEliminar.Width = 135;                            // 551..686
+            btnEliminar.Location = new Point(551, 8);
+
+            btnEliminarPagina = new Button
+            {
+                Name = "btnEliminarPagina",
+                UseVisualStyleBackColor = false
+            };
+            EstiloUI.EstilizarBotonSecundario(btnEliminarPagina);
+            btnEliminarPagina.Click += btnEliminarPagina_Click;
+            btnEliminarPagina.Text = "Eliminar página";
+            btnEliminarPagina.Width = 160;                      // 694..854
+            btnEliminarPagina.Height = btnEliminar.Height;
+            btnEliminarPagina.Location = new Point(btnEliminar.Right + 8, btnEliminar.Top);
+            panelBotones.Controls.Add(btnEliminarPagina);
+            btnEliminarPagina.BringToFront();
         }
 
         /// <summary>
@@ -861,6 +897,106 @@ namespace BibliotecaApp
                 MessageBox.Show("Error al modificar el registro: " + ex.Message,
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        // ------------------------------------------------------------------
+        //  Eliminar página: borra en bloque la página visible (estilo UcPrestamosExternos)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Autenticación de Administrador (mismo modal que "Eliminar") antes de
+        /// eliminar en bloque la página visible. Si el modal no devuelve
+        /// DialogResult.OK (credenciales incorrectas o cierre del diálogo),
+        /// se aborta sin ejecutar nada.
+        /// </summary>
+        private void btnEliminarPagina_Click(object? sender, EventArgs e)
+        {
+            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
+            {
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
+            }
+
+            EliminarPaginaActual();
+        }
+
+        /// <summary>
+        /// Elimina en bloque (DELETE parametrizado + transacción) los registros de
+        /// la página visible y recarga la grilla. Si la página eliminada era la
+        /// última, CargarRegistros() retrocede a la nueva última página válida.
+        /// </summary>
+        private void EliminarPaginaActual()
+        {
+            // 1) Instantánea de los IDs de la página activa ANTES de tocar la BD
+            var idsPagina = new List<long>();
+            foreach (DataGridViewRow fila in dgvRegistros.Rows)
+            {
+                if (fila.IsNewRow) continue;
+
+                object? valorId = fila.Cells["ID"].Value;
+                if (valorId != null && valorId != DBNull.Value
+                    && long.TryParse(valorId.ToString(), out long id))
+                {
+                    idsPagina.Add(id);
+                }
+            }
+
+            if (idsPagina.Count == 0)
+            {
+                MessageBox.Show("La página actual no tiene registros para eliminar.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // 2) Confirmación explícita con la cantidad de registros (eliminación definitiva)
+            DialogResult confirmar = MessageBox.Show(
+                $"Se eliminarán {idsPagina.Count} registro(s) de la página actual.\n" +
+                "Esta acción no se puede deshacer. ¿Continuar?",
+                "Biblioteca CUBO", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (confirmar != DialogResult.Yes) return;
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var transaccion = conexion.BeginTransaction();
+                int eliminados;
+                try
+                {
+                    // DELETE parametrizado reutilizando un único parámetro
+                    using var comando = conexion.CreateCommand();
+                    comando.Transaction = transaccion;
+                    comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
+
+                    var parametro = comando.CreateParameter();
+                    parametro.ParameterName = "$id";
+                    comando.Parameters.Add(parametro);
+
+                    eliminados = 0;
+                    foreach (long id in idsPagina)
+                    {
+                        parametro.Value = id;
+                        eliminados += comando.ExecuteNonQuery();
+                    }
+
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw; // el catch exterior muestra el error unificado
+                }
+
+                MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar la página: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            // 3) Recargar: recalcula totalPaginas y acomoda paginaActual si era la última
+            CargarRegistros();
         }
 
         // ------------------------------------------------------------------
