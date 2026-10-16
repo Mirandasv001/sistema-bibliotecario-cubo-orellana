@@ -1032,8 +1032,10 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Elimina en bloque (DELETE parametrizado + transacción) los registros de
-        /// la página visible y recarga el grid. Si la página eliminada era la
-        /// última, CargarPrestamosActivos() regresa a la nueva última página.
+        /// la página visible y recarga el grid. Solo purga el historial en estado
+        /// 'Entregado'; los préstamos activos (Pendiente/Renovado) se conservan
+        /// y sus libros quedan protegidos. Si la página eliminada era la última,
+        /// CargarPrestamosActivos() regresa a la nueva última página.
         /// </summary>
         private void EliminarPaginaActual()
         {
@@ -1058,9 +1060,12 @@ namespace BibliotecaApp
                 return;
             }
 
-            // 2) Confirmación (la eliminación es definitiva)
+            // 2) Confirmación (la eliminación es definitiva; solo aplica a
+            //    préstamos en estado 'Entregado', los activos se conservan)
             DialogResult confirmar = MessageBox.Show(
-                $"Se eliminarán {idsPagina.Count} registro(s) de la página actual.\n" +
+                $"Se eliminarán los préstamos ya entregados de la página actual " +
+                $"(hasta {idsPagina.Count} registro(s)).\n" +
+                "Los préstamos activos (Pendiente/Renovado) no se eliminan. " +
                 "Esta acción no se puede deshacer. ¿Continuar?",
                 "Biblioteca CUBO", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
@@ -1073,10 +1078,14 @@ namespace BibliotecaApp
                 int eliminados;
                 try
                 {
-                    // DELETE parametrizado reutilizando un único parámetro
+                    // DELETE parametrizado reutilizando un único parámetro.
+                    // Condición de integridad: solo se purgan préstamos YA
+                    // entregados; los activos (Pendiente/Renovado) y sus libros
+                    // quedan intactos (mismo guard que el borrado individual).
                     using var comando = conexion.CreateCommand();
                     comando.Transaction = transaccion;
-                    comando.CommandText = "DELETE FROM PrestamosExternos WHERE ID = $id;";
+                    comando.CommandText =
+                        "DELETE FROM PrestamosExternos WHERE ID = $id AND EstadoLibro = 'Entregado';";
 
                     var parametro = comando.CreateParameter();
                     parametro.ParameterName = "$id";
@@ -1097,8 +1106,21 @@ namespace BibliotecaApp
                     throw; // el catch exterior muestra el error unificado
                 }
 
-                MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos.",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (eliminados == 0)
+                {
+                    MessageBox.Show(
+                        "No hay préstamos en estado 'Entregado' en la página actual; " +
+                        "los préstamos activos (Pendiente/Renovado) no se eliminan en bloque.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    string conservados = eliminados < idsPagina.Count
+                        ? $" Se conservaron {idsPagina.Count - eliminados} préstamo(s) activo(s)."
+                        : string.Empty;
+                    MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos." + conservados,
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
             catch (Exception ex)
             {

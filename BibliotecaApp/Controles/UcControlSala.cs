@@ -933,6 +933,9 @@ namespace BibliotecaApp
         /// Elimina en bloque (DELETE parametrizado + transacción) los registros de
         /// la página visible y recarga la grilla. Si la página eliminada era la
         /// última, CargarRegistros() retrocede a la nueva última página válida.
+        /// Sincroniza el inventario: cada registro borrado que seguía 'En lectura'
+        /// libera su ejemplar en Libros ('En Sala' → 'Disponible'), igual que el
+        /// borrado individual de la fila.
         /// </summary>
         private void EliminarPaginaActual()
         {
@@ -970,12 +973,23 @@ namespace BibliotecaApp
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var transaccion = conexion.BeginTransaction();
                 int eliminados;
+                int liberados = 0;
                 try
                 {
+                    // Lectura autoritativa de estado/título ANTES de borrar cada fila
+                    using var leerEstado = conexion.CreateCommand();
+                    leerEstado.Transaction = transaccion;
+                    leerEstado.CommandText =
+                        "SELECT TituloLibro, HoraRecibido FROM ControlUsuariosSala WHERE ID = $id;";
+
                     // DELETE parametrizado reutilizando un único parámetro
                     using var comando = conexion.CreateCommand();
                     comando.Transaction = transaccion;
                     comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
+
+                    var parametroLectura = leerEstado.CreateParameter();
+                    parametroLectura.ParameterName = "$id";
+                    leerEstado.Parameters.Add(parametroLectura);
 
                     var parametro = comando.CreateParameter();
                     parametro.ParameterName = "$id";
@@ -984,8 +998,36 @@ namespace BibliotecaApp
                     eliminados = 0;
                     foreach (long id in idsPagina)
                     {
+                        // 1) Leer estado y título del registro antes de eliminarlo
+                        parametroLectura.Value = id;
+                        string tituloLibro = string.Empty;
+                        bool estabaEnLectura = false;
+
+                        using (var lector = leerEstado.ExecuteReader())
+                        {
+                            if (lector.Read())
+                            {
+                                tituloLibro = lector["TituloLibro"]?.ToString() ?? string.Empty;
+                                estabaEnLectura = string.Equals(
+                                    lector["HoraRecibido"]?.ToString(),
+                                    EstadoEnLectura, StringComparison.OrdinalIgnoreCase);
+                            }
+                        }
+
+                        // 2) Eliminar el registro de la sala
                         parametro.Value = id;
-                        eliminados += comando.ExecuteNonQuery();
+                        int borrados = comando.ExecuteNonQuery();
+                        eliminados += borrados;
+
+                        // 3) Sincronizar el inventario: si el registro seguía 'En lectura',
+                        //    liberar su ejemplar ('En Sala' → 'Disponible'). Los ya devueltos
+                        //    liberaron su ejemplar al registrarse la devolución y
+                        //    LiberarEjemplarEnSala es idempotente ante registros legados.
+                        if (borrados > 0 && estabaEnLectura && tituloLibro.Length > 0)
+                        {
+                            LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
+                            liberados++;
+                        }
                     }
 
                     transaccion.Commit();
@@ -996,7 +1038,10 @@ namespace BibliotecaApp
                     throw; // el catch exterior muestra el error unificado
                 }
 
-                MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos.",
+                string detalleLiberacion = liberados > 0
+                    ? $" Se liberaron {liberados} ejemplar(es) en el inventario."
+                    : string.Empty;
+                MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos." + detalleLiberacion,
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
