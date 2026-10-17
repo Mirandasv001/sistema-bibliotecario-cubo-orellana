@@ -37,7 +37,7 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 
 | Módulo de Inventario | Módulo de Préstamos Externos |
 | :---: | :---: |
-| <img width="1917" height="965" alt="image" src="https://github.com/user-attachments/assets/716f5f71-7c46-47eb-a6dd-7269de7e035b" /> | <img width="1917" height="970" alt="image" src="https://github.com/user-attachments/assets/db5d364b-1e67-4b72-b2f9-4fdb5901b119" />|
+| <img width="1917" height="958" alt="image" src="https://github.com/user-attachments/assets/a01a9c1f-d6fb-40a7-a2d0-a5dcc01d0ee2" />| <img width="1917" height="970" alt="image" src="https://github.com/user-attachments/assets/db5d364b-1e67-4b72-b2f9-4fdb5901b119" />|
 
 | Login | Control de Sala |
 | :---: | :---: |
