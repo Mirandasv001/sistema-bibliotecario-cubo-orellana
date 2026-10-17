@@ -152,87 +152,41 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Copia una imagen de Recursos a %TEMP% con un nombre seguro (solo
-        /// letras/dígitos, sin espacios) y devuelve su URI file:/// absoluta,
-        /// formato que el motor IE del WebBrowser sí carga dentro de
-        /// DocumentText. Resuelve primero junto al .exe y luego hacia el
-        /// código fuente. Devuelve cadena vacía si la imagen no existe.
-        /// </summary>
-        private static string PrepararUriImagen(string nombreArchivo)
-        {
-            try
-            {
-                // 1) Resolver el origen: junto al .exe o fallback a ..\..\..\Recursos
-                string rutaOrigen = Path.Combine(AppContext.BaseDirectory, "Recursos", nombreArchivo);
-                if (!File.Exists(rutaOrigen))
-                {
-                    string rutaFuente = Path.GetFullPath(
-                        Path.Combine(AppContext.BaseDirectory, @"..\..\..\Recursos", nombreArchivo));
-                    if (File.Exists(rutaFuente))
-                    {
-                        rutaOrigen = rutaFuente;
-                    }
-                }
-
-                // 2) Nombre seguro en %TEMP% (sin espacios ni acentos)
-                string nombreSeguro = "cubo_guia_";
-                foreach (char c in Path.GetFileName(nombreArchivo))
-                {
-                    bool valido = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                                  || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
-                    nombreSeguro += valido ? c : '_';
-                }
-                string rutaDestino = Path.Combine(Path.GetTempPath(), nombreSeguro);
-
-                // 3) Copiar (si IE retiene una sesión anterior, se reutiliza el ya existente)
-                if (File.Exists(rutaOrigen))
-                {
-                    try
-                    {
-                        File.Copy(rutaOrigen, rutaDestino, true);
-                    }
-                    catch
-                    {
-                        // Copia bloqueada: si el archivo de Temp ya existe, es válido
-                    }
-                }
-
-                // 4) Devolver la URI estandarizada (file:/// con %20 donde haga falta)
-                if (File.Exists(rutaDestino))
-                {
-                    string uri = new Uri(rutaDestino).AbsoluteUri;
-                    System.Diagnostics.Debug.WriteLine($"[GuiaUso] URI de '{nombreArchivo}': {uri}");
-                    return uri;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"[GuiaUso] Imagen NO encontrada: {nombreArchivo}");
-                return string.Empty;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[GuiaUso] Error preparando '{nombreArchivo}': {ex.Message}");
-                return string.Empty;
-            }
-        }
-
         private void CargarManual()
         {
             try
             {
                 if (webBrowserManual == null) return;
 
-                // --- Imágenes servidas desde %TEMP% con nombres seguros (sin espacios):
-                //     generan URIs file:/// absolutas que el motor IE sí renderiza.
-                //     (Nota: en disco "Imagen 4" es .jpg, no .png.)
-                string uriImagen = PrepararUriImagen("MODULO CUBO.jpg");
-                string uriImgExcel1 = PrepararUriImagen("formato_excel 1.png");
-                string uriImgExcel2 = PrepararUriImagen("formato sin encabezados 2.png");
-                string uriImgExcel3 = PrepararUriImagen("guardar como csv 3.png");
-                string uriImgExcel4 = PrepararUriImagen("Imagen 4.jpg");
-                string uriImgExcel5 = PrepararUriImagen("Inventario cargado 5.png");
-                string uriImgAlertas6 = PrepararUriImagen("Alerta 6.jpg"); // en disco: Alerta 6.jpg (versión nítida)
-                string uriImgEstadistica7 = PrepararUriImagen("Estadistica 7.png");
+                // --- Imágenes incrustadas en el HTML como Data URI Base64, leídas
+                //     en memoria desde Recursos (junto al .exe). Así viajan dentro
+                //     del propio documento: sin %TEMP%, sin permisos de disco y a
+                //     salvo de la limpieza automática de Windows en otra PC.
+                //     (Nota: en disco "Imagen 4" y "Alerta 6" son .jpg, no .png.)
+                string uriImagen = string.Empty;
+                string uriImgExcel1 = string.Empty;
+                string uriImgExcel2 = string.Empty;
+                string uriImgExcel3 = string.Empty;
+                string uriImgExcel4 = string.Empty;
+                string uriImgExcel5 = string.Empty;
+                string uriImgAlertas6 = string.Empty;
+                string uriImgEstadistica7 = string.Empty;
+                try
+                {
+                    uriImagen = "data:image/jpeg;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "MODULO CUBO.jpg")));
+                    uriImgExcel1 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "formato_excel 1.png")));
+                    uriImgExcel2 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "formato sin encabezados 2.png")));
+                    uriImgExcel3 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "guardar como csv 3.png")));
+                    uriImgExcel4 = "data:image/jpeg;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Imagen 4.jpg")));
+                    uriImgExcel5 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Inventario cargado 5.png")));
+                    uriImgAlertas6 = "data:image/jpeg;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Alerta 6.jpg")));
+                    uriImgEstadistica7 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Estadistica 7.png")));
+                }
+                catch (Exception exImg)
+                {
+                    // Archivo faltante o ilegible: su <img> queda vacía, pero el manual carga igual
+                    System.Diagnostics.Debug.WriteLine($"[GuiaUso] Error codificando imágenes: {exImg.Message}");
+                }
 
                 string html = $@"
 <!DOCTYPE html>
