@@ -45,8 +45,7 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 
 | Alertas de Vencidos | Estadísticas |
 | :---: | :---: |
-| <img width="1916" height="687" alt="image" src="https://github.com/user-attachments/assets/f8a3cc0e-1a4f-42ae-b2e0-78d6bf3139a0" />
- | <img width="1905" height="1005" alt="image" src="https://github.com/user-attachments/assets/1291f54a-dfb6-419b-965a-b0fa0f2c39bb" />|
+| <img width="1916" height="687" alt="image" src="https://github.com/user-attachments/assets/f8a3cc0e-1a4f-42ae-b2e0-78d6bf3139a0" /> | <img width="1905" height="1005" alt="image" src="https://github.com/user-attachments/assets/1291f54a-dfb6-419b-965a-b0fa0f2c39bb" />|
 
 | Guía de Uso |
 | :---: |
