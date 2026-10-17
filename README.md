@@ -51,7 +51,7 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 | :---: |
 | <img width="1917" height="866" alt="image" src="https://github.com/user-attachments/assets/77b304fc-6865-4e0a-bf62-6121de4385e8" />|
 
-> 📂 **¿Dónde van las capturas?** En la carpeta **`docs/capturas/`** de este repositorio, con estos nombres exactos: `01-login.png`, `03-control-sala.png`, `05-alertas-vencidos.png`, `06-estadisticas.png` y `07-guia-de-uso.png`. Las dos primeras (Inventario y Préstamos) ya están alojadas en GitHub.
+
 
 ---
 
