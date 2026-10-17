@@ -831,9 +831,11 @@ namespace BibliotecaApp
                 numEdad.Value = edad;
             }
 
+            // Proveedor InvariantCulture: strftime fija 'dd/MM/yyyy' con '/', por lo
+            // que el parseo no debe depender del separador de la región de Windows.
             if (DateTime.TryParseExact(fila.Cells["Fecha"].Value?.ToString(),
-                    "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None,
-                    out DateTime fecha))
+                    "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out DateTime fecha))
             {
                 dtpFecha.Value = fecha;
             }

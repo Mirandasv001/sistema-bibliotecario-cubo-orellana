@@ -1563,8 +1563,9 @@ namespace BibliotecaApp
                             return;
                         }
 
-                        // Actualizar datos del préstamo
-                        ActualizarDatosPrestamo(conexion, transaccion, id);
+                        // Actualizar datos del préstamo (persistiendo el nuevo
+                        // CodigoLibro para que la devolución libere el ejemplar correcto)
+                        ActualizarDatosPrestamo(conexion, transaccion, id, codigoNuevo);
 
                         // Liberar ejemplar viejo SOLO si ningún otro préstamo activo lo retiene.
                         if (!string.IsNullOrEmpty(codigoViejo))
@@ -1626,12 +1627,23 @@ namespace BibliotecaApp
         /// <summary>
         /// Ejecuta el UPDATE de los campos del formulario en PrestamosExternos.
         /// Se separa para reutilizar dentro de transacciones con manejo de inventario.
+        /// Si se indica <paramref name="codigoLibro"/>, también persiste el código
+        /// del ejemplar (caso: cambió el título y el préstamo ahora retiene al
+        /// ejemplar nuevo). Si es null, CodigoLibro queda intacto.
         /// </summary>
-        private void ActualizarDatosPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id)
+        private void ActualizarDatosPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id, string? codigoLibro = null)
         {
             using var cmd = conexion.CreateCommand();
             cmd.Transaction = transaccion;
-            cmd.CommandText = @"
+
+            // Auditoría F1: sin persistir CodigoLibro, al cambiar el título la
+            // devolución liberaba el ejemplar viejo y el nuevo quedaba 'Prestado'
+            // para siempre (libro fantasma).
+            string columnaCodigo = codigoLibro == null
+                ? string.Empty
+                : ",\n                    CodigoLibro     = $codigoLibro";
+
+            cmd.CommandText = $@"
                 UPDATE PrestamosExternos SET
                     NombreUsuario   = $nombre,
                     Correo          = $correo,
@@ -1643,7 +1655,7 @@ namespace BibliotecaApp
                     FechaPrestamo   = $fechaPrestamo,
                     PersonalPresto  = $personalPresto,
                     FechaEntrega    = $fechaEntrega,
-                    EstadoLibro     = $estado
+                    EstadoLibro     = $estado{columnaCodigo}
                 WHERE ID = $id;";
 
             cmd.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
@@ -1658,6 +1670,8 @@ namespace BibliotecaApp
             cmd.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("$estado",
                 string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
+            if (codigoLibro != null)
+                cmd.Parameters.AddWithValue("$codigoLibro", codigoLibro);
             cmd.Parameters.AddWithValue("$id", id);
             cmd.ExecuteNonQuery();
         }
@@ -1984,15 +1998,18 @@ namespace BibliotecaApp
 
                 // Fechas desde la BD protegidas con FechaSegura: la BD puede contener
                 // fechas no inicializadas (0001-01-01) que el control no admite.
-                if (DateTime.TryParse(fila["FechaPrestamo"]?.ToString(), out var fp))
-                    dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, fp);
+                // Parseo independiente de la región (ISO) con fallback regional.
+                DateTime? fp = FechaDesdeTexto(fila["FechaPrestamo"]?.ToString());
+                if (fp.HasValue)
+                    dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, fp.Value);
 
                 txtPersonalPresto.Text = fila["PersonalPresto"]?.ToString() ?? "";
 
                 txtEstado.Text = fila["EstadoLibro"]?.ToString() ?? "Pendiente";
 
-                if (DateTime.TryParse(fila["FechaEntrega"]?.ToString(), out var fe))
-                    dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, fe);
+                DateTime? fe = FechaDesdeTexto(fila["FechaEntrega"]?.ToString());
+                if (fe.HasValue)
+                    dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, fe.Value);
 
                 // Seleccionar el título en el ComboBox (por texto).
                 txtTituloLibro.Text = tituloLibro;
@@ -2046,6 +2063,27 @@ namespace BibliotecaApp
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             control.Focus();
             return false;
+        }
+
+        /// <summary>
+        /// Convierte una fecha proveniente de la BD en DateTime de forma
+        /// independiente de la configuración regional de Windows: primero intenta
+        /// el formato ISO (yyyy-MM-dd, el que guarda la BD) con InvariantCulture;
+        /// si no, reintenta con la cultura regional por compatibilidad con
+        /// registros legados. Devuelve null si no es parseable.
+        /// </summary>
+        private static DateTime? FechaDesdeTexto(string? texto)
+        {
+            if (string.IsNullOrWhiteSpace(texto)) return null;
+
+            if (DateTime.TryParse(texto, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out DateTime fechaIso))
+                return fechaIso;
+
+            if (DateTime.TryParse(texto, out DateTime fechaRegional))
+                return fechaRegional;
+
+            return null;
         }
 
         /// <summary>

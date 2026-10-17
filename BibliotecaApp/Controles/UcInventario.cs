@@ -651,6 +651,40 @@ namespace BibliotecaApp
                 return;
             }
 
+            // --- INTEGRIDAD (auditoría F1): no borrar libros con préstamo activo.
+            // Si se borrara, la devolución futura quedaría bloqueada para siempre
+            // (UPDATE sobre un código inexistente → rollback eterno del cierre).
+            try
+            {
+                using var conexionVerificacion = ConexionDB.ObtenerConexion();
+                using var cmdVerificar = conexionVerificacion.CreateCommand();
+                cmdVerificar.CommandText = @"
+                    SELECT COUNT(*) FROM PrestamosExternos
+                    WHERE EstadoLibro IN ('Pendiente', 'Renovado')
+                      AND (CodigoLibro = @codigo
+                           OR ((CodigoLibro IS NULL OR CodigoLibro = '')
+                               AND TituloLibro =
+                                   (SELECT Titulo FROM Libros WHERE Codigo = @codigo)));";
+                cmdVerificar.Parameters.AddWithValue("@codigo", codigo);
+                long activos = Convert.ToInt64(cmdVerificar.ExecuteScalar() ?? 0L);
+
+                if (activos > 0)
+                {
+                    MessageBox.Show(
+                        $"No se puede eliminar el libro \"{codigo}\": tiene {activos} préstamo(s) activo(s) (Pendiente/Renovado).\n\n" +
+                        "Registra primero la devolución o renueva/cierra el préstamo; " +
+                        "de lo contrario el registro quedaría bloqueado para siempre.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("No se pudo verificar si el libro tiene préstamos activos:\n" + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             // --- Autenticación de seguridad (mismo modal que Préstamos: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
@@ -1006,6 +1040,34 @@ namespace BibliotecaApp
         // ====================================================================
         private void BtnVaciarInventario_Click(object? sender, EventArgs e)
         {
+            // --- INTEGRIDAD (auditoría F1): bloquear el vaciado si existen
+            // préstamos activos; borrar el inventario dejaría esos ejemplares
+            // como "fantasma" y sus devoluciones imposibles de cerrar.
+            try
+            {
+                using var conexionVerificacion = ConexionDB.ObtenerConexion();
+                using var cmdVerificar = conexionVerificacion.CreateCommand();
+                cmdVerificar.CommandText =
+                    "SELECT COUNT(*) FROM PrestamosExternos WHERE EstadoLibro IN ('Pendiente', 'Renovado');";
+                long activos = Convert.ToInt64(cmdVerificar.ExecuteScalar() ?? 0L);
+
+                if (activos > 0)
+                {
+                    MessageBox.Show(
+                        $"No se puede vaciar el inventario: existen {activos} préstamo(s) activo(s) (Pendiente/Renovado).\n\n" +
+                        "Registra primero las devoluciones pendientes; si no, esos libros " +
+                        "quedarían bloqueados y sin poder devolverse nunca.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("No se pudo verificar el estado de los préstamos:\n" + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             // --- Autenticación de seguridad (mismo modal que Control de Sala: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
