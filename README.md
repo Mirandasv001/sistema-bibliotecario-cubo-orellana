@@ -1,6 +1,6 @@
 # Sistema de Gestión Bibliotecaria — CUBO Ing. Rigoberto Orellana
 
-Sistema de escritorio integral desarrollado en **C# (.NET WinForms)** para la digitalización, control de inventario y trazabilidad operativa de préstamos en el Centro Urbano de Bienestar y Oportunidades (CUBO).
+Sistema de escritorio integral desarrollado en **C# (.NET 10 WinForms)** para la digitalización, control de inventario y trazabilidad operativa de préstamos en el Centro Urbano de Bienestar y Oportunidades (CUBO).
 
 ---
 
@@ -16,16 +16,19 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 * **Flujo Seguro de Préstamos Externos:** Transferencia automática de datos desde el inventario hacia el módulo de préstamos mediante interacción directa (doble clic), previniendo errores humanos de digitación.
 * **Interfaz Dinámica (UI/UX Adaptativa):** Implementación de `SplitContainer` horizontal que permite expandir o contraer la vista de datos estilo terminal, con desplazamiento vertical nativo.
 * **Control de Devoluciones y Renovaciones:** Registro granular de fechas, personal a cargo y actualización automática del estado del ejemplar.
-* **Módulo de Alertas de Vencimiento:** Monitoreo y control de préstamos con fecha de entrega expirada.
+* **Módulo de Alertas de Vencimiento:** Monitoreo y control de préstamos con fecha de entrega expirada, con cálculo de días de retraso según la hora local.
 * **Guía de Uso Integrada:** Documentación de procesos accesible directamente desde la barra lateral del sistema.
+* **Control de Acceso:** Autenticación de usuarios con perfiles de Administrador y Operador.
+* **Instalador Autónomo:** Paquete de instalación para Windows que incluye el motor .NET 10, sin descargas adicionales.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-* **Lenguaje:** C# (.NET)
+* **Lenguaje:** C# (.NET 10)
 * **Interfaz Gráfica:** Windows Forms (WinForms) con diseño modular basado en `UserControls`
-* **Persistencia de Datos:** Base de datos relacional (SQLite / ADO.NET)
+* **Persistencia de Datos:** SQLite (`Microsoft.Data.Sqlite`) — la base se crea automáticamente en `%APPDATA%\BibliotecaCUBO`
+* **Empaquetado:** `dotnet publish` (self-contained) + Inno Setup 6
 * **Control de Versiones:** Git / GitHub
 
 ---
@@ -34,28 +37,55 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 
 | Módulo de Inventario | Módulo de Préstamos Externos |
 | :---: | :---: |
-| <img width="1354" height="695" alt="image" src="https://github.com/user-attachments/assets/da690040-9882-43f9-beff-e413463016f8" />| <img width="1362" height="541" alt="image" src="https://github.com/user-attachments/assets/5aa81144-af5c-4a9a-839c-6285c3a31d6e" />|
+| <img width="620" alt="Inventario" src="https://github.com/user-attachments/assets/da690040-9882-43f9-beff-e413463016f8" /> | <img width="620" alt="Préstamos Externos" src="https://github.com/user-attachments/assets/5aa81144-af5c-4a9a-839c-6285c3a31d6e" /> |
+
+| Login | Control de Sala |
+| :---: | :---: |
+| <img width="620" alt="Login" src="docs/capturas/01-login.png" /> | <img width="620" alt="Control de Sala" src="docs/capturas/03-control-sala.png" /> |
+
+| Alertas de Vencidos | Estadísticas |
+| :---: | :---: |
+| <img width="620" alt="Alertas de Vencidos" src="docs/capturas/05-alertas-vencidos.png" /> | <img width="620" alt="Estadísticas" src="docs/capturas/06-estadisticas.png" /> |
+
+| Guía de Uso |
+| :---: |
+| <img width="620" alt="Guía de Uso" src="docs/capturas/07-guia-de-uso.png" /> |
+
+> 📂 **¿Dónde van las capturas?** En la carpeta **`docs/capturas/`** de este repositorio, con estos nombres exactos: `01-login.png`, `03-control-sala.png`, `05-alertas-vencidos.png`, `06-estadisticas.png` y `07-guia-de-uso.png`. Las dos primeras (Inventario y Préstamos) ya están alojadas en GitHub.
 
 ---
 
 ## ⚙️ Instalación y Ejecución
 
-### Prerrequisitos
-* Sistema Operativo: Windows 10 / 11
-* [.NET Desktop Runtime](https://dotnet.microsoft.com/download) / Visual Studio 2022 con carga de trabajo de escritorio .NET
+### Opción A — Usuario final (recomendada)
 
-### Pasos
+1. Descargar `BibliotecaCUBO-Instalador-1.0.exe` desde la sección **Releases** de GitHub.
+2. Ejecutar el instalador y seguir el asistente (crea accesos directos en el menú de inicio y, opcionalmente, en el escritorio).
+3. Listo: **no requiere instalar .NET ni ningún componente adicional**, el motor viene incluido.
+
+> 💾 Los datos se guardan en `%APPDATA%\BibliotecaCUBO\biblioteca.db` (carpeta del usuario, sin permisos de administración).
+
+### Opción B — Desarrolladores (desde el código fuente)
+
+**Prerrequisitos:**
+* Sistema Operativo: Windows 10 / 11 (x64)
+* [.NET 10 SDK](https://dotnet.microsoft.com/download) o Visual Studio 2022+ con la carga de trabajo de escritorio .NET
+
+**Pasos:**
 1. **Clonar el repositorio:**
    ```bash
-   git clone [https://github.com/Mirandasv001/sistema-bibliotecario-cubo-orellana.git](https://github.com/Mirandasv001/sistema-bibliotecario-cubo-orellana.git)
+   git clone https://github.com/Mirandasv001/sistema-bibliotecario-cubo-orellana.git
+   ```
+2. **Abrir la solución:** abrir el archivo `BibliotecaApp.slnx` en Visual Studio.
+3. **Compilar y ejecutar:** presionar `F5` o seleccionar *Compilar > Compilar Solución*.
+4. **Generar el instalador** (opcional): ejecutar `dotnet publish -c Release -r win-x64 --self-contained true` y luego compilar `Instalar-BibliotecaCUBO.iss` con Inno Setup 6.
 
-Abrir la solución:
-Abrir el archivo .sln en Visual Studio.
+**Credenciales de prueba:** el sistema crea por defecto un usuario Administrador (`AdminCubo` / `Admin123$`) y un Operador (`UserCubo` / `1234$`).
 
-Compilar y Ejecutar:
-Presionar F5 o seleccionar Compilar > Compilar Solución.
+---
 
-👤 Autor
-Erick Miranda — @Mirandasv001
+## 👤 Autor
+
+**Erick Miranda** — [@Mirandasv001](https://github.com/Mirandasv001)
 
 Estudiante de Ingeniería en Desarrollo de Software
