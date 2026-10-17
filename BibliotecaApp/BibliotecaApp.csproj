@@ -28,18 +28,12 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <None Update="images (2).jpg">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <!-- Recursos gráficos: se copian junto al .exe preservando la subcarpeta Recursos\,
-         porque las rutas de logo ahora son fijas (sin búsquedas ascendentes) -->
-    <None Update="Recursos\*.jpg">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Recursos\*.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Recursos\app.ico">
+    <!-- Recursos gráficos: comodín a prueba de futuro (Recursos\**\*). Copia TODO
+         lo que haya en la carpeta —jpg, png, ico, csv y cualquier imagen futura—
+         preservando la subcarpeta Recursos\ junto al .exe, de modo que agregar una
+         imagen nueva no exige volver a tocar este archivo para que viaje al
+         directorio de salida y al instalador. -->
+    <None Update="Recursos\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
