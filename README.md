@@ -41,8 +41,7 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 
 | Login | Control de Sala |
 | :---: | :---: |
-| <img width="456" height="755" alt="image" src="https://github.com/user-attachments/assets/101709fb-a61a-4f74-9938-c817cb9c93da" />
-| <img width="1917" height="963" alt="image" src="https://github.com/user-attachments/assets/0b910a6e-545a-4f1e-9d02-a6b45d1a146d" />|
+| <img width="456" height="755" alt="image" src="https://github.com/user-attachments/assets/101709fb-a61a-4f74-9938-c817cb9c93da" /> | <img width="1917" height="963" alt="image" src="https://github.com/user-attachments/assets/0b910a6e-545a-4f1e-9d02-a6b45d1a146d" />|
 
 | Alertas de Vencidos | Estadísticas |
 | :---: | :---: |
