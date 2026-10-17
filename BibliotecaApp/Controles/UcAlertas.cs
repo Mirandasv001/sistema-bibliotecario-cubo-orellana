@@ -119,7 +119,8 @@ namespace BibliotecaApp
                            Correo                                 AS Correo,
                            TituloLibro                            AS [Título del Libro],
                            strftime('%d/%m/%Y', FechaEntrega)     AS [Entrega Esperada],
-                           CAST(julianday('now') - julianday(FechaEntrega) AS INTEGER)
+                           CAST(julianday(date('now', 'localtime'))
+                                - julianday(date(FechaEntrega)) AS INTEGER)
                                                                    AS [Días de Retraso],
                            CorreoAlertaEnviado
                     FROM PrestamosExternos
