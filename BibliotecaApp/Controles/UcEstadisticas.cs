@@ -66,10 +66,26 @@ namespace BibliotecaApp
         private string _nombrePrestGenero1 = "Masculino";
         private string _nombrePrestGenero2 = "Femenino";
 
-        // Colores por género (configurables)
-        private static readonly Color ColorGenero1 = Color.FromArgb(52, 152, 219);  // Azul
-        private static readonly Color ColorGenero2 = Color.FromArgb(231, 76, 60);   // Rojo
-        private static readonly Color ColorTotal = Color.FromArgb(27, 43, 66);      // Azul oscuro
+        // Colores por género (configurables). El mapeo es SIEMPRE por nombre de
+        // género (nunca por posición), así Masculino y Femenino conservan el mismo
+        // color en las DOS gráficas: Masculino = celeste/azul, Femenino = rojo.
+        private static readonly Color ColorGenero1 = Color.FromArgb(52, 152, 219);  // Masculino: celeste/azul
+        private static readonly Color ColorGenero2 = Color.FromArgb(231, 76, 60);   // Femenino: rojo
+        private static readonly Color ColorSinDato = Color.FromArgb(160, 170, 185); // "(Sin dato)": gris neutro
+        private static readonly Color ColorTotal = Color.FromArgb(27, 43, 66);      // Total: azul oscuro
+
+        // Paleta para géneros no estándar (distinto de Masculino/Femenino/"(Sin dato)").
+        // Se indexa por un hash estable del nombre (suma de caracteres), NO por
+        // GetHashCode, para que un mismo género sea del mismo color en ambas gráficas
+        // y entre sesiones.
+        private static readonly Color[] PaletaGeneros =
+        {
+            Color.FromArgb(46, 204, 113),   // Verde
+            Color.FromArgb(155, 89, 182),   // Morado
+            Color.FromArgb(241, 196, 15),   // Amarillo
+            Color.FromArgb(230, 126, 34),   // Naranja
+            Color.FromArgb(26, 188, 156)    // Turquesa
+        };
 
         public UcEstadisticas()
         {
@@ -472,6 +488,34 @@ namespace BibliotecaApp
         }
 
         /// <summary>
+        /// Devuelve el color de una barra según el NOMBRE de su género, de forma
+        /// idéntica en las DOS gráficas (consistencia Sala vs Préstamos):
+        /// Total = azul oscuro, Masculino = celeste/azul, Femenino = rojo,
+        /// "(Sin dato)" = gris neutro. Cualquier otro género recibe un color
+        /// estable de PaletaGeneros (mismo nombre ⇒ mismo color en ambas gráficas).
+        /// El mapeo es por nombre y NO por posición, para que un género no cambie
+        /// de color aunque sea el más o el menos frecuente en cada gráfica.
+        /// </summary>
+        private static Color ColorPorGenero(string etiqueta)
+        {
+            if (string.IsNullOrWhiteSpace(etiqueta)) return ColorSinDato;
+
+            // "Total" es la primera barra agregada en DatosBarras*
+            if (etiqueta.Equals("Total", StringComparison.OrdinalIgnoreCase)) return ColorTotal;
+
+            if (etiqueta.Equals("Masculino", StringComparison.OrdinalIgnoreCase)) return ColorGenero1;
+            if (etiqueta.Equals("Femenino", StringComparison.OrdinalIgnoreCase)) return ColorGenero2;
+
+            if (etiqueta.StartsWith("(Sin dato", StringComparison.OrdinalIgnoreCase)) return ColorSinDato;
+
+            // Géneros no estándar: hash estable (suma de caracteres) sobre la paleta.
+            // Se evita GetHashCode porque no es estable entre sesiones en .NET.
+            int suma = 0;
+            foreach (char c in etiqueta) suma += c;
+            return PaletaGeneros[suma % PaletaGeneros.Length];
+        }
+
+        /// <summary>
         /// Método GDI+ maestro: dibuja barras redondeadas con escalado correcto a
         /// partir de un Dictionary genérico (una barra por entrada, en orden).
         /// Mantiene AntiAlias, gridlines, ejes y colores de EstiloUI (W-12).
@@ -566,8 +610,9 @@ namespace BibliotecaApp
                 string etiqueta = entradas[i].Key;
                 int valor = entradas[i].Value;
 
-                // 1ª barra = Total (azul oscuro); los géneros alternan azul/rojo
-                Color colorBarra = i == 0 ? ColorTotal : (i % 2 == 1 ? ColorGenero1 : ColorGenero2);
+                // Color por NOMBRE de género (consistente entre las dos gráficas):
+                // Total = azul oscuro, Masculino = celeste/azul, Femenino = rojo.
+                Color colorBarra = ColorPorGenero(etiqueta);
                 using var brushBarra = new SolidBrush(colorBarra);
 
                 int xBarra = inicioX + i * (anchoBarra + espacioEntreBarras);
