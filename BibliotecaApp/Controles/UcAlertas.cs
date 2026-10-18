@@ -288,8 +288,11 @@ namespace BibliotecaApp
                         string subject = "Aviso de préstamo vencido - Biblioteca CUBO";
                         string body = $"Estimado/a {usuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.";
 
-                        string uri = $"mailto:{correo}" +
-                                     $"?subject={Uri.EscapeDataString(subject)}" +
+                        // El destinatario principal (To) es la propia biblioteca, para que el
+                        // cliente de correo no falle por el campo "Para" vacío. El usuario
+                        // real se envía en copia oculta (Bcc) vía parámetro bcc=.
+                        string uri = $"mailto:cuboingrigobertoorellana@gmail.com?bcc={Uri.EscapeDataString(correo)}" +
+                                     $"&subject={Uri.EscapeDataString(subject)}" +
                                      $"&body={Uri.EscapeDataString(body)}";
 
                         var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
@@ -350,7 +353,11 @@ namespace BibliotecaApp
                 string body = Uri.EscapeDataString(
                     $"Estimado/a {nombreUsuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.");
 
-                string mailtoUri = $"mailto:{correo}?subject={subject}&body={body}";
+                // El destinatario principal (To) es la propia biblioteca, para que el
+                // cliente de correo no falle por el campo "Para" vacío. El usuario real
+                // se envía en copia oculta (Bcc) vía parámetro bcc=. subject y body ya
+                // vienen escapados.
+                string mailtoUri = $"mailto:cuboingrigobertoorellana@gmail.com?bcc={Uri.EscapeDataString(correo)}&subject={subject}&body={body}";
 
                 // Lanzar cliente de correo por defecto
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };

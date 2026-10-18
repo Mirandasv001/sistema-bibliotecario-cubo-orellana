@@ -113,7 +113,7 @@ namespace BibliotecaApp
             // Van al FINAL de la fila y un espaciador los empuja al extremo derecho.
             CrearBotonesPaginacion();
 
-            // Campo Género (Label + ComboBox) en code-behind: fila libre 8 de tlpCampos
+            // Campo Género (Label + ComboBox) en code-behind: sección DATOS DEL USUARIO
             CrearCampoGenero();
 
             // Asegurar que la columna Notificado exista en la BD
@@ -360,9 +360,10 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Crea el campo Género (Label + ComboBox) en code-behind y lo coloca en
-        /// la MISMA fila que "Fecha de Entrega Esperada", columnas 2 y 3 (libres),
-        /// alineado justo debajo de "Personal que Prestó". Sin crear filas nuevas
-        /// ni modificar el archivo .Designer.cs.
+        /// la sección DATOS DEL USUARIO: a la derecha del TextBox de Dirección
+        /// (columnas 4 y 5), alineado justo debajo de DUI y Correo. Para liberar
+        /// esas columnas se recoloca Dirección a su propia columna (se quita el
+        /// ColumnSpan de 3 que tenía en el Designer). Sin modificar .Designer.cs.
         /// </summary>
         private void CrearCampoGenero()
         {
@@ -379,10 +380,40 @@ namespace BibliotecaApp
             EstiloUI.EstilizarEntrada(cmbGeneroPrestamo); // DropDownList + Flat + márgenes uniformes
             cmbGeneroPrestamo.Margin = new Padding(3, 0, 15, 4); // mismo margen que el resto de campos
 
-            // Fila de "Fecha de Entrega Esperada" (dtpFechaEntrega), columnas 2 y 3
-            int filaEntrega = tlpCampos.GetRow(dtpFechaEntrega);
-            tlpCampos.Controls.Add(lblGenero, 2, filaEntrega);
-            tlpCampos.Controls.Add(cmbGeneroPrestamo, 3, filaEntrega);
+            // Dirección ocupaba las columnas 3, 4 y 5 (ColumnSpan 3). Se reduce a
+            // su propia columna (3) para dejar libre la derecha y colocar allí
+            // Género, dentro de la MISMA fila de usuario (la de Teléfono/Dirección).
+            int filaUsuario = tlpCampos.GetRow(txtDireccion);
+            tlpCampos.SetColumnSpan(txtDireccion, 1);
+            tlpCampos.Controls.Add(lblGenero, 4, filaUsuario);
+            tlpCampos.Controls.Add(cmbGeneroPrestamo, 5, filaUsuario);
+
+            ConfigurarOrdenTabulacion();
+        }
+
+        /// <summary>
+        /// Fija el TabIndex de los campos de entrada en orden explícito y
+        /// secuencial, para que el flujo del teclado en la sección de usuario sea
+        /// siempre Nombre → Correo → DUI → Teléfono → Dirección → Género, y el
+        /// TAB posterior a Género salte directo a "Código del Ejemplar".
+        /// Al dar valores distintos se elimina la dependencia del orden de
+        /// inserción (z-order), que es lo que hoy hacía tabular Género al final.
+        /// </summary>
+        private void ConfigurarOrdenTabulacion()
+        {
+            txtNombre.TabIndex = 0;
+            txtCorreo.TabIndex = 1;
+            txtDui.TabIndex = 2;
+            txtTelefono.TabIndex = 3;
+            txtDireccion.TabIndex = 4;
+            cmbGeneroPrestamo.TabIndex = 5;
+
+            // Salto tras Género: el siguiente campo tabulable es Código del Ejemplar
+            txtCodigoLibro.TabIndex = 6;
+            txtTituloLibro.TabIndex = 7;
+            dtpFechaPrestamo.TabIndex = 8;
+            txtPersonalPresto.TabIndex = 9;
+            dtpFechaEntrega.TabIndex = 10;
         }
 
         // ====================================================================
@@ -1289,7 +1320,11 @@ namespace BibliotecaApp
                     $"Te confirmamos el préstamo del libro '{tituloLibro}'. Te recordamos amablemente que la fecha esperada de devolución o renovación es el {fechaEntrega}.\n\n" +
                     $"¡Esperamos que disfrutes tu lectura!");
 
-                string mailtoUri = $"mailto:{correo}?subject={subject}&body={body}";
+                // El destinatario principal (To) es la propia biblioteca, para que el
+                // cliente de correo no falle por el campo "Para" vacío. El usuario real
+                // se envía en copia oculta (Bcc) vía parámetro bcc=, escapado para no
+                // romper la URI. subject y body ya vienen escapados.
+                string mailtoUri = $"mailto:cuboingrigobertoorellana@gmail.com?bcc={Uri.EscapeDataString(correo)}&subject={subject}&body={body}";
 
                 // Lanzar cliente de correo por defecto
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
