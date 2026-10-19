@@ -6,17 +6,12 @@ using System.Collections.Generic;
 namespace BibliotecaApp
 {
     /// <summary>
-    /// Módulo de Estadísticas: DOS gráficas GDI+ nativas con un filtro de
-    /// rango de fechas compartido (arriba, gobernando ambas):
-    /// izquierda = Control de Sala (ControlUsuariosSala.Fecha),
-    /// derecha = Préstamos Externos (PrestamosExternos.FechaPrestamo).
-    /// Cada mitad tiene sus 3 tarjetas de resumen (Total + top 2 géneros).
-    /// Implementación 100% nativa sin dependencias externas (pintado GDI+).
-    /// W-12: Soporte dinámico de géneros (Dictionary) — no hardcodea Masculino/Femenino.
+    /// Dos gráficas GDI+ con un filtro de fechas compartido: a la izquierda
+    /// Control de Sala, a la derecha Préstamos Externos. Cada mitad tiene sus
+    /// 3 tarjetas de resumen (total + los 2 géneros más frecuentes).
     /// </summary>
     public partial class UcEstadisticas : UserControl
     {
-        // Controles de la interfaz (sin readonly para permitir asignación en ConfigurarControles)
         private Panel _panelFiltros;
         private DateTimePicker _dtpDesde;
         private DateTimePicker _dtpHasta;
@@ -92,9 +87,6 @@ namespace BibliotecaApp
             InitializeComponent();
             ConfigurarControles();
 
-            // ============================================================
-            // LIMPIAR LABELS DE INICIO: forzar textos en "0" al arrancar
-            // ============================================================
             _lblTotalVisitasValor.Text = "0";
             _lblGenero1Valor.Text = "0";
             _lblGenero2Valor.Text = "0";
@@ -112,9 +104,6 @@ namespace BibliotecaApp
 
         private void ConfigurarControles()
         {
-            // =================================================================
-            // PANEL SUPERIOR - FILTROS
-            // =================================================================
             _panelFiltros = new Panel
             {
                 Dock = DockStyle.Top,
@@ -176,9 +165,6 @@ namespace BibliotecaApp
             _panelFiltros.Controls.AddRange(new Control[] { lblDesde, _dtpDesde, lblHasta, _dtpHasta, _btnFiltrar });
             this.Controls.Add(_panelFiltros);
 
-            // =================================================================
-            // PANEL DE RESUMEN - TARJETAS
-            // =================================================================
             _panelResumen = new Panel
             {
                 Dock = DockStyle.Top,
@@ -187,17 +173,15 @@ namespace BibliotecaApp
                 Padding = new Padding(0, 0, 0, 10)
             };
 
-            // --- Mitad IZQUIERDA: Control de Sala (3 tarjetas) ---
+            // Sala a la izquierda, Préstamos a la derecha.
             var cardTotal = CrearTarjetaResumen("Total de lectores en sala", "0", ColorTotal, out _lblTotalVisitasTitulo, out _lblTotalVisitasValor);
             var cardGenero1 = CrearTarjetaResumen(_nombreGenero1, "0", ColorGenero1, out _lblGenero1Titulo, out _lblGenero1Valor);
             var cardGenero2 = CrearTarjetaResumen(_nombreGenero2, "0", ColorGenero2, out _lblGenero2Titulo, out _lblGenero2Valor);
 
-            // --- Mitad DERECHA: Préstamos Externos (3 tarjetas nuevas) ---
             var cardPrestTotal = CrearTarjetaResumen("Total Préstamos", "0", ColorTotal, out _lblTotalPrestamosTitulo, out _lblTotalPrestamosValor);
             var cardPrestGenero1 = CrearTarjetaResumen(_nombrePrestGenero1, "0", ColorGenero1, out _lblPrestGenero1Titulo, out _lblPrestGenero1Valor);
             var cardPrestGenero2 = CrearTarjetaResumen(_nombrePrestGenero2, "0", ColorGenero2, out _lblPrestGenero2Titulo, out _lblPrestGenero2Valor);
 
-            // Orden: 3 primeras = Sala (izquierda), 3 siguientes = Préstamos (derecha)
             _tarjetas = new[] { cardTotal, cardGenero1, cardGenero2,
                                  cardPrestTotal, cardPrestGenero1, cardPrestGenero2 };
 
@@ -205,9 +189,6 @@ namespace BibliotecaApp
             _panelResumen.Resize += (_, _) => UbicarTarjetas(); // tarjetas más pequeñas: 3 por mitad
             this.Controls.Add(_panelResumen);
 
-            // =================================================================
-            // PANEL GRÁFICA - DOS MITADES (Sala | Préstamos), PINTADO NATIVO GDI+
-            // =================================================================
             _pnlContenedorGraficas = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -326,22 +307,16 @@ namespace BibliotecaApp
         }
 
         /// <summary>
-        /// Carga los datos de AMBOS módulos con el mismo rango de fechas
-        /// y actualiza las 6 tarjetas + las 2 gráficas (GDI+).
-        /// Método público para ser llamado desde Form1 al mostrar la vista.
-        /// W-12: Usa Dictionary para soportar cualquier género dinámicamente.
+        /// Carga ambas gráficas con el mismo rango de fechas y actualiza las 6
+        /// tarjetas. Se llama desde Form1 al mostrar la vista.
         /// </summary>
         public void CargarDatos()
         {
-            // ============================================================
-            // PASO 1: REINICIAR ACUMULADORES (lo primero, obligatorio)
-            // ============================================================
             var generosSala = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var generosPrestamos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             int totalVisitas = 0;
             int totalPrestamos = 0;
 
-            // Formato estricto yyyy-MM-dd para parámetros
             string fechaDesde = _dtpDesde.Value.ToString("yyyy-MM-dd");
             string fechaHasta = _dtpHasta.Value.ToString("yyyy-MM-dd");
 
@@ -350,13 +325,10 @@ namespace BibliotecaApp
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var comando = conexion.CreateCommand();
 
-                // Mismo rango de fechas para ambas consultas
                 comando.Parameters.AddWithValue("$desde", fechaDesde);
                 comando.Parameters.AddWithValue("$hasta", fechaHasta);
 
-                // ============================================================
-                // PASO 2: CONSULTA 1 — Control de Sala (columna Fecha)
-                // ============================================================
+                // Control de Sala
                 comando.CommandText = @"
                     SELECT Genero, COUNT(*)
                     FROM ControlUsuariosSala
@@ -366,9 +338,7 @@ namespace BibliotecaApp
                 using (var lector = comando.ExecuteReader())
                     AcumularPorGenero(lector, generosSala, ref totalVisitas);
 
-                // ============================================================
-                // PASO 3: CONSULTA 2 — Préstamos Externos (columna FechaPrestamo)
-                // ============================================================
+                // Préstamos externos
                 comando.CommandText = @"
                     SELECT Genero, COUNT(*)
                     FROM PrestamosExternos
@@ -384,9 +354,6 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
-            // ============================================================
-            // PASO 4: TOP 2 GÉNEROS + TOTAL — CONTROL DE SALA
-            // ============================================================
             var topSala = generosSala.OrderByDescending(kvp => kvp.Value).Take(2).ToList();
             _nombreGenero1 = topSala.Count > 0 ? topSala[0].Key : "Masculino";
             _valorGenero1 = topSala.Count > 0 ? topSala[0].Value : 0;
@@ -394,9 +361,6 @@ namespace BibliotecaApp
             _valorGenero2 = topSala.Count > 1 ? topSala[1].Value : 0;
             _valorTotal = totalVisitas;
 
-            // ============================================================
-            // PASO 5: TOP 2 GÉNEROS + TOTAL — PRÉSTAMOS EXTERNOS
-            // ============================================================
             var topPrestamos = generosPrestamos.OrderByDescending(kvp => kvp.Value).Take(2).ToList();
             _nombrePrestGenero1 = topPrestamos.Count > 0 ? topPrestamos[0].Key : "Masculino";
             _valorPrestGenero1 = topPrestamos.Count > 0 ? topPrestamos[0].Value : 0;
@@ -404,9 +368,6 @@ namespace BibliotecaApp
             _valorPrestGenero2 = topPrestamos.Count > 1 ? topPrestamos[1].Value : 0;
             _valorPrestTotal = totalPrestamos;
 
-            // ============================================================
-            // PASO 6: ACTUALIZAR LAS 6 TARJETAS
-            // ============================================================
             _lblTotalVisitasValor.Text = totalVisitas.ToString("N0");
             _lblGenero1Titulo.Text = _nombreGenero1;
             _lblGenero1Valor.Text = _valorGenero1.ToString("N0");
@@ -516,31 +477,29 @@ namespace BibliotecaApp
         }
 
         /// <summary>
-        /// Método GDI+ maestro: dibuja barras redondeadas con escalado correcto a
-        /// partir de un Dictionary genérico (una barra por entrada, en orden).
-        /// Mantiene AntiAlias, gridlines, ejes y colores de EstiloUI (W-12).
+        /// Pinta las barras con escalado proporcional: una por cada entrada del
+        /// diccionario, en orden.
         /// </summary>
         private void DibujarGraficaBarras(Graphics g, Dictionary<string, int> datos, string titulo, int ancho, int alto)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            var entradas = datos.ToList(); // orden de inserción: Total primero, luego géneros
+            var entradas = datos.ToList(); // Total primero, luego los géneros
 
             int areaWidth = ancho - PadIzq - PadDer;
             int areaHeight = alto - PadArr - PadAba;
-            int baseY = alto - PadAba; // Línea base (eje X)
+            int baseY = alto - PadAba;
             if (areaWidth < 40) areaWidth = 40;
             if (areaHeight < 40) areaHeight = 40;
 
-            // Colores
             Color colorEje = Color.FromArgb(180, 180, 180);
             Color colorGrid = Color.FromArgb(230, 230, 230);
             Color colorTexto = EstiloUI.TextoOscuro;
             Color colorTextoSecundario = Color.FromArgb(120, 130, 140);
 
-            // Fuentes cacheadas en EstiloUI (A-0x: sin crear Font por repintado;
-            // no se hacen Dispose porque son instancias compartidas)
+            // Fuentes compartidas de EstiloUI: no se crean ni se hacen Dispose en
+            // cada repintado.
             var fontValor = EstiloUI.FuenteGraficaValor;
             var fontCategoria = EstiloUI.FuenteGraficaCategoria;
             var fontTitulo = EstiloUI.FuenteGraficaTitulo;
@@ -559,7 +518,6 @@ namespace BibliotecaApp
             g.DrawString(titulo, fontTitulo, brushTexto,
                 PadIzq + (areaWidth - szTitulo.Width) / 2, PadArr - 5);
 
-            // ---- CASO SIN DATOS (evita dibujar gráfica fantasma) ----
             if (entradas.Count == 0 || entradas.All(kv => kv.Value == 0))
             {
                 string msg = "No hay registros";
@@ -570,7 +528,6 @@ namespace BibliotecaApp
                 return;
             }
 
-            // ---- CÁLCULO DE ESCALA (máximo entre todas las entradas) ----
             int maxValor = entradas.Max(kv => kv.Value);
 
             // Espacio reservado arriba para el texto del valor (altura de fuente + gap)
@@ -587,7 +544,6 @@ namespace BibliotecaApp
             // Y mínimo que puede alcanzar el tope de una barra
             int minTopY = PadArr + margenSuperiorTotal;
 
-            // ---- GRIDLINES HORIZONTALES (fondo profesional) ----
             int numGridLines = 4;
             for (int i = 1; i <= numGridLines; i++)
             {
@@ -598,7 +554,6 @@ namespace BibliotecaApp
             // Dibujar eje X (línea base)
             g.DrawLine(penEje, PadIzq, baseY, PadIzq + areaWidth, baseY);
 
-            // ---- BARRAS DINÁMICAS (una por entrada del diccionario) ----
             int numBarras = entradas.Count;
             int espacioEntreBarras = 30;
             int anchoBarra = Math.Min(70, (areaWidth - espacioEntreBarras * (numBarras + 1)) / numBarras);

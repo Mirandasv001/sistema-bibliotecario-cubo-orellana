@@ -88,9 +88,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Inicio
-        // ------------------------------------------------------------------
         private void Form1_Load(object sender, EventArgs e)
         {
             CargarLogo();
@@ -112,8 +109,8 @@ namespace BibliotecaApp
         {
             try
             {
-                // C-03/C-04: ruta fija junto al .exe y lectura vía MemoryStream
-                // (Image.FromFile bloquearía el archivo en disco)
+                // junto al .exe; MemoryStream porque Image.FromFile dejaría el
+                // archivo bloqueado en disco
                 string rutaLogo = Path.Combine(AppContext.BaseDirectory, "Recursos", "Logo de inicio.jpg");
                 if (File.Exists(rutaLogo))
                 {
@@ -131,9 +128,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Navegación entre apartados
-        // ------------------------------------------------------------------
         private void MostrarApartadoSala()
         {
             if (_vistaSala == null)
@@ -240,14 +234,10 @@ namespace BibliotecaApp
         public void NotificarCambioPrestamos()
         {
             ActualizarContadorAlertas();
-            // W-10: Verificar !IsDisposed para evitar ObjectDisposedException
+            // el !IsDisposed evita un ObjectDisposedException si la vista ya se cerró
             if (_vistaAlertas is { IsDisposed: false }) _vistaAlertas.Actualizar();
             if (_vistaInventario is { IsDisposed: false }) _vistaInventario.Actualizar();
         }
-
-        // ------------------------------------------------------------------
-        //  Flujo ágil: Inventario (doble clic) → Préstamos Externos
-        // ------------------------------------------------------------------
 
         /// <summary>
         /// Método público invocado por UcInventario al hacer doble clic en un
@@ -290,10 +280,6 @@ namespace BibliotecaApp
                 boton.ForeColor = activo ? Color.White : Color.WhiteSmoke;
             }
         }
-
-        // ====================================================================
-        //  NOTIFICACIONES DE PRÉSTAMOS VENCIDOS (bolita roja / badge)
-        // ====================================================================
 
         /// <summary>
         /// Consulta cuántos préstamos están vencidos (EstadoLibro = 'Pendiente'
@@ -357,10 +343,6 @@ namespace BibliotecaApp
                 new RectangleF(x, y, badgeSize, badgeSize), formato);
         }
 
-        // ====================================================================
-        //  CERRAR SESIÓN
-        // ====================================================================
-
         private void btnCerrarSesion_Click(object? sender, EventArgs e)
         {
             DialogResult resultado = MessageBox.Show(
@@ -375,9 +357,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  CAMBIAR CONTRASEÑA (antes Gestión de Usuarios, Solo Admin)
-        // ====================================================================
         private void MostrarGestionUsuarios()
         {
             // Validación previa por texto: evita abrir el formulario por accidente.

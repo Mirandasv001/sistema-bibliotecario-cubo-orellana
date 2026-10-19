@@ -94,17 +94,8 @@ namespace BibliotecaApp
             // total, CargarRegistros retrocede sola a la última página válida.
             dgvRegistros.SizeChanged += DgvRegistros_SizeChanged;
 
-            // =================================================================
-            // BOTONES DE ELIMINACIÓN (code-behind, sin tocar el Designer)
-            // Textos y anchos forzados DESPUÉS de crear y estilizar: "Eliminar
-            // (fila)" 135 px y "Eliminar página" 160 px (más ancho, con aire
-            // para el rótulo), con 8 px de margen entre ambos y altura idéntica
-            // a btnEliminar (40 px). Verificado en el archivo: no hay
-            // AplicarPermisos()/ActualizarBotones()/Load que reasigne Text o
-            // Width de estos botones (solo se configuran aquí). Fila completa:
-            // 14..854, dentro de los 880 px de ancho comprobados visibles en
-            // panelBotones.
-            // =================================================================
+            // "Eliminar (fila)" y "Eliminar página" se crean y estilan aquí en
+            // code-behind; nada más reasigna su texto o ancho.
             btnRegistrar.Location = new Point(14, 8);           // 14..184
             btnMarcarDevolucion.Location = new Point(208, 8);   // 208..383
             btnModificar.Location = new Point(407, 8);          // 407..527
@@ -127,12 +118,7 @@ namespace BibliotecaApp
             panelBotones.Controls.Add(btnEliminarPagina);
             btnEliminarPagina.BringToFront();
 
-            // =================================================================
-            // PERMISOS DE INTERFAZ (RBAC): los controles de eliminación solo se
-            // exponen cuando la sesión activa es de Administrador. La visibilidad
-            // queda estrictamente igual al booleano de sesión (SesionGlobal.EsAdmin):
-            // un Operador nunca ve "Eliminar (fila)" ni "Eliminar página".
-            // =================================================================
+            // Los botones de eliminar solo se ven si la sesión es de Administrador
             bool esAdmin = SesionGlobal.EsAdmin;
             btnEliminar.Visible = esAdmin;
             btnEliminarPagina.Visible = esAdmin;
@@ -156,10 +142,7 @@ namespace BibliotecaApp
             dgvRegistros.CellFormatting += DgvRegistros_CellFormatting;
         }
 
-        // ====================================================================
-        //  PAGINACIÓN (botones creados dinámicamente en code-behind)
-        //  Estilo minimalista idéntico a UcPrestamosExternos
-        // ====================================================================
+        // Paginación creada en code-behind, con el mismo estilo que UcPrestamosExternos
 
         /// <summary>
         /// Crea los botones de paginación (Anterior / Siguiente / lblPagina)
@@ -167,7 +150,7 @@ namespace BibliotecaApp
         /// </summary>
         private void CrearBotonesPaginacion(FlowLayoutPanel flpPaginacion)
         {
-            // --- Espaciador invisible: ocupa el hueco sobrante de la fila ---
+            // ocupa el hueco que sobra en la fila, sin verse
             _espaciadorPaginacion = new Label
             {
                 Name = "espaciadorPaginacion",
@@ -178,7 +161,6 @@ namespace BibliotecaApp
             };
             flpPaginacion.Controls.Add(_espaciadorPaginacion);
 
-            // --- Botón "Anterior": estilo minimalista, icono cuadrado 35px ---
             btnAnterior = new Button
             {
                 Name = "btnAnterior",
@@ -194,7 +176,6 @@ namespace BibliotecaApp
             btnAnterior.Size = new Size(35, 40);
             btnAnterior.Click += btnAnterior_Click;
 
-            // --- Etiqueta de página ---
             lblPagina = new Label
             {
                 Name = "lblPagina",
@@ -205,7 +186,6 @@ namespace BibliotecaApp
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
 
-            // --- Botón "Siguiente": estilo minimalista, icono cuadrado 35px ---
             btnSiguiente = new Button
             {
                 Name = "btnSiguiente",
@@ -378,9 +358,6 @@ namespace BibliotecaApp
             LimpiarCampos();
         }
 
-        // ------------------------------------------------------------------
-        //  Carga de datos
-        // ------------------------------------------------------------------
         private void CargarTitulosDeLibros()
         {
             try
@@ -423,7 +400,6 @@ namespace BibliotecaApp
 
                 using var comando = conexion.CreateCommand();
 
-                // --- Paginación: calcula total de páginas y offset defensivo ---
                 CalcularTotalPaginas();
                 if (paginaActual > totalPaginas) paginaActual = totalPaginas;
                 if (paginaActual <= 0) paginaActual = 1;
@@ -455,7 +431,6 @@ namespace BibliotecaApp
 
                 dgvRegistros.DataSource = tabla;
 
-                // --- UI de paginación (botones dinámicos) ---
                 if (lblPagina != null) lblPagina.Text = $"Página {paginaActual} de {totalPaginas}";
                 if (btnAnterior != null) btnAnterior.Enabled = (paginaActual > 1);
                 if (btnSiguiente != null) btnSiguiente.Enabled = (paginaActual < totalPaginas);
@@ -567,9 +542,6 @@ namespace BibliotecaApp
                 txtNombre.Focus();
         }
 
-        // ------------------------------------------------------------------
-        //  Selección: solo guarda el ID de la fila seleccionada y sale de modo edición si cambia de fila
-        // ------------------------------------------------------------------
         private void dgvRegistros_CellClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.RowIndex >= dgvRegistros.Rows.Count)
@@ -590,10 +562,6 @@ namespace BibliotecaApp
             idSeleccionado = nuevoId;
             // NO se cargan los datos en los controles aquí; eso se hace al pulsar "Modificar"
         }
-
-        // ------------------------------------------------------------------
-        //  Check-in: registrar entrada a leer
-        // ------------------------------------------------------------------
 
         /// <summary>
         /// CHECK-OUT compartido (Opción B — Libros es la única fuente de verdad):
@@ -724,9 +692,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Check-out: marcar devolución del libro
-        // ------------------------------------------------------------------
         /// <summary>
         /// CHECK-OUT (Opción B): registra la devolución en sala y libera UN
         /// ejemplar del título ('En Sala' → 'Disponible') dentro de la MISMA
@@ -800,10 +765,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Editar: habilita los campos para edición (botón "Editar")
-        // Carga los datos de la fila seleccionada en los controles
-        // ------------------------------------------------------------------
         private void btnModificar_Click(object sender, EventArgs e)
         {
             // Validar que hay una fila seleccionada
@@ -847,9 +808,6 @@ namespace BibliotecaApp
             EstablecerModoEdicion(true);
         }
 
-        // ------------------------------------------------------------------
-        //  Guardar Cambios: persiste la edición en BD (botón "Guardar Cambios")
-        // ------------------------------------------------------------------
         private void btnGuardarCambios_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
@@ -910,10 +868,6 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        // ------------------------------------------------------------------
-        //  Eliminar página: borra en bloque la página visible (estilo UcPrestamosExternos)
-        // ------------------------------------------------------------------
 
         /// <summary>
         /// Autenticación de Administrador (mismo modal que "Eliminar") antes de
@@ -1056,9 +1010,6 @@ namespace BibliotecaApp
             CargarRegistros();
         }
 
-        // ------------------------------------------------------------------
-        //  Eliminar: borra el registro con autenticación de administrador
-        // ------------------------------------------------------------------
         private void btnEliminar_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
@@ -1141,9 +1092,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Validación y limpieza
-        // ------------------------------------------------------------------
         private bool HayFilaSeleccionada()
         {
             if (idSeleccionado > 0 && dgvRegistros.CurrentRow != null)
@@ -1216,7 +1164,7 @@ namespace BibliotecaApp
         /// <summary>
         /// Suscribe los eventos de ratón al DataGridView para habilitar
         /// el desplazamiento por arrastre (drag scroll) con cambio de cursor.
-        /// W-06: Implementación SIN reflection — usa VScrollBar público del control.
+        /// Usa la VScrollBar pública del control, sin reflection.
         /// </summary>
         private void ConfigurarDragScroll()
         {

@@ -57,13 +57,8 @@ namespace BibliotecaApp
         /// <summary>Familia base: Segoe UI (requerido por diseño corporativo).</summary>
         public const string FuenteBase = "Segoe UI";
 
-        // ═══════════════════════════════════════════════════════════════════
-        // A-01/A-02/A-03: TIPOGRAFÍAS CACHEADAS A NIVEL DE PROCESO
-        // Compartir estas instancias evita agotar los handles GDI+ que producía
-        // crear una nueva Font en cada estilo o repintado. No se hacen Dispose:
-        // viven mientras viva la aplicación (verificado: Control.Dispose en
-        // WinForms .NET no dispone la Font asignada a un control).
-        // ═══════════════════════════════════════════════════════════════════
+        // Las fuentes se crean una sola vez y se comparten. Si se creara una Font
+        // por repintado se acaban los handles GDI+. Por lo mismo no se hacen Dispose.
 
         /// <summary>Normal — 10 pt, Regular, Segoe UI.</summary>
         public static readonly Font FuenteNormal = new Font(FuenteBase, 10f, FontStyle.Regular, GraphicsUnit.Point);
@@ -138,7 +133,7 @@ namespace BibliotecaApp
             boton.Height = 40;
             boton.UseVisualStyleBackColor = false;
 
-            // W-16: Evitar suscripciones múltiples - remover handlers previos antes de agregar
+            // quito los handlers viejos para no acumular suscripciones dobles
             boton.MouseEnter -= BotonPrimario_MouseEnter;
             boton.MouseLeave -= BotonPrimario_MouseLeave;
             boton.MouseEnter += BotonPrimario_MouseEnter;
@@ -172,7 +167,7 @@ namespace BibliotecaApp
             boton.Height = 40;
             boton.UseVisualStyleBackColor = false;
 
-            // W-16: Evitar suscripciones múltiples - remover handlers previos antes de agregar
+            // quito los handlers viejos para no acumular suscripciones dobles
             boton.MouseEnter -= BotonSecundario_MouseEnter;
             boton.MouseLeave -= BotonSecundario_MouseLeave;
             boton.MouseEnter += BotonSecundario_MouseEnter;
@@ -212,7 +207,7 @@ namespace BibliotecaApp
         {
             if (control == null) return;
 
-            control.Font = FuenteNormal; // A-0x: instancia cacheada (10 pt, Segoe UI)
+            control.Font = FuenteNormal;
             control.ForeColor = TextoOscuro;                                                 // #2B2D42
             control.BackColor = Blanco;
             control.Margin = new Padding(3, 0, 12, 6);

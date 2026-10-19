@@ -11,8 +11,8 @@ namespace BibliotecaApp
     {
         private const string NombreBaseDatos = "biblioteca.db";
 
-        // C-01: carpeta de datos en %APPDATA%, escribible por usuarios sin privilegios
-        // (a diferencia de Program Files, donde el instalador coloca el .exe).
+        // Los datos viven en %APPDATA%: en Program Files (donde va el .exe) un
+        // usuario sin privilegios no podría escribir
         private static readonly string CarpetaDatos =
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -51,9 +51,8 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Inicializa la base de datos: tablas + importación del catálogo.
-        /// C-02: todo el proceso secuencial corre dentro de UNA sola transacción;
-        /// si cualquier paso falla se revierte el conjunto completo para no
-        /// dejar la BD a medias (schema + datos).
+        /// Todo corre en una sola transacción; si algo falla se revierte completo,
+        /// para no dejar la BD a medias (esquema sin datos, o datos sin esquema).
         /// </summary>
         public static void Inicializar()
         {
@@ -335,9 +334,6 @@ namespace BibliotecaApp
             indice.ExecuteNonQuery();
         }
 
-        // ------------------------------------------------------------------
-        //  Estructura
-        // ------------------------------------------------------------------
         private static void CrearTablas(SqliteConnection conexion)
         {
             const string sqlLibros = @"
@@ -444,9 +440,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Bandera: inventario vaciado manualmente por el administrador
-        // ------------------------------------------------------------------
         private const string ClaveInventarioVaciado = "InventarioVaciado";
 
         /// <summary>
@@ -475,9 +468,6 @@ namespace BibliotecaApp
             return string.Equals(valor as string, "1", StringComparison.OrdinalIgnoreCase);
         }
 
-        // ------------------------------------------------------------------
-        //  Importación del catálogo CSV
-        // ------------------------------------------------------------------
         private static void ImportarCatalogoDesdeCsv(SqliteConnection conexion, SqliteTransaction transaccion)
         {
             // Si el administrador vació el inventario explícitamente, NO se
@@ -491,9 +481,8 @@ namespace BibliotecaApp
             var filas = LectorCsv.Leer(rutaCsv);
             if (filas.Count == 0) return;
 
-            // C-02: se ejecuta dentro de la transacción global de Inicializar
-            // (el Commit / Rollback lo gestiona Inicializar; aquí no se crea
-            // una transacción propia porque SQLite admite una por conexión).
+            // entra en la transacción global de Inicializar; aquí no se abre otra
+            // porque SQLite admite una por conexión
             using var comando = conexion.CreateCommand();
             comando.Transaction = transaccion;
             comando.CommandText = @"
@@ -530,17 +519,16 @@ namespace BibliotecaApp
             System.Diagnostics.Debug.WriteLine($"Catálogo CUBO: {insertados} libros insertados desde CSV.");
         }
 
-        // C-03: nombre real del archivo de catálogo (se copia junto al .exe vía csproj)
+        // se copia junto al .exe desde el .csproj
         private const string NombreCatalogoCsv =
             "CATÁLOGO BIBLIOTECA CUBO SITIO DEL NIÑO - ORIGINAL-2026 .xlsx - INVENTARIO TOTAL (1).csv";
 
         private static string? BuscarArchivoCsv()
         {
-            // W-07: Prioridad 1 - Ruta configurable via app.config / property
+            // Primero se respeta la ruta configurada; si no, va junto al .exe
             if (!string.IsNullOrWhiteSpace(CatalogoCsvPath) && File.Exists(CatalogoCsvPath))
                 return CatalogoCsvPath;
 
-            // C-03: Prioridad 2 - Ruta fija junto al .exe, sin búsquedas ascendentes
             string ruta = Path.Combine(AppContext.BaseDirectory, NombreCatalogoCsv);
             return File.Exists(ruta) ? ruta : null;
         }

@@ -67,7 +67,7 @@ namespace BibliotecaApp
                 LineAlignment = StringAlignment.Center
             };
 
-            var fuente = EstiloUI.FuenteVacia; // A-0x: instancia cacheada (no Dispose: es compartida)
+            var fuente = EstiloUI.FuenteVacia; // compartida: no Dispose
             var area = e.ClipRectangle;
 
             e.Graphics.DrawString(
@@ -221,7 +221,6 @@ namespace BibliotecaApp
         /// </summary>
         private async void btnNotificar_Click(object sender, EventArgs e)
         {
-            // 1️⃣ VALIDAR QUE HAY FILAS CON CORREOS VÁLIDOS
             var filasValidas = dgvAlertas.Rows
                 .Cast<DataGridViewRow>()
                 .Where(r => !r.IsNewRow)
@@ -241,7 +240,7 @@ namespace BibliotecaApp
                 return;
             }
 
-            // 2️⃣ GENERAR CSV DE RESPALDO EN LA CARPETA TEMPORAL DEL SISTEMA
+            // CSV de respaldo en la carpeta temporal
             string csvPath = null;
             try
             {
@@ -250,11 +249,11 @@ namespace BibliotecaApp
                 csvPath = Path.Combine(tempPath, $"Morosos_Notificados_{timestamp}.csv");
 
                 var sb = new StringBuilder();
-                sb.AppendLine("Usuario,Titulo,Correo"); // Encabezados
+                sb.AppendLine("Usuario,Titulo,Correo");
 
                 foreach (var fila in filasValidas)
                 {
-                    // Escapar comillas y envolver en comillas si contiene coma, salto de línea o comillas
+                    // el CSV exige comillas si el valor trae coma, salto de línea o comillas
                     string Escape(string s) => s.Contains(',') || s.Contains('"') || s.Contains('\n')
                         ? "\"" + s.Replace("\"", "\"\"") + "\""
                         : s;
@@ -268,15 +267,13 @@ namespace BibliotecaApp
             {
                 MessageBox.Show($"No se pudo generar el CSV en la carpeta temporal:\n{exCsv.Message}",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                // Continuamos para intentar abrir los mailto
+                // seguimos aunque falle: los correos son lo importante
             }
 
-            // 3️⃣ CREAR Y LANZAR MAILTO INDIVIDUAL POR CADA USUARIO MOROSO
-            // W-05: Fire-and-forget para no bloquear el hilo de UI al abrir múltiples mailto:
+            // Un mailto por cada moroso. En fire-and-forget para no congelar la UI.
             int emailsEnviados = 0;
             foreach (var fila in filasValidas)
             {
-                // Capturar variables locales para el closure
                 string usuario = fila.Usuario;
                 string correo = fila.Correo;
                 string tituloLibro = fila.TituloLibro;
@@ -298,7 +295,6 @@ namespace BibliotecaApp
                         var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
                         Process.Start(psi);
 
-                        // Incrementar contador de forma thread-safe
                         Interlocked.Increment(ref emailsEnviados);
                     }
                     catch (Exception exMail)
@@ -308,15 +304,14 @@ namespace BibliotecaApp
                 });
             }
 
-            // Pequeña pausa para dar tiempo a que se lancen los procesos (fire-and-forget)
+            // deja que se lancen antes del resumen
             await Task.Delay(100);
 
-            // 4️⃣ CONFIRMACIÓN FINAL
             string msg = $"Se abrieron {emailsEnviados} ventana(s) de correo personalizadas (una por usuario moroso).";
             if (!string.IsNullOrEmpty(csvPath) && File.Exists(csvPath))
                 msg += $"\n\nRespaldo CSV guardado en:\n{csvPath}";
             else
-                msg += "\n\n⚠ No se pudo generar el archivo CSV de respaldo.";
+                msg += "\n\nNo se pudo generar el archivo CSV de respaldo.";
 
             MessageBox.Show(msg, "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -327,18 +322,15 @@ namespace BibliotecaApp
         /// </summary>
         private void DgvAlertas_CellContentClick(object? sender, DataGridViewCellEventArgs e)
         {
-            // Validar que sea clic en la columna de botones y fila válida
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
             if (dgvAlertas.Columns[e.ColumnIndex].Name != "btnNotificarIndividual") return;
 
             var fila = dgvAlertas.Rows[e.RowIndex];
 
-            // Extraer datos de la fila
             string nombreUsuario = fila.Cells["Usuario"].Value?.ToString()?.Trim() ?? "";
             string correo = fila.Cells["Correo"].Value?.ToString()?.Trim() ?? "";
             string tituloLibro = fila.Cells["Título del Libro"].Value?.ToString()?.Trim() ?? "";
 
-            // Validar que hay correo
             if (string.IsNullOrWhiteSpace(correo) || !correo.Contains("@"))
             {
                 MessageBox.Show("El usuario no tiene un correo electrónico válido registrado.",
@@ -348,22 +340,18 @@ namespace BibliotecaApp
 
             try
             {
-                // Construir URI mailto: individual
                 string subject = Uri.EscapeDataString("Aviso de préstamo vencido - Biblioteca CUBO");
                 string body = Uri.EscapeDataString(
                     $"Estimado/a {nombreUsuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.");
 
-                // El destinatario principal (To) es la propia biblioteca, para que el
-                // cliente de correo no falle por el campo "Para" vacío. El usuario real
-                // se envía en copia oculta (Bcc) vía parámetro bcc=. subject y body ya
-                // vienen escapados.
+                // El campo "Para" va con la biblioteca y el usuario en copia oculta, para
+                // que el cliente no falle con "Para" vacío. subject y body ya van escapados.
                 string mailtoUri = $"mailto:cuboingrigobertoorellana@gmail.com?bcc={Uri.EscapeDataString(correo)}&subject={subject}&body={body}";
 
-                // Lanzar cliente de correo por defecto
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
                 Process.Start(psi);
 
-                // Persistir en BD: CorreoAlertaEnviado = 1 (solo alerta de retraso; no toca bienvenida)
+                // solo la alerta de retraso, no la de bienvenida
                 int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
                 using (var conexion = ConexionDB.ObtenerConexion())
                 using (var updateCmd = conexion.CreateCommand())
@@ -373,7 +361,6 @@ namespace BibliotecaApp
                     updateCmd.ExecuteNonQuery();
                 }
 
-                // Feedback visual: cambiar botón a "Enviado" con color verde
                 var celda = dgvAlertas.Rows[e.RowIndex].Cells[e.ColumnIndex];
                 celda.Value = "Enviado";
                 celda.Style.BackColor = Color.LightGreen;

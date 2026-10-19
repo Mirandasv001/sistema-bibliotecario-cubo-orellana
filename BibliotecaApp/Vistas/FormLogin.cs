@@ -42,8 +42,7 @@ namespace BibliotecaApp
         {
             try
             {
-                // C-03/C-04: ruta fija junto al .exe (sin búsquedas ascendentes) y
-                // lectura vía MemoryStream para no bloquear el archivo en disco.
+                // junto al .exe; con MemoryStream para no dejar el archivo bloqueado
                 string rutaLogo = Path.Combine(AppContext.BaseDirectory, "Recursos", "Logo de inicio.jpg");
                 if (File.Exists(rutaLogo))
                 {
