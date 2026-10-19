@@ -37,21 +37,21 @@ El sistema reemplaza el control manual en bitácoras físicas por una plataforma
 
 | Módulo de Inventario | Módulo de Préstamos Externos |
 | :---: | :---: |
-| <img width="620" alt="Inventario" src="https://github.com/user-attachments/assets/da690040-9882-43f9-beff-e413463016f8" /> | <img width="620" alt="Préstamos Externos" src="https://github.com/user-attachments/assets/5aa81144-af5c-4a9a-839c-6285c3a31d6e" /> |
+| <img width="1917" height="958" alt="image" src="https://github.com/user-attachments/assets/a01a9c1f-d6fb-40a7-a2d0-a5dcc01d0ee2" />| <img width="1917" height="970" alt="image" src="https://github.com/user-attachments/assets/db5d364b-1e67-4b72-b2f9-4fdb5901b119" />|
 
 | Login | Control de Sala |
 | :---: | :---: |
-| <img width="620" alt="Login" src="docs/capturas/01-login.png" /> | <img width="620" alt="Control de Sala" src="docs/capturas/03-control-sala.png" /> |
+| <img width="456" height="755" alt="image" src="https://github.com/user-attachments/assets/101709fb-a61a-4f74-9938-c817cb9c93da" /> | <img width="1917" height="963" alt="image" src="https://github.com/user-attachments/assets/0b910a6e-545a-4f1e-9d02-a6b45d1a146d" />|
 
 | Alertas de Vencidos | Estadísticas |
 | :---: | :---: |
-| <img width="620" alt="Alertas de Vencidos" src="docs/capturas/05-alertas-vencidos.png" /> | <img width="620" alt="Estadísticas" src="docs/capturas/06-estadisticas.png" /> |
+| <img width="1916" height="687" alt="image" src="https://github.com/user-attachments/assets/f8a3cc0e-1a4f-42ae-b2e0-78d6bf3139a0" /> | <img width="1905" height="1005" alt="image" src="https://github.com/user-attachments/assets/1291f54a-dfb6-419b-965a-b0fa0f2c39bb" />|
 
 | Guía de Uso |
 | :---: |
-| <img width="620" alt="Guía de Uso" src="docs/capturas/07-guia-de-uso.png" /> |
+| <img width="1917" height="866" alt="image" src="https://github.com/user-attachments/assets/77b304fc-6865-4e0a-bf62-6121de4385e8" />|
 
-> 📂 **¿Dónde van las capturas?** En la carpeta **`docs/capturas/`** de este repositorio, con estos nombres exactos: `01-login.png`, `03-control-sala.png`, `05-alertas-vencidos.png`, `06-estadisticas.png` y `07-guia-de-uso.png`. Las dos primeras (Inventario y Préstamos) ya están alojadas en GitHub.
+
 
 ---
 
