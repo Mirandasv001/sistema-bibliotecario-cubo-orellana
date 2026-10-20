@@ -7,42 +7,15 @@ namespace BibliotecaApp
         public FormLogin()
         {
             InitializeComponent();
-            AsignarIconoAplicacion();
             CargarLogo();
-        }
-
-        /// <summary>
-        /// Asigna el icono institucional CUBO a la barra de título con fallback seguro.
-        /// </summary>
-        private void AsignarIconoAplicacion()
-        {
-            try
-            {
-                // Prioridad 1: extraer el icono embebido en el .exe (ApplicationIcon del csproj).
-                this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-            }
-            catch
-            {
-                try
-                {
-                    // Prioridad 2: cargar desde Recursos\app.ico junto al .exe.
-                    string rutaIcono = Path.Combine(AppContext.BaseDirectory, "Recursos", "app.ico");
-                    if (File.Exists(rutaIcono))
-                        this.Icon = new Icon(rutaIcono);
-                }
-                catch
-                {
-                    // Fallback: icono por defecto del sistema (no crashea).
-                    this.Icon = SystemIcons.Application;
-                }
-            }
         }
 
         private void CargarLogo()
         {
             try
             {
-                // junto al .exe; con MemoryStream para no dejar el archivo bloqueado
+                // C-03/C-04: ruta fija junto al .exe (sin búsquedas ascendentes) y
+                // lectura vía MemoryStream para no bloquear el archivo en disco.
                 string rutaLogo = Path.Combine(AppContext.BaseDirectory, "Recursos", "Logo de inicio.jpg");
                 if (File.Exists(rutaLogo))
                 {

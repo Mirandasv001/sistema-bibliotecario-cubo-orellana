@@ -361,7 +361,3 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-
-# Instalador compilado: el binario (.exe de 42 MB) se distribuye via GitHub Releases,
-# nunca dentro del repositorio
-instalador/

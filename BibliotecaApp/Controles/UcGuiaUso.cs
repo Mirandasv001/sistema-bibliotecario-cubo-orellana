@@ -1,25 +1,17 @@
-using System.ComponentModel;
 using System.Drawing;
-using System.IO;
 using System.Windows.Forms;
 
 namespace BibliotecaApp
 {
     /// <summary>
     /// Guía de Uso a pantalla completa para bibliotecarios.
-    /// Manual operativo completo renderizado en un WebBrowser (HTML + imágenes
-    /// copiadas a %TEMP% con nombres seguros → URIs file:/// estables).
-    /// Todo por code-behind: el .Designer.cs no se modifica.
+    /// Muestra el manual operativo completo en un RichTextBox con formato enriquecido.
     /// </summary>
     public partial class UcGuiaUso : UserControl
     {
-        // WebBrowser que renderiza el manual completo (texto + imagen + scroll nativo)
-        private WebBrowser? webBrowserManual;
-
         public UcGuiaUso()
         {
             InitializeComponent();
-            ConstruirLayoutManual();
         }
 
         private void UcGuiaUso_Load(object sender, EventArgs e)
@@ -35,310 +27,54 @@ namespace BibliotecaApp
             CargarManual();
         }
 
-        /// <summary>
-        /// Limpia los controles manuales del Designer (rtbManual) e instala un
-        /// WebBrowser con Dock=Fill que renderiza el manual con scroll nativo.
-        /// Idempotente: solo construye el layout la primera vez.
-        /// </summary>
-        private void ConstruirLayoutManual()
-        {
-            if (webBrowserManual != null) return;
-
-            // Quitar el RichTextBox del Designer (provoca el corte de texto)
-            Controls.Remove(rtbManual);
-            rtbManual.Dispose();
-
-            webBrowserManual = new WebBrowser
-            {
-                Name = "webBrowserManual",
-                Dock = DockStyle.Fill,
-                IsWebBrowserContextMenuEnabled = false,
-                AllowNavigation = false,
-                ScrollBarsEnabled = true
-            };
-
-            // Enlaces externos (http/https): se interceptan y abren en el
-            // navegador predeterminado del sistema, nunca dentro del formulario.
-            webBrowserManual.Navigating += WebBrowserManual_Navigating;
-            webBrowserManual.NewWindow += WebBrowserManual_NewWindow;
-            webBrowserManual.DocumentCompleted += WebBrowserManual_DocumentCompleted;
-
-            Controls.Add(webBrowserManual);
-            webBrowserManual.BringToFront();
-        }
-
-        /// <summary>
-        /// Abre una URL en el navegador externo predeterminado del sistema
-        /// (Chrome/Edge) mediante ShellExecute, exigido en .NET 5+.
-        /// </summary>
-        private static void AbrirEnNavegadorExterno(string url)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url)
-                {
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[GuiaUso] No se pudo abrir el enlace externo: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Intercepta la navegación del propio control: cualquier enlace http/https
-        /// se cancela aquí y se deriva al navegador externo del usuario.
-        /// </summary>
-        private void WebBrowserManual_Navigating(object? sender, WebBrowserNavigatingEventArgs e)
-        {
-            string url = e.Url?.AbsoluteUri ?? string.Empty;
-            if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                e.Cancel = true;
-                AbrirEnNavegadorExterno(url);
-            }
-        }
-
-        /// <summary>
-        /// Los enlaces con target='_blank' solicitan una ventana nueva (evento
-        /// NewWindow, cuyo delegate solo expone CancelEventArgs): se cancela la
-        /// ventana interna y la apertura externa la resuelve el Click de cada
-        /// enlace capturado en DocumentCompleted.
-        /// </summary>
-        private void WebBrowserManual_NewWindow(object? sender, CancelEventArgs e)
-        {
-            e.Cancel = true;
-        }
-
-        /// <summary>
-        /// Al terminar de cargar el manual se suscribe el Click de cada enlace
-        /// del DOM para abrirlo en el navegador externo (los href son absolutos).
-        /// Se resta antes de sumar para evitar suscripciones dobles si el
-        /// documento se recarga (Load/Actualizar).
-        /// </summary>
-        private void WebBrowserManual_DocumentCompleted(object? sender, WebBrowserDocumentCompletedEventArgs e)
-        {
-            try
-            {
-                if (webBrowserManual?.Document == null) return;
-
-                foreach (HtmlElement enlace in webBrowserManual.Document.Links)
-                {
-                    enlace.Click -= EnlaceManual_Click;
-                    enlace.Click += EnlaceManual_Click;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[GuiaUso] Error enlazando hipervínculos: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Clic en un enlace del manual: si es http/https, se abre directamente
-        /// en el navegador predeterminado del sistema (Chrome/Edge).
-        /// </summary>
-        private void EnlaceManual_Click(object? sender, EventArgs e)
-        {
-            if (sender is not HtmlElement enlace) return;
-
-            string href = enlace.GetAttribute("href") ?? string.Empty;
-            if (href.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                href.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                AbrirEnNavegadorExterno(href);
-            }
-        }
-
         private void CargarManual()
         {
             try
             {
-                if (webBrowserManual == null) return;
+                // RTF estructurado con jerarquía visual profesional
+                rtbManual.Rtf = @"{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang1033{\fonttbl{\f0\fnil\fcharset0 Segoe UI;}{\f1\fnil\fcharset0 Segoe UI Semibold;}{\f2\fnil\fcharset0 Segoe UI Black;}}
+{\colortbl ;\red22\green41\blue69;\red51\green102\blue153;\red80\green80\blue80;\red0\green120\blue215;}
+{\*\generator Riched20 10.0.19041}\viewkind4\uc1 
+\pard\sa200\sl276\slmult1\cf1\f2\fs32 SISTEMA DE GESTI\'d3N BIBLIOTECARIA - CUBO ING. RIGOBERTO ORELLANA\par
+\cf3\f0\fs22\i Manual Operativo para Bibliotecarios\i0\par
+\par
+\cf2\f1\fs26 CONTROL DE SALA\par
+\cf3\f0\fs20 Este m\'f3dulo registra las visitas diarias a las instalaciones del CUBO.\par
+\pard\li360\sa200\sl276\slmult1\cf0\f1\fs20\'95 Registro: \f0 Llene los datos del visitante (Nombre, G\'e9nero, Edad) y el libro que leer\'e1 dentro de las instalaciones. Haga clic en \cf4\f1 ""Registrar Lectura""\cf0\f0 .\par
+\cf0\f1\'95 Devoluci\'f3n Interna: \f0 Seleccione al usuario en la tabla y haga clic en \cf4\f1 ""Marcar Devoluci\'f3n""\cf0\f0  cuando termine su lectura.\par
+\cf0\f1\'95 Seguridad: \f0 La eliminaci\'f3n de registros est\'e1 protegida. Requerir\'e1 ingresar nuevamente sus credenciales de administrador para evitar borrados accidentales.\par
+\pard\sa200\sl276\slmult1\par
+\cf2\f1\fs26 INVENTARIO DE LIBROS\par
+\cf3\f0\fs20 Cat\'e1logo digital completo de la biblioteca.\par
+\pard\li360\sa200\sl276\slmult1\cf0\f1\fs20\'95 B\'fasqueda: \f0 Puede filtrar el cat\'e1logo escribiendo el c\'f3digo del ejemplar o el t\'edtulo del libro en la barra superior.\par
+\cf0\f1\'95 Pr\'e9stamo R\'e1pido: \f0 Si hace ""Doble Clic"" sobre cualquier libro de la lista, el sistema lo llevar\'e1 autom\'e1ticamente al m\'f3dulo de Pr\'e9stamos Externos con los datos del libro ya cargados.\par
+\cf0\f1\'95 Importaci\'f3n Masiva (Admin): \f0 Permite cargar miles de libros simult\'e1neamente desde un archivo CSV.\par
+\pard\sa200\sl276\slmult1\par
+\cf2\f1\fs26 PR\'c9STAMOS EXTERNOS\par
+\cf3\f0\fs20 Gesti\'f3n de libros que los usuarios llevan a casa.\par
+\pard\li360\sa200\sl276\slmult1\cf0\f1\fs20\'95 Nuevo Pr\'e9stamo: \f0 Ingrese los datos de contacto del usuario. El sistema calcular\'e1 autom\'e1ticamente 8 d\'edas como fecha l\'edmite de entrega.\par
+\cf0\f1\'95 Notificaci\'f3n de Bienvenida: \f0 Una vez registrado el pr\'e9stamo, haga clic en el bot\'f3n \cf4\f1 ""Enviar""\cf0\f0  en la tabla para mandarle un correo personalizado al usuario con los detalles de su libro.\par
+\cf0\f1\'95 Devoluciones y Renovaciones: \f0 Busque el registro, cambie el Estado en la lista desplegable y asigne el nombre del personal responsable. El sistema validar\'e1 autom\'e1ticamente que los campos requeridos est\'e9n llenos seg\'fan la acci\'f3n.\par
+\pard\sa200\sl276\slmult1\par
+\cf2\f1\fs26 ALERTAS DE VENCIDOS\par
+\cf3\f0\fs20 Control de morosidad y recuperaci\'f3n de libros.\par
+\pard\li360\sa200\sl276\slmult1\cf0\f1\fs20\'95 Notificaciones Individuales: \f0 La tabla muestra los usuarios que han excedido su fecha l\'edmite. Al hacer clic en el bot\'f3n \cf4\f1 ""Enviar""\cf0\f0  junto al nombre del moroso, el sistema redactar\'e1 autom\'e1ticamente un correo personalizado recordando la devoluci\'f3n del libro.\par
+\cf0\f1\'95 Seguimiento Visual: \f0 Los botones cambiar\'e1n a color verde (\cf4\f1 ""Enviado""\cf0\f0 ) para que el equipo de bibliotecarios sepa a qui\'e9n ya se le ha notificado durante el turno.\par
+\pard\sa200\sl276\slmult1\par
+\cf2\f1\fs26 ESTAD\'cdSTICAS\par
+\cf3\f0\fs20 Panel de an\'e1lisis para reportes de alcance.\par
+\pard\li360\sa200\sl276\slmult1\cf0\f1\fs20\'95 Uso: \f0 Seleccione un rango de fechas (""Desde"" y ""Hasta"") y presione \cf4\f1 ""Filtrar""\cf0\f0 . El sistema generar\'e1 gr\'e1ficos exactos del total de visitas divididas por g\'e9nero para facilitar los informes administrativos.\par
+}";
 
-                // --- Imágenes incrustadas en el HTML como Data URI Base64, leídas
-                //     en memoria desde Recursos (junto al .exe). Así viajan dentro
-                //     del propio documento: sin %TEMP%, sin permisos de disco y a
-                //     salvo de la limpieza automática de Windows en otra PC.
-                //     (Nota: en disco "Imagen 4" y "Alerta 6" son .jpg, no .png.)
-                string uriImagen = string.Empty;
-                string uriImgExcel1 = string.Empty;
-                string uriImgExcel2 = string.Empty;
-                string uriImgExcel3 = string.Empty;
-                string uriImgExcel4 = string.Empty;
-                string uriImgExcel5 = string.Empty;
-                string uriImgAlertas6 = string.Empty;
-                string uriImgEstadistica7 = string.Empty;
-                try
-                {
-                    uriImagen = "data:image/jpeg;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "MODULO CUBO.jpg")));
-                    uriImgExcel1 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "formato_excel 1.png")));
-                    uriImgExcel2 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "formato sin encabezados 2.png")));
-                    uriImgExcel3 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "guardar como csv 3.png")));
-                    uriImgExcel4 = "data:image/jpeg;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Imagen 4.jpg")));
-                    uriImgExcel5 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Inventario cargado 5.png")));
-                    uriImgAlertas6 = "data:image/jpeg;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Alerta 6.jpg")));
-                    uriImgEstadistica7 = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Recursos", "Estadistica 7.png")));
-                }
-                catch (Exception exImg)
-                {
-                    // Archivo faltante o ilegible: su <img> queda vacía, pero el manual carga igual
-                    System.Diagnostics.Debug.WriteLine($"[GuiaUso] Error codificando imágenes: {exImg.Message}");
-                }
-
-                string html = $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset='utf-8'>
-    <style>
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px 40px; color: #333; line-height: 1.6; }}
-        h1 {{ color: #1a365d; font-size: 27px; margin-bottom: 5px; text-transform: uppercase; }}
-        .subtitle {{ color: #666; font-size: 17px; font-style: italic; margin-bottom: 35px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }}
-        h2 {{ color: #2b6cb0; font-size: 21px; margin-top: 40px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; }}
-        h3 {{ color: #2d3748; font-size: 19px; margin-top: 25px; margin-bottom: 10px; }}
-        p, li {{ font-size: 17px; margin-bottom: 10px; color: #4a5568; }}
-        ul, ol {{ margin-top: 5px; margin-bottom: 20px; padding-left: 25px; }}
-        li {{ margin-bottom: 8px; }}
-        .highlight {{ background-color: #ebf8ff; padding: 2px 6px; border-radius: 4px; color: #2b6cb0; font-weight: bold; }}
-        /* Ajuste de imagen más pequeña y centrada */
-        .img-container {{ text-align: center; margin: 30px 0; }}
-        img {{ max-width: 55%; height: auto; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px; }}
-        .firma-dev {{
-            text-align: center;
-            font-size: 11px;
-            color: #94a3b8; /* Gris intermedio: discreto pero legible */
-            margin-top: 80px;
-            padding-bottom: 10px;
-        }}
-        .firma-dev a {{
-            color: #94a3b8;
-            text-decoration: none;
-        }}
-        .firma-dev a:hover {{
-            color: #64748b; /* El cursor lo oscurece para dar retroalimentación */
-        }}
-    </style>
-</head>
-<body>
-    <h1>SISTEMA DE GESTIÓN BIBLIOTECARIA</h1>
-    <div class='subtitle'>Manual Operativo y Guía Paso a Paso para Bibliotecarios</div>
-
-    <h2>1. ROLES Y NIVELES DE ACCESO</h2>
-    <p>El sistema está blindado con niveles de seguridad para evitar la pérdida accidental de datos del inventario y del historial de visitantes. Los perfiles son:</p>
-    <ul>
-        <li><b>Administrador:</b> Tiene control y acceso total al sistema. Es el único perfil autorizado para visualizar y utilizar botones de acciones críticas como <span class='highlight'>Vaciar Inventario</span>, <span class='highlight'>Eliminar (fila)</span>, <span class='highlight'>Eliminar página</span>, <span class='highlight'>Editar Libro</span> y realizar la <span class='highlight'>Importación CSV</span>.</li>
-        <li><b>Operador:</b> Diseñado para el personal de apoyo y trabajo diario. Puede registrar lecturas, realizar préstamos externos, marcar devoluciones y consultar el inventario. Por seguridad, todas las opciones de borrado y modificación estructural están ocultas y bloqueadas.</li>
-    </ul>
-
-    <h2>2. SISTEMA DE UBICACIÓN FÍSICA (NOMENCLATURA)</h2>
-    <p>Para localizar un libro rápidamente en la sala o saber exactamente dónde guardarlo al ser devuelto, el sistema utiliza coordenadas alfanuméricas exactas.</p>
-    <p>Como ejemplo, <b>El CUBO Ing. Rigoberto Orellana cuenta con 5 módulos</b> físicos de estanterías. El código se divide en tres partes:</p>
-    <ul>
-        <li><b>Módulo (Ej. M1 al M5):</b> Representa el librero de madera completo.</li>
-        <li><b>Columna (A, B, C, D, E...):</b> Son las divisiones verticales dentro de ese módulo, contando siempre de izquierda a derecha.</li>
-        <li><b>Cuadro / Nivel (1, 2, 3, 4...):</b> Son los espacios o tramos horizontales dentro de una columna, contados desde arriba hacia abajo.</li>
-    </ul>
-    <p><i>Ejemplo Práctico:</i> Si la ficha del libro dice ubicación <span class='highlight'>M1A4</span>, significa que debes caminar al <b>Módulo 1</b>, ubicar la primera <b>Columna (A)</b> y buscar en el <b>Cuarto cuadro (hacia abajo)</b>.</p>
-
-    <div class='img-container'>
-        <img src='{uriImagen}' alt='Guía de Estantería M1A4' />
-    </div>
-
-    <h2>3. IMPORTACIÓN MASIVA DE INVENTARIO (CSV)</h2>
-    <p>Para cargar el catálogo completo de libros de forma automática, el sistema utiliza archivos CSV. Es <b>estrictamente obligatorio</b> respetar el orden de las columnas para que la base de datos funcione correctamente.</p>
-    <p><i>Nota de Seguridad:</i> Esta función requiere credenciales de <b>Administrador</b> para evitar la duplicación o corrupción accidental del catálogo general.</p>
-
-    <ol>
-        <li><b>Preparar el documento:</b> Abre tu inventario en Excel o Google Sheets. Asegúrate de que las columnas estén exactamente en este orden: <i>Código, Título, Autor, Editorial, Estado, Ubicación</i>.</li>
-        <div class='img-container'>
-            <img src='{uriImgExcel1}' alt='Formato Excel con encabezados' style='max-width: 80%;' />
-        </div>
-
-        <li><b>Eliminar los encabezados:</b> Antes de guardar, debes <b>eliminar la Fila 1</b> (donde dice ""CÓDIGO"", ""TÍTULO"", etc.). El archivo final solo debe contener los datos de los libros, comenzando directamente desde la primera fila.</li>
-        <div class='img-container'>
-            <img src='{uriImgExcel2}' alt='Formato Excel sin encabezados' style='max-width: 80%;' />
-        </div>
-
-        <li><b>Guardar como CSV:</b> Ve a Archivo > Guardar como... y en el tipo de archivo selecciona obligatoriamente <b>CSV (delimitado por comas)</b>.</li>
-        <div class='img-container'>
-            <img src='{uriImgExcel3}' alt='Guardar como CSV' style='max-width: 60%;' />
-        </div>
-
-        <li><b>Importar al sistema:</b> Ingresa al sistema con tu perfil de Administrador, ve al módulo <b>Inventario</b>, haz clic en el botón superior <b>Importar CSV</b> y selecciona el archivo que acabas de guardar.</li>
-        <div class='img-container'>
-            <img src='{uriImgExcel4}' alt='Botón Importar CSV' style='max-width: 80%;' />
-        </div>
-
-        <li><b>¡Importación Exitosa!:</b> Si los pasos se siguieron correctamente, el sistema mostrará un mensaje de éxito y el catálogo completo aparecerá inmediatamente en la tabla, listo para ser utilizado en préstamos y consultas.</li>
-        <div class='img-container'>
-            <img src='{uriImgExcel5}' alt='Inventario cargado con éxito' style='max-width: 90%; border: 2px solid #4CAF50;' />
-        </div>
-    </ol>
-
-    <h2>4. GUÍA PASO A PASO POR MÓDULOS</h2>
-
-    <h3>4.1. Control de Sala (Lectura Interna)</h3>
-    <p>Este módulo es para los usuarios que toman un libro y lo leen dentro de las instalaciones del CUBO.</p>
-    <ol>
-        <li><b>Registrar:</b> Escribe el Nombre del usuario, su Edad, selecciona el Género y anota el Título del libro. Haz clic en el botón oscuro <b>Registrar Lectura</b>. <i>(Nota: Al hacer esto, el sistema cambiará automáticamente la disponibilidad de ese libro a <span class='highlight'>'En Sala'</span> en el Inventario).</i></li>
-        <li><b>Devolución:</b> Cuando el usuario termine de leer, búscalo en la tabla inferior. Haz un solo clic sobre su nombre para seleccionar la fila y presiona el botón <b>Marcar Devolución</b>. El estado cambiará a 'Entregado', se registrará la hora de recepción, y el libro volverá a estar <span class='highlight'>'Disponible'</span>.</li>
-    </ol>
-
-    <h3>4.2. Inventario General de Libros</h3>
-    <p>El catálogo digital de toda la biblioteca.</p>
-    <ol>
-        <li><b>Búsqueda Rápida:</b> Usa la barra superior para buscar por título, autor o código del libro. La tabla se filtrará automáticamente.</li>
-        <li><b>Proceso de Préstamo (Doble Clic):</b> Para prestar un libro, es <b>obligatorio</b> buscarlo en esta tabla y hacer <b>Doble Clic</b> sobre su fila. Así es como el sistema vincula el libro exacto y te envía directamente al módulo de Préstamos Externos con los datos ya cargados.</li>
-        <li><b>Control de Disponibilidad:</b> El sistema gestiona dónde está cada ejemplar de forma automática. En la última columna verás si un libro está <b>'Disponible'</b> (en el estante), <b>'En Sala'</b> (leyéndose dentro del CUBO) o <b>'Pendiente'</b> (prestado a casa).</li>
-    </ol>
-
-    <h3>4.3. Préstamos Externos (Para llevar a casa)</h3>
-    <p>Gestión estricta de los libros que salen de las instalaciones.</p>
-    <ol>
-        <li><b>Registro de Usuario:</b> Tras hacer Doble Clic en el inventario, llegarás aquí. Llena el nombre, DUI, teléfono, correo y dirección de la persona. <i>(Al guardar el préstamo, la disponibilidad del libro cambiará a <span class='highlight'>'Pendiente'</span> de forma automática).</i></li>
-        <li><b>Fechas y Flexibilidad:</b> Al seleccionar la fecha actual, el sistema calculará automáticamente <b>8 días de vigencia</b> como límite sugerido. Sin embargo, el calendario es flexible y te permite ajustar manualmente la fecha de entrega si se requiere otorgar más o menos tiempo.</li>
-        <li><b>Notificación por Correo:</b> Tras guardar, busca el registro en la tabla y presiona el <b>botón Enviar</b>. Esto le mandará al usuario un correo con el resumen y la fecha programada de devolución.</li>
-        <li><b>Renovación:</b> Si el usuario solicita más tiempo para seguir leyendo, selecciona su registro y usa el botón <b>Renovar (fila)</b>. El sistema te pedirá ingresar el nombre del personal que autoriza la extensión y recalculará la nueva fecha.</li>
-        <li><b>Devolución:</b> Si el usuario trae su libro para entregarlo, selecciona el registro y haz clic en <b>Registrar Devolución (fila)</b>. El sistema te pedirá el nombre del personal que está recibiendo el ejemplar en ese momento. El estado cambiará a 'Entregado' <i>(y el libro volverá a estar 'Disponible' en el inventario)</i>.</li>
-        <li><b>Modificar Datos:</b> Únicamente si te equivocaste al ingresar los datos del usuario o del libro, selecciona el registro, corrige la información en las casillas superiores y presiona el botón <b>Modificar</b>.</li>
-    </ol>
-
-    <h3>4.4. Alertas de Vencidos</h3>
-    <p>Este módulo trabaja en automático. Cada vez que entres, el sistema revisará todos los préstamos externos. Si un libro superó la fecha límite de entrega y sigue marcado como 'Pendiente', aparecerá en esta lista roja.</p>
-    <ul>
-        <li><b>Notificación de Retraso:</b> En esta pantalla también encontrarás un <b>botón Enviar</b>. Al presionarlo, el sistema mandará un correo con un mensaje especial ajustado para solicitar al usuario moroso la devolución inmediata del ejemplar.</li>
-    </ul>
-    <div class='img-container'>
-        <img src='{uriImgAlertas6}' alt='Pantalla Alertas de Vencidos' style='max-width: 90%; margin-top: 10px;' />
-    </div>
-
-    <h3>4.5. Estadísticas</h3>
-    <p>Panel de control general. Usa los calendarios para seleccionar una fecha de ""Desde"" y ""Hasta"", presiona ""Filtrar"" y el sistema generará gráficas exactas mostrando cuántos hombres y mujeres visitaron la sala o se llevaron libros en ese periodo de tiempo. Ideal para los reportes mensuales de gestión.</p>
-    <div class='img-container'>
-        <img src='{uriImgEstadistica7}' alt='Pantalla de Estadísticas' style='max-width: 90%; margin-top: 10px;' />
-    </div>
-
-    <h3>4.6. Cambiar Contraseña</h3>
-    <p>Módulo para actualizar la credencial de acceso del sistema. Como medida de protección contra modificaciones accidentales, se mostrará una ventana de confirmación donde es obligatorio escribir la frase <b>'cambiar contraseña'</b> para poder habilitar el botón Continuar y proceder con el cambio.</p>
-
-    <div class='firma-dev'>
-        dev by <a href='https://github.com/Mirandasv001' target='_blank'>Erick Miranda</a> | ig: <a href='https://www.instagram.com/erick_miranda006' target='_blank'>@erick_miranda006</a>
-    </div>
-
-</body>
-</html>";
-
-                // Asumiendo que instanciaste un WebBrowser llamado webBrowserManual
-                webBrowserManual.DocumentText = html;
+                // Restaurar cursor al inicio
+                rtbManual.SelectionStart = 0;
+                rtbManual.SelectionLength = 0;
+                rtbManual.ScrollToCaret();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error cargando manual: {ex.Message}");
-                if (webBrowserManual != null)
-                    webBrowserManual.DocumentText = "<body style='font-family:Segoe UI;padding:20px;'>Error al cargar el manual de usuario.</body>";
+                rtbManual.Text = "Error al cargar el manual de usuario.";
             }
         }
     }

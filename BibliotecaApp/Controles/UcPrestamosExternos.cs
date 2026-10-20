@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.Windows.Forms;
 using Microsoft.Data.Sqlite;
 
@@ -113,7 +114,7 @@ namespace BibliotecaApp
             // Van al FINAL de la fila y un espaciador los empuja al extremo derecho.
             CrearBotonesPaginacion();
 
-            // Campo Género (Label + ComboBox) en code-behind: sección DATOS DEL USUARIO
+            // Campo Género (Label + ComboBox) en code-behind: fila libre 8 de tlpCampos
             CrearCampoGenero();
 
             // Asegurar que la columna Notificado exista en la BD
@@ -225,9 +226,14 @@ namespace BibliotecaApp
                 splitPrestamos.SplitterDistance = deseado;
         }
 
+        // ====================================================================
+        //  FLUJO ÁGIL — carga directa desde Inventario
+        // ====================================================================
+
         /// <summary>
-        /// Precarga el código y el título del ejemplar que vino desde Inventario
-        /// y bloquea esos dos campos para que solo se completen los datos del usuario.
+        /// Método público invocado por Form1.CargarPrestamoDesdeInventario.
+        /// Precarga el Código y el Título del ejemplar y bloquea ambos campos
+        /// para que el operador solo complete los datos del usuario.
         /// </summary>
         public void CargarDesdeInventario(string codigo, string titulo)
         {
@@ -237,6 +243,10 @@ namespace BibliotecaApp
             MostrarAviso($"Ejemplar \"{codigo}\" disponible. Campos de libro bloqueados.", EstiloUI.Acento);
             txtNombre.Focus();
         }
+
+        // ====================================================================
+        //  BÚSQUEDA RÁPIDA POR CÓDIGO DEL EJEMPLAR
+        // ====================================================================
 
         private void txtCodigoLibro_KeyPress(object? sender, KeyPressEventArgs e)
         {
@@ -339,6 +349,9 @@ namespace BibliotecaApp
             lblAvisoCodigo.Text = "";
         }
 
+        // ------------------------------------------------------------------
+        //  Placeholders nativos (Win32 EM_SETCUEBANNER)
+        // ------------------------------------------------------------------
         private void AplicarPlaceholders()
         {
             EstiloUI.EstablecerPlaceholder(txtDui, "Ej: 00000000-0");
@@ -348,10 +361,9 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Crea el campo Género (Label + ComboBox) en code-behind y lo coloca en
-        /// la sección DATOS DEL USUARIO: a la derecha del TextBox de Dirección
-        /// (columnas 4 y 5), alineado justo debajo de DUI y Correo. Para liberar
-        /// esas columnas se recoloca Dirección a su propia columna (se quita el
-        /// ColumnSpan de 3 que tenía en el Designer). Sin modificar .Designer.cs.
+        /// la MISMA fila que "Fecha de Entrega Esperada", columnas 2 y 3 (libres),
+        /// alineado justo debajo de "Personal que Prestó". Sin crear filas nuevas
+        /// ni modificar el archivo .Designer.cs.
         /// </summary>
         private void CrearCampoGenero()
         {
@@ -368,44 +380,18 @@ namespace BibliotecaApp
             EstiloUI.EstilizarEntrada(cmbGeneroPrestamo); // DropDownList + Flat + márgenes uniformes
             cmbGeneroPrestamo.Margin = new Padding(3, 0, 15, 4); // mismo margen que el resto de campos
 
-            // Dirección ocupaba las columnas 3, 4 y 5 (ColumnSpan 3). Se reduce a
-            // su propia columna (3) para dejar libre la derecha y colocar allí
-            // Género, dentro de la MISMA fila de usuario (la de Teléfono/Dirección).
-            int filaUsuario = tlpCampos.GetRow(txtDireccion);
-            tlpCampos.SetColumnSpan(txtDireccion, 1);
-            tlpCampos.Controls.Add(lblGenero, 4, filaUsuario);
-            tlpCampos.Controls.Add(cmbGeneroPrestamo, 5, filaUsuario);
-
-            ConfigurarOrdenTabulacion();
+            // Fila de "Fecha de Entrega Esperada" (dtpFechaEntrega), columnas 2 y 3
+            int filaEntrega = tlpCampos.GetRow(dtpFechaEntrega);
+            tlpCampos.Controls.Add(lblGenero, 2, filaEntrega);
+            tlpCampos.Controls.Add(cmbGeneroPrestamo, 3, filaEntrega);
         }
 
-        /// <summary>
-        /// Fija el TabIndex de los campos de entrada en orden explícito y
-        /// secuencial, para que el flujo del teclado en la sección de usuario sea
-        /// siempre Nombre → Correo → DUI → Teléfono → Dirección → Género, y el
-        /// TAB posterior a Género salte directo a "Código del Ejemplar".
-        /// Al dar valores distintos se elimina la dependencia del orden de
-        /// inserción (z-order), que es lo que hoy hacía tabular Género al final.
-        /// </summary>
-        private void ConfigurarOrdenTabulacion()
-        {
-            txtNombre.TabIndex = 0;
-            txtCorreo.TabIndex = 1;
-            txtDui.TabIndex = 2;
-            txtTelefono.TabIndex = 3;
-            txtDireccion.TabIndex = 4;
-            cmbGeneroPrestamo.TabIndex = 5;
-
-            // Salto tras Género: el siguiente campo tabulable es Código del Ejemplar
-            txtCodigoLibro.TabIndex = 6;
-            txtTituloLibro.TabIndex = 7;
-            dtpFechaPrestamo.TabIndex = 8;
-            txtPersonalPresto.TabIndex = 9;
-            dtpFechaEntrega.TabIndex = 10;
-        }
+        // ====================================================================
+        //  CONSULTA DE CÓDIGOS — resolver ejemplar físico desde el título
+        // ====================================================================
 
         /// <summary>
-        /// Busca el código del primer ejemplar disponible de un título; null si no queda stock.
+        /// Devuelve el Codigo del primer ejemplar disponible de un título, o null si no hay stock.
         /// </summary>
         private static string? ObtenerCodigoDisponible(SqliteConnection conexion, string titulo)
         {
@@ -419,7 +405,7 @@ namespace BibliotecaApp
         }
 
         /// <summary>
-        /// Devuelve el Codigo del primer ejemplar Prestado de un título, o null.
+        /// Devuelve el Codigo del primer ejemplar en estado Prestado de un título, o null.
         /// </summary>
         private static string? ObtenerCodigoPrestado(SqliteConnection conexion, string titulo)
         {
@@ -432,6 +418,10 @@ namespace BibliotecaApp
             return cmd.ExecuteScalar()?.ToString();
         }
 
+        // ====================================================================
+        //  CARGA DE PRÉSTAMOS ACTIVOS (DataGridView)
+        // ====================================================================
+
         private void CargarPrestamosActivos()
         {
             try
@@ -440,6 +430,7 @@ namespace BibliotecaApp
 
                 using var comando = conexion.CreateCommand();
 
+                // --- Paginación: calcula total de páginas y offset defensivo ---
                 CalcularTotalPaginas();
                 if (paginaActual > totalPaginas) paginaActual = totalPaginas;
                 if (paginaActual <= 0) paginaActual = 1;
@@ -481,6 +472,7 @@ namespace BibliotecaApp
 
                 dgvPrestamos.DataSource = tabla;
 
+                // --- UI de paginación (botones dinámicos) ---
                 if (lblPagina != null) lblPagina.Text = $"Página {paginaActual} de {totalPaginas}";
                 if (btnAnterior != null) btnAnterior.Enabled = (paginaActual > 1);
                 if (btnSiguiente != null) btnSiguiente.Enabled = (paginaActual < totalPaginas);
@@ -501,6 +493,7 @@ namespace BibliotecaApp
                     dgvPrestamos.Columns.Add(colNotificado);
                 }
 
+                // --- Trazabilidad: quién renovó / quién devolvió (columnas por código) ---
                 if (!dgvPrestamos.Columns.Contains("PersonalRenovo"))
                 {
                     var colPersonalRenovo = new DataGridViewTextBoxColumn
@@ -562,8 +555,12 @@ namespace BibliotecaApp
                     dgvPrestamos.Columns.Add(btnCol);
                 }
 
+                // --- Orden lógico de columnas (code-behind, sin tocar Designer) ---
+                // ... -> Fecha Préstamo -> Personal que Prestó -> Fecha Renovación ->
+                //      Personal Renovó -> Entrega Esperada -> Personal Devolvió -> Estado
                 ReordenarColumnasGrid();
 
+                // --- Columnas de fecha más compactas (evita que la tabla se amontone) ---
                 foreach (var nombreColFecha in new[]
                          {
                              "FechaPrestamo", "FechaRenovacion", "Entrega Esperada"
@@ -608,7 +605,9 @@ namespace BibliotecaApp
             }
         }
 
-        // Paginación creada en code-behind, sin tocar el Designer
+        // ====================================================================
+        //  PAGINACIÓN (botones creados dinámicamente en code-behind)
+        // ====================================================================
 
         /// <summary>
         /// Crea los botones de paginación (Anterior / Siguiente / lblPagina)
@@ -617,7 +616,7 @@ namespace BibliotecaApp
         /// </summary>
         private void CrearBotonesPaginacion()
         {
-            // ocupa el hueco que sobra en la fila, sin verse
+            // --- Espaciador invisible: ocupa el hueco sobrante de la fila ---
             _espaciadorPaginacion = new Label
             {
                 Name = "espaciadorPaginacion",
@@ -628,6 +627,7 @@ namespace BibliotecaApp
             };
             flpBotones.Controls.Add(_espaciadorPaginacion);
 
+            // --- Botón "Anterior": estilo minimalista, icono cuadrado 35px ---
             btnAnterior = new Button
             {
                 Name = "btnAnterior",
@@ -643,6 +643,7 @@ namespace BibliotecaApp
             btnAnterior.Size = new Size(35, 40);
             btnAnterior.Click += btnAnterior_Click;
 
+            // --- Etiqueta de página ---
             lblPagina = new Label
             {
                 Name = "lblPagina",
@@ -653,6 +654,7 @@ namespace BibliotecaApp
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
 
+            // --- Botón "Siguiente": estilo minimalista, icono cuadrado 35px ---
             btnSiguiente = new Button
             {
                 Name = "btnSiguiente",
@@ -672,8 +674,7 @@ namespace BibliotecaApp
             flpBotones.Controls.Add(lblPagina);
             flpBotones.Controls.Add(btnSiguiente);
 
-            // WeakReference en la lambda: el handler de Resize no debe mantener
-            // vivo al control entero
+            // W-11: WeakReference en lambda Resize para evitar retención de 'this'
             var weakThis = new WeakReference<UcPrestamosExternos>(this);
             EventHandler resizeHandler = null;
             resizeHandler = (_, _) =>
@@ -839,9 +840,13 @@ namespace BibliotecaApp
             }
         }
 
+        // ====================================================================
+        //  BOTONES DE ADMINISTRACIÓN (Eliminar / Limpiar) — solo administrador
+        // ====================================================================
+
         /// <summary>
-        /// Crea btnEliminar y btnLimpiar aquí en code-behind y los agrega a flpBotones.
-        /// Su visibilidad por rol se aplica en el Load.
+        /// Crea btnEliminar y btnLimpiar dinámicamente (sin tocar Designer)
+        /// y los agrega a flpBotones. La visibilidad por rol se aplica en el Load.
         /// </summary>
         private void CrearBotonesAdministracion()
         {
@@ -881,8 +886,8 @@ namespace BibliotecaApp
         /// </summary>
         private void btnEliminar_Click(object? sender, EventArgs e)
         {
-            // tomo los valores de la fila antes de cualquier diálogo: si el usuario
-            // cambia de fila mientras está abierto, se quedarían apuntando a otra
+            // W-02: Capturar valores de la fila ANTES de cualquier MessageBox/Dialog
+            // para evitar race condition si el usuario cambia de fila mientras el dialog está abierto.
             if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
             {
                 MessageBox.Show("Seleccione un préstamo de la lista para eliminar.",
@@ -903,6 +908,7 @@ namespace BibliotecaApp
                 return;
             }
 
+            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
@@ -1015,6 +1021,7 @@ namespace BibliotecaApp
         /// </summary>
         private void btnLimpiar_Click(object? sender, EventArgs e)
         {
+            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
@@ -1026,10 +1033,8 @@ namespace BibliotecaApp
 
         /// <summary>
         /// Elimina en bloque (DELETE parametrizado + transacción) los registros de
-        /// la página visible y recarga el grid. Solo purga el historial en estado
-        /// 'Entregado'; los préstamos activos (Pendiente/Renovado) se conservan
-        /// y sus libros quedan protegidos. Si la página eliminada era la última,
-        /// CargarPrestamosActivos() regresa a la nueva última página.
+        /// la página visible y recarga el grid. Si la página eliminada era la
+        /// última, CargarPrestamosActivos() regresa a la nueva última página.
         /// </summary>
         private void EliminarPaginaActual()
         {
@@ -1054,12 +1059,9 @@ namespace BibliotecaApp
                 return;
             }
 
-            // 2) Confirmación (la eliminación es definitiva; solo aplica a
-            //    préstamos en estado 'Entregado', los activos se conservan)
+            // 2) Confirmación (la eliminación es definitiva)
             DialogResult confirmar = MessageBox.Show(
-                $"Se eliminarán los préstamos ya entregados de la página actual " +
-                $"(hasta {idsPagina.Count} registro(s)).\n" +
-                "Los préstamos activos (Pendiente/Renovado) no se eliminan. " +
+                $"Se eliminarán {idsPagina.Count} registro(s) de la página actual.\n" +
                 "Esta acción no se puede deshacer. ¿Continuar?",
                 "Biblioteca CUBO", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
@@ -1072,14 +1074,10 @@ namespace BibliotecaApp
                 int eliminados;
                 try
                 {
-                    // DELETE parametrizado reutilizando un único parámetro.
-                    // Condición de integridad: solo se purgan préstamos YA
-                    // entregados; los activos (Pendiente/Renovado) y sus libros
-                    // quedan intactos (mismo guard que el borrado individual).
+                    // DELETE parametrizado reutilizando un único parámetro
                     using var comando = conexion.CreateCommand();
                     comando.Transaction = transaccion;
-                    comando.CommandText =
-                        "DELETE FROM PrestamosExternos WHERE ID = $id AND EstadoLibro = 'Entregado';";
+                    comando.CommandText = "DELETE FROM PrestamosExternos WHERE ID = $id;";
 
                     var parametro = comando.CreateParameter();
                     parametro.ParameterName = "$id";
@@ -1100,21 +1098,8 @@ namespace BibliotecaApp
                     throw; // el catch exterior muestra el error unificado
                 }
 
-                if (eliminados == 0)
-                {
-                    MessageBox.Show(
-                        "No hay préstamos en estado 'Entregado' en la página actual; " +
-                        "los préstamos activos (Pendiente/Renovado) no se eliminan en bloque.",
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else
-                {
-                    string conservados = eliminados < idsPagina.Count
-                        ? $" Se conservaron {idsPagina.Count - eliminados} préstamo(s) activo(s)."
-                        : string.Empty;
-                    MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos." + conservados,
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -1126,8 +1111,13 @@ namespace BibliotecaApp
             CargarPrestamosActivos();
         }
 
+        // ====================================================================
+        //  EVENTOS DEL DataGridView (nombres exactos que exige el Designer)
+        // ====================================================================
+
         /// <summary>
-        /// Desactiva renovar/notificar si el préstamo ya está Entregado.
+        /// Bloquea/habilita las acciones de la fila seleccionada según el estado:
+        /// un préstamo 'Entregado' no puede renovarse ni notificarse.
         /// </summary>
         private void DgvPrestamos_SelectionChanged(object? sender, EventArgs e)
         {
@@ -1269,22 +1259,19 @@ namespace BibliotecaApp
 
             try
             {
-                // Construir URI mailto: con subject y body según requerimientos exactos
-                // Subject: "Confirmación de préstamo - Biblioteca CUBO"
-                // Body: "Hola [usuario], muchas gracias por elegir la Biblioteca CUBO.\n\nTe confirmamos el préstamo del libro '[libro]'. Te recordamos amablemente que la fecha esperada de devolución o renovación es el [fecha].\n\n¡Esperamos que disfrutes tu lectura!"
-                string subject = Uri.EscapeDataString("Confirmación de préstamo - Biblioteca CUBO");
-                string body = Uri.EscapeDataString(
-                    $"Hola {nombreUsuario}, muchas gracias por elegir la Biblioteca CUBO.\n\n" +
-                    $"Te confirmamos el préstamo del libro '{tituloLibro}'. Te recordamos amablemente que la fecha esperada de devolución o renovación es el {fechaEntrega}.\n\n" +
-                    $"¡Esperamos que disfrutes tu lectura!");
+                string titulo = CultureInfo.CurrentCulture.TextInfo
+                    .ToTitleCase(tituloLibro.ToLower());
 
-                // El destinatario principal (To) es la propia biblioteca, para que el
-                // cliente de correo no falle por el campo "Para" vacío. El usuario real
-                // se envía en copia oculta (Bcc) vía parámetro bcc=, escapado para no
-                // romper la URI. subject y body ya vienen escapados.
-                string mailtoUri = $"mailto:cuboingrigobertoorellana@gmail.com?bcc={Uri.EscapeDataString(correo)}&subject={subject}&body={body}";
+                string subject = "Confirmacion de prestamo - Biblioteca CUBO";
+                string body = $"Hola {nombreUsuario}, muchas gracias por elegir la Biblioteca CUBO.\r\n\r\n" +
+                              $"Te confirmamos el prestamo del libro \"{titulo}\".\r\n" +
+                              $"La fecha esperada de devolucion o renovacion es el {fechaEntrega}.\r\n\r\n" +
+                              "Esperamos que disfrutes tu lectura.";
 
-                // Lanzar cliente de correo por defecto
+                string mailtoUri = $"mailto:{correo}" +
+                                   $"?subject={Uri.EscapeDataString(subject)}" +
+                                   $"&body={Uri.EscapeDataString(body)}";
+
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
                 Process.Start(psi);
 
@@ -1312,8 +1299,13 @@ namespace BibliotecaApp
             }
         }
 
+        // ====================================================================
+        //  REGISTRAR PRÉSTAMO
+        // ====================================================================
+
         private void btnRegistrar_Click(object sender, EventArgs e)
         {
+            // 1. VALIDACIÓN ESTRICTA SOLO PARA ALTA DE PRÉSTAMO
             if (string.IsNullOrWhiteSpace(txtNombre.Text) ||
                 string.IsNullOrWhiteSpace(txtDui.Text) ||
                 string.IsNullOrWhiteSpace(txtCodigoLibro.Text) ||
@@ -1457,6 +1449,10 @@ namespace BibliotecaApp
             }
         }
 
+        // ====================================================================
+        //  ACTUALIZAR PRÉSTAMO (modo edición)
+        // ====================================================================
+
         /// <summary>
         /// Actualiza un préstamo existente. Si cambió el título, libera el ejemplar
         /// viejo y marca uno nuevo — ambos por Codigo único.
@@ -1517,9 +1513,8 @@ namespace BibliotecaApp
                 }
                 else
                 {
-                    // Título distinto: libero el ejemplar viejo y marco el nuevo. La
-                    // validación de stock va dentro de la misma transacción, para que
-                    // dos operaciones simultáneas no tomen el último ejemplar a la vez.
+                    // Título distinto: liberar ejemplar viejo + marcar ejemplar nuevo.
+                    // W-09: Validación de stock DENTRO de la transacción para evitar race condition.
                     using var transaccion = conexion.BeginTransaction();
                     try
                     {
@@ -1548,9 +1543,8 @@ namespace BibliotecaApp
                             return;
                         }
 
-                        // Actualizar datos del préstamo (persistiendo el nuevo
-                        // CodigoLibro para que la devolución libere el ejemplar correcto)
-                        ActualizarDatosPrestamo(conexion, transaccion, id, codigoNuevo);
+                        // Actualizar datos del préstamo
+                        ActualizarDatosPrestamo(conexion, transaccion, id);
 
                         // Liberar ejemplar viejo SOLO si ningún otro préstamo activo lo retiene.
                         if (!string.IsNullOrEmpty(codigoViejo))
@@ -1612,23 +1606,12 @@ namespace BibliotecaApp
         /// <summary>
         /// Ejecuta el UPDATE de los campos del formulario en PrestamosExternos.
         /// Se separa para reutilizar dentro de transacciones con manejo de inventario.
-        /// Si se indica <paramref name="codigoLibro"/>, también persiste el código
-        /// del ejemplar (caso: cambió el título y el préstamo ahora retiene al
-        /// ejemplar nuevo). Si es null, CodigoLibro queda intacto.
         /// </summary>
-        private void ActualizarDatosPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id, string? codigoLibro = null)
+        private void ActualizarDatosPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id)
         {
             using var cmd = conexion.CreateCommand();
             cmd.Transaction = transaccion;
-
-            // Auditoría F1: sin persistir CodigoLibro, al cambiar el título la
-            // devolución liberaba el ejemplar viejo y el nuevo quedaba 'Prestado'
-            // para siempre (libro fantasma).
-            string columnaCodigo = codigoLibro == null
-                ? string.Empty
-                : ",\n                    CodigoLibro     = $codigoLibro";
-
-            cmd.CommandText = $@"
+            cmd.CommandText = @"
                 UPDATE PrestamosExternos SET
                     NombreUsuario   = $nombre,
                     Correo          = $correo,
@@ -1640,7 +1623,7 @@ namespace BibliotecaApp
                     FechaPrestamo   = $fechaPrestamo,
                     PersonalPresto  = $personalPresto,
                     FechaEntrega    = $fechaEntrega,
-                    EstadoLibro     = $estado{columnaCodigo}
+                    EstadoLibro     = $estado
                 WHERE ID = $id;";
 
             cmd.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
@@ -1655,8 +1638,6 @@ namespace BibliotecaApp
             cmd.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("$estado",
                 string.IsNullOrWhiteSpace(txtEstado.Text) ? "Pendiente" : txtEstado.Text.Trim());
-            if (codigoLibro != null)
-                cmd.Parameters.AddWithValue("$codigoLibro", codigoLibro);
             cmd.Parameters.AddWithValue("$id", id);
             cmd.ExecuteNonQuery();
         }
@@ -1683,6 +1664,10 @@ namespace BibliotecaApp
             cmd.Parameters.AddWithValue("$id", id);
             cmd.ExecuteNonQuery();
         }
+
+        // ====================================================================
+        //  DEVOLUCIÓN
+        // ====================================================================
 
         /// <summary>
         /// Marca el préstamo como "Entregado" y libera el ejemplar físico (por Codigo).
@@ -1915,6 +1900,10 @@ namespace BibliotecaApp
             }
         }
 
+        // ====================================================================
+        //  MODIFICAR — carga el registro en el formulario
+        // ====================================================================
+
         private void btnModificar_Click(object sender, EventArgs e)
         {
             if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
@@ -1975,18 +1964,15 @@ namespace BibliotecaApp
 
                 // Fechas desde la BD protegidas con FechaSegura: la BD puede contener
                 // fechas no inicializadas (0001-01-01) que el control no admite.
-                // Parseo independiente de la región (ISO) con fallback regional.
-                DateTime? fp = FechaDesdeTexto(fila["FechaPrestamo"]?.ToString());
-                if (fp.HasValue)
-                    dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, fp.Value);
+                if (DateTime.TryParse(fila["FechaPrestamo"]?.ToString(), out var fp))
+                    dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, fp);
 
                 txtPersonalPresto.Text = fila["PersonalPresto"]?.ToString() ?? "";
 
                 txtEstado.Text = fila["EstadoLibro"]?.ToString() ?? "Pendiente";
 
-                DateTime? fe = FechaDesdeTexto(fila["FechaEntrega"]?.ToString());
-                if (fe.HasValue)
-                    dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, fe.Value);
+                if (DateTime.TryParse(fila["FechaEntrega"]?.ToString(), out var fe))
+                    dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, fe);
 
                 // Seleccionar el título en el ComboBox (por texto).
                 txtTituloLibro.Text = tituloLibro;
@@ -2005,6 +1991,10 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        // ====================================================================
+        //  VALIDACIÓN Y LIMPIEZA
+        // ====================================================================
 
         /// <summary>
         /// Valida los campos obligatorios del formulario usando
@@ -2036,27 +2026,6 @@ namespace BibliotecaApp
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             control.Focus();
             return false;
-        }
-
-        /// <summary>
-        /// Convierte una fecha proveniente de la BD en DateTime de forma
-        /// independiente de la configuración regional de Windows: primero intenta
-        /// el formato ISO (yyyy-MM-dd, el que guarda la BD) con InvariantCulture;
-        /// si no, reintenta con la cultura regional por compatibilidad con
-        /// registros legados. Devuelve null si no es parseable.
-        /// </summary>
-        private static DateTime? FechaDesdeTexto(string? texto)
-        {
-            if (string.IsNullOrWhiteSpace(texto)) return null;
-
-            if (DateTime.TryParse(texto, System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out DateTime fechaIso))
-                return fechaIso;
-
-            if (DateTime.TryParse(texto, out DateTime fechaRegional))
-                return fechaRegional;
-
-            return null;
         }
 
         /// <summary>

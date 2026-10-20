@@ -30,7 +30,6 @@ namespace BibliotecaApp
             try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { /* sin consola adjunta */ }
 
             InitializeComponent();
-            AsignarIconoAplicacion();
 
             // Configuración de UI dinámica
             ConfigurarBotonMenu(btnSala, "Control de Sala");
@@ -61,33 +60,9 @@ namespace BibliotecaApp
             _timerAlertas.Tick += (_, _) => ActualizarContadorAlertas();
         }
 
-        /// <summary>
-        /// Asigna el icono institucional CUBO a la barra de título con fallback seguro.
-        /// </summary>
-        private void AsignarIconoAplicacion()
-        {
-            try
-            {
-                // Prioridad 1: extraer el icono embebido en el .exe (ApplicationIcon del csproj).
-                this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-            }
-            catch
-            {
-                try
-                {
-                    // Prioridad 2: cargar desde Recursos\app.ico junto al .exe.
-                    string rutaIcono = Path.Combine(AppContext.BaseDirectory, "Recursos", "app.ico");
-                    if (File.Exists(rutaIcono))
-                        this.Icon = new Icon(rutaIcono);
-                }
-                catch
-                {
-                    // Fallback: icono por defecto del sistema (no crashea).
-                    this.Icon = SystemIcons.Application;
-                }
-            }
-        }
-
+        // ------------------------------------------------------------------
+        //  Inicio
+        // ------------------------------------------------------------------
         private void Form1_Load(object sender, EventArgs e)
         {
             CargarLogo();
@@ -109,8 +84,8 @@ namespace BibliotecaApp
         {
             try
             {
-                // junto al .exe; MemoryStream porque Image.FromFile dejaría el
-                // archivo bloqueado en disco
+                // C-03/C-04: ruta fija junto al .exe y lectura vía MemoryStream
+                // (Image.FromFile bloquearía el archivo en disco)
                 string rutaLogo = Path.Combine(AppContext.BaseDirectory, "Recursos", "Logo de inicio.jpg");
                 if (File.Exists(rutaLogo))
                 {
@@ -128,6 +103,9 @@ namespace BibliotecaApp
             }
         }
 
+        // ------------------------------------------------------------------
+        //  Navegación entre apartados
+        // ------------------------------------------------------------------
         private void MostrarApartadoSala()
         {
             if (_vistaSala == null)
@@ -234,10 +212,14 @@ namespace BibliotecaApp
         public void NotificarCambioPrestamos()
         {
             ActualizarContadorAlertas();
-            // el !IsDisposed evita un ObjectDisposedException si la vista ya se cerró
+            // W-10: Verificar !IsDisposed para evitar ObjectDisposedException
             if (_vistaAlertas is { IsDisposed: false }) _vistaAlertas.Actualizar();
             if (_vistaInventario is { IsDisposed: false }) _vistaInventario.Actualizar();
         }
+
+        // ------------------------------------------------------------------
+        //  Flujo ágil: Inventario (doble clic) → Préstamos Externos
+        // ------------------------------------------------------------------
 
         /// <summary>
         /// Método público invocado por UcInventario al hacer doble clic en un
@@ -280,6 +262,10 @@ namespace BibliotecaApp
                 boton.ForeColor = activo ? Color.White : Color.WhiteSmoke;
             }
         }
+
+        // ====================================================================
+        //  NOTIFICACIONES DE PRÉSTAMOS VENCIDOS (bolita roja / badge)
+        // ====================================================================
 
         /// <summary>
         /// Consulta cuántos préstamos están vencidos (EstadoLibro = 'Pendiente'
@@ -343,6 +329,10 @@ namespace BibliotecaApp
                 new RectangleF(x, y, badgeSize, badgeSize), formato);
         }
 
+        // ====================================================================
+        //  CERRAR SESIÓN
+        // ====================================================================
+
         private void btnCerrarSesion_Click(object? sender, EventArgs e)
         {
             DialogResult resultado = MessageBox.Show(
@@ -357,6 +347,9 @@ namespace BibliotecaApp
             }
         }
 
+        // ====================================================================
+        //  CAMBIAR CONTRASEÑA (antes Gestión de Usuarios, Solo Admin)
+        // ====================================================================
         private void MostrarGestionUsuarios()
         {
             // Validación previa por texto: evita abrir el formulario por accidente.

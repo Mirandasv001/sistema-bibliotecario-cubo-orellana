@@ -150,7 +150,7 @@ namespace BibliotecaApp
             _btnVaciarInventario.Click += BtnVaciarInventario_Click;
             panelEncabezado.Controls.Add(_btnVaciarInventario);
 
-            // Agregar/Eliminar/Editar van con el mismo contenedor, tamaño y estilo que Vaciar
+            // --- Botones de acciones de libros: mismo contenedor, tamaño y estilo que Vaciar ---
             btnAgregarLibro = new Button
             {
                 Name = "btnAgregarLibro",
@@ -182,6 +182,7 @@ namespace BibliotecaApp
             btnEliminarLibro.Click += btnEliminarLibro_Click;
             panelEncabezado.Controls.Add(btnEliminarLibro);
 
+            // --- Botón Editar: a la derecha de Eliminar, estilo acento (no destructivo) ---
             btnEditarLibro = new Button
             {
                 Name = "btnEditarLibro",
@@ -293,7 +294,7 @@ namespace BibliotecaApp
                         codigo + " " + titulo).ToLowerInvariant();
                 }
 
-                // suelto la tabla anterior antes de reasignar
+                // W-18: Dispose DataTable/DataView anterior para liberar memoria antes de reasignar
                 _vistaFiltrada?.Dispose();
                 _datosInventario?.Dispose();
 
@@ -650,40 +651,7 @@ namespace BibliotecaApp
                 return;
             }
 
-            // No dejo borrar un libro con préstamo activo: si se fuera, la
-            // devolución quedaría bloqueada para siempre (UPDATE sobre un código
-            // inexistente y rollback eterno del cierre)
-            try
-            {
-                using var conexionVerificacion = ConexionDB.ObtenerConexion();
-                using var cmdVerificar = conexionVerificacion.CreateCommand();
-                cmdVerificar.CommandText = @"
-                    SELECT COUNT(*) FROM PrestamosExternos
-                    WHERE EstadoLibro IN ('Pendiente', 'Renovado')
-                      AND (CodigoLibro = @codigo
-                           OR ((CodigoLibro IS NULL OR CodigoLibro = '')
-                               AND TituloLibro =
-                                   (SELECT Titulo FROM Libros WHERE Codigo = @codigo)));";
-                cmdVerificar.Parameters.AddWithValue("@codigo", codigo);
-                long activos = Convert.ToInt64(cmdVerificar.ExecuteScalar() ?? 0L);
-
-                if (activos > 0)
-                {
-                    MessageBox.Show(
-                        $"No se puede eliminar el libro \"{codigo}\": tiene {activos} préstamo(s) activo(s) (Pendiente/Renovado).\n\n" +
-                        "Registra primero la devolución o renueva/cierra el préstamo; " +
-                        "de lo contrario el registro quedaría bloqueado para siempre.",
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("No se pudo verificar si el libro tiene préstamos activos:\n" + ex.Message,
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
+            // --- Autenticación de seguridad (mismo modal que Préstamos: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
@@ -977,6 +945,10 @@ namespace BibliotecaApp
                 dgvInventario.Columns["Título"]!.FillWeight = 55;
         }
 
+        // ====================================================================
+        //  DOBLE CLIC → iniciar préstamo externo
+        // ====================================================================
+
         private void dgvInventario_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
@@ -1008,6 +980,7 @@ namespace BibliotecaApp
         /// </summary>
         private void dgvInventario_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
+            // Solo actuar sobre la columna "Disponibilidad"
             if (e.ColumnIndex < 0 || e.ColumnIndex >= dgvInventario.Columns.Count) return;
             if (dgvInventario.Columns[e.ColumnIndex].Name != "Disponibilidad") return;
             if (e.Value == null) return;
@@ -1020,45 +993,26 @@ namespace BibliotecaApp
             }
             else if (string.Equals(valor, "En Sala", StringComparison.OrdinalIgnoreCase))
             {
+                // Amarillo suave LemonChiffon con texto casi negro: contraste sin agredir la vista
                 e.CellStyle.BackColor = Color.FromArgb(255, 250, 205);
                 e.CellStyle.ForeColor = Color.FromArgb(45, 45, 45);
             }
+            // Para "Disponible" o cualquier otro valor, no modificamos el estilo
+            // y el DataGridView usa su estilo por defecto
         }
 
+        // ====================================================================
+        //  ADMIN: VACIAR INVENTARIO
+        // ====================================================================
         private void BtnVaciarInventario_Click(object? sender, EventArgs e)
         {
-            // No vacío si hay préstamos activos: esos ejemplares quedarían como
-            // "fantasma" y sus devoluciones no se podrían cerrar nunca
-            try
-            {
-                using var conexionVerificacion = ConexionDB.ObtenerConexion();
-                using var cmdVerificar = conexionVerificacion.CreateCommand();
-                cmdVerificar.CommandText =
-                    "SELECT COUNT(*) FROM PrestamosExternos WHERE EstadoLibro IN ('Pendiente', 'Renovado');";
-                long activos = Convert.ToInt64(cmdVerificar.ExecuteScalar() ?? 0L);
-
-                if (activos > 0)
-                {
-                    MessageBox.Show(
-                        $"No se puede vaciar el inventario: existen {activos} préstamo(s) activo(s) (Pendiente/Renovado).\n\n" +
-                        "Registra primero las devoluciones pendientes; si no, esos libros " +
-                        "quedarían bloqueados y sin poder devolverse nunca.",
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("No se pudo verificar el estado de los préstamos:\n" + ex.Message,
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
+            // --- Autenticación de seguridad (mismo modal que Control de Sala: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
+                if (frmAuth.ShowDialog(this) != DialogResult.OK) return; // Si cancela o falla auth, salir
             }
 
+            // --- Confirmación final ---
             var resultado = MessageBox.Show(
                 "¿Está seguro de que desea ELIMINAR TODOS los libros del inventario?\n\nEsta acción no se puede deshacer.",
                 "Confirmar vaciado de inventario",
@@ -1080,13 +1034,19 @@ namespace BibliotecaApp
                     cmd.ExecuteNonQuery();
                 }
 
-                // Sin esto el programa importaría el CSV de nuevo al arrancar y el
-                // inventario volvería a aparecer lleno
+                // W-08: ELIMINADO — 'Libros.Codigo' es TEXT PRIMARY KEY (no AUTOINCREMENT),
+                // por tanto sqlite_sequence no aplica. La línea siguiente era código muerto.
+
+                // PERSISTENCIA: marcar el vaciado. Sin esta bandera, el arranque
+                // volvería a importar el catálogo CSV y el inventario reaparecería.
                 ConexionDB.MarcarInventarioVaciado(true);
 
-                // vacío el grid de inmediato, sin esperar a la recarga
+                // CRÍTICO: limpiar de inmediato el DataSource del DataGridView para
+                // que la tabla se vea vacía al instante, sin esperar a la recarga.
                 dgvInventario.DataSource = null;
 
+                // Recargar desde la BD real: reconstruye la tabla vacía, el
+                // contador de libros y reaplica el filtro de búsqueda activo.
                 CargarInventario();
 
                 MessageBox.Show("Inventario vaciado correctamente.", "Biblioteca CUBO",
@@ -1099,9 +1059,12 @@ namespace BibliotecaApp
             }
         }
 
+        // ====================================================================
+        //  ADMIN: IMPORTAR CSV MASIVO
+        // ====================================================================
         private void BtnImportarCSV_Click(object? sender, EventArgs e)
         {
-            // sin contar la fila de nuevo registro que agrega el propio grid
+            // Validar si hay filas (descontando la fila de nuevo registro si AllowUserToAddRows es true)
             int filasReales = dgvInventario.AllowUserToAddRows ? dgvInventario.Rows.Count - 1 : dgvInventario.Rows.Count;
             if (filasReales > 0)
             {
@@ -1200,8 +1163,8 @@ namespace BibliotecaApp
                         ? campos[6].Trim()
                         : "Disponible";
 
-                    // no pisar un "Prestado" a "Disponible": miro el estado actual en
-                    // BD antes de insertar o reemplazar
+                    // C-05: No sobrescribir 'Prestado' a 'Disponible' si el ejemplar ya está prestado.
+                    // Verificamos la disponibilidad actual en BD antes de insertar/reemplazar.
                     string disponibilidadFinal = disponibilidadCsv;
                     pCheckCodigo.Value = codigo;
                     object? result = checkCmd.ExecuteScalar();

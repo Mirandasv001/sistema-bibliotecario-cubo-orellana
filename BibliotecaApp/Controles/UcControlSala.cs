@@ -1,4 +1,6 @@
-﻿using System.Data;
+﻿using System.Collections.Generic;
+using System.Data;
+using System.Linq;
 using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
@@ -29,11 +31,11 @@ namespace BibliotecaApp
         private Button? btnSiguiente;
         private Label? lblPagina;
 
+        // Botón de borrado masivo de la página visible (solo Administrador)
+        private Button? btnEliminarPagina;
+
         // Espaciador invisible que empuja la paginación al extremo derecho del FlowLayoutPanel
         private Control? _espaciadorPaginacion;
-
-        // Botón "Eliminar página" (code-behind, misma lógica que UcPrestamosExternos)
-        private Button? btnEliminarPagina;
 
         public UcControlSala()
         {
@@ -75,6 +77,28 @@ namespace BibliotecaApp
             panelBotones.Controls.Add(flpPaginacion);
             // NO hacer BringToFront() - los botones de acción (Top) deben quedar arriba
 
+            // Botón "Eliminar página": borra en bloque los registros visibles.
+            // Solo lo ve un Administrador; un Operador nunca lo ve.
+            // panelBotones es un panel estándar (no de flujo): la posición visual
+            // depende de Location, no del índice de controles. Se coloca a la
+            // derecha de btnEliminar, con su mismo tamaño y alineado en Y.
+            btnEliminarPagina = new Button
+            {
+                Name = "btnEliminarPagina",
+                Text = "Eliminar página",
+                AutoSize = false,
+                Location = new Point(btnEliminar.Right + 6, btnEliminar.Top),
+                Size = new Size(155, btnEliminar.Height),  // Ancho 155 para que "Eliminar página" se lea completo
+                Margin = new Padding(3, 3, 3, 3)  // Igual que los botones de acción (default WinForms)
+            };
+            EstiloUI.EstilizarBotonSecundario(btnEliminarPagina);
+            btnEliminarPagina.Click += BtnEliminarPagina_Click;
+            btnEliminarPagina.Visible = SesionGlobal.EsAdmin;
+
+            // Mismo contenedor padre que los botones principales.
+            btnEliminar.Parent.Controls.Add(btnEliminarPagina);
+            btnEliminar.Parent.Controls.SetChildIndex(btnEliminarPagina, btnEliminar.Parent.Controls.GetChildIndex(btnEliminar) + 1);
+
             // Crear botones de paginación dinámicamente
             CrearBotonesPaginacion(flpPaginacion);
 
@@ -93,35 +117,6 @@ namespace BibliotecaApp
             // recarga la página actual; si paginaActual queda fuera del nuevo
             // total, CargarRegistros retrocede sola a la última página válida.
             dgvRegistros.SizeChanged += DgvRegistros_SizeChanged;
-
-            // "Eliminar (fila)" y "Eliminar página" se crean y estilan aquí en
-            // code-behind; nada más reasigna su texto o ancho.
-            btnRegistrar.Location = new Point(14, 8);           // 14..184
-            btnMarcarDevolucion.Location = new Point(208, 8);   // 208..383
-            btnModificar.Location = new Point(407, 8);          // 407..527
-
-            btnEliminar.Text = "Eliminar (fila)";
-            btnEliminar.Width = 135;                            // 551..686
-            btnEliminar.Location = new Point(551, 8);
-
-            btnEliminarPagina = new Button
-            {
-                Name = "btnEliminarPagina",
-                UseVisualStyleBackColor = false
-            };
-            EstiloUI.EstilizarBotonSecundario(btnEliminarPagina);
-            btnEliminarPagina.Click += btnEliminarPagina_Click;
-            btnEliminarPagina.Text = "Eliminar página";
-            btnEliminarPagina.Width = 160;                      // 694..854
-            btnEliminarPagina.Height = btnEliminar.Height;
-            btnEliminarPagina.Location = new Point(btnEliminar.Right + 8, btnEliminar.Top);
-            panelBotones.Controls.Add(btnEliminarPagina);
-            btnEliminarPagina.BringToFront();
-
-            // Los botones de eliminar solo se ven si la sesión es de Administrador
-            bool esAdmin = SesionGlobal.EsAdmin;
-            btnEliminar.Visible = esAdmin;
-            btnEliminarPagina.Visible = esAdmin;
         }
 
         /// <summary>
@@ -142,7 +137,10 @@ namespace BibliotecaApp
             dgvRegistros.CellFormatting += DgvRegistros_CellFormatting;
         }
 
-        // Paginación creada en code-behind, con el mismo estilo que UcPrestamosExternos
+        // ====================================================================
+        //  PAGINACIÓN (botones creados dinámicamente en code-behind)
+        //  Estilo minimalista idéntico a UcPrestamosExternos
+        // ====================================================================
 
         /// <summary>
         /// Crea los botones de paginación (Anterior / Siguiente / lblPagina)
@@ -150,7 +148,7 @@ namespace BibliotecaApp
         /// </summary>
         private void CrearBotonesPaginacion(FlowLayoutPanel flpPaginacion)
         {
-            // ocupa el hueco que sobra en la fila, sin verse
+            // --- Espaciador invisible: ocupa el hueco sobrante de la fila ---
             _espaciadorPaginacion = new Label
             {
                 Name = "espaciadorPaginacion",
@@ -161,6 +159,7 @@ namespace BibliotecaApp
             };
             flpPaginacion.Controls.Add(_espaciadorPaginacion);
 
+            // --- Botón "Anterior": estilo minimalista, icono cuadrado 35px ---
             btnAnterior = new Button
             {
                 Name = "btnAnterior",
@@ -176,6 +175,7 @@ namespace BibliotecaApp
             btnAnterior.Size = new Size(35, 40);
             btnAnterior.Click += btnAnterior_Click;
 
+            // --- Etiqueta de página ---
             lblPagina = new Label
             {
                 Name = "lblPagina",
@@ -186,6 +186,7 @@ namespace BibliotecaApp
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
 
+            // --- Botón "Siguiente": estilo minimalista, icono cuadrado 35px ---
             btnSiguiente = new Button
             {
                 Name = "btnSiguiente",
@@ -358,6 +359,9 @@ namespace BibliotecaApp
             LimpiarCampos();
         }
 
+        // ------------------------------------------------------------------
+        //  Carga de datos
+        // ------------------------------------------------------------------
         private void CargarTitulosDeLibros()
         {
             try
@@ -400,6 +404,7 @@ namespace BibliotecaApp
 
                 using var comando = conexion.CreateCommand();
 
+                // --- Paginación: calcula total de páginas y offset defensivo ---
                 CalcularTotalPaginas();
                 if (paginaActual > totalPaginas) paginaActual = totalPaginas;
                 if (paginaActual <= 0) paginaActual = 1;
@@ -431,6 +436,7 @@ namespace BibliotecaApp
 
                 dgvRegistros.DataSource = tabla;
 
+                // --- UI de paginación (botones dinámicos) ---
                 if (lblPagina != null) lblPagina.Text = $"Página {paginaActual} de {totalPaginas}";
                 if (btnAnterior != null) btnAnterior.Enabled = (paginaActual > 1);
                 if (btnSiguiente != null) btnSiguiente.Enabled = (paginaActual < totalPaginas);
@@ -460,6 +466,82 @@ namespace BibliotecaApp
             catch (Exception ex)
             {
                 MessageBox.Show("Error al cargar los registros: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Elimina en bloque todos los registros visibles en la página actual del
+        /// DataGridView. Usa transacción y borra por ID con parámetros IN para que
+        /// la operación sea atómica: si algo falla, no se borra nada a medias.
+        /// </summary>
+        private void BtnEliminarPagina_Click(object? sender, EventArgs e)
+        {
+            // Refuerzo de seguridad en el propio manejador (defensa en profundidad),
+            // además de la visibilidad condicional al crear el botón.
+            if (!SesionGlobal.EsAdmin)
+            {
+                MessageBox.Show("Solo un Administrador puede eliminar registros.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Recolectar los IDs de las filas visibles en el grid (página activa).
+            var idsVisibles = new List<int>();
+            foreach (DataGridViewRow fila in dgvRegistros.Rows)
+            {
+                if (fila.IsNewRow) continue;
+                object? valor = fila.Cells["ID"].Value;
+                if (valor != null && int.TryParse(valor.ToString(), out int id))
+                    idsVisibles.Add(id);
+            }
+
+            if (idsVisibles.Count == 0)
+            {
+                MessageBox.Show("No hay registros visibles para eliminar.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            DialogResult confirmar = MessageBox.Show(
+                $"¿Eliminar los {idsVisibles.Count} registro(s) de la página actual?",
+                "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (confirmar != DialogResult.Yes) return;
+
+            try
+            {
+                int eliminados = 0;
+
+                using (var conexion = ConexionDB.ObtenerConexion())
+                using (var transaccion = conexion.BeginTransaction())
+                {
+                    // Borrado masivo parametrizado con IN (...): un solo DELETE
+                    // atómico dentro de la transacción (sin SQL concatenado).
+                    string parametros = string.Join(",", idsVisibles.Select((_, i) => $"@id{i}"));
+
+                    using var comando = conexion.CreateCommand();
+                    comando.Transaction = transaccion;
+                    comando.CommandText = $"DELETE FROM ControlUsuariosSala WHERE ID IN ({parametros});";
+
+                    for (int i = 0; i < idsVisibles.Count; i++)
+                        comando.Parameters.AddWithValue($"@id{i}", idsVisibles[i]);
+
+                    eliminados = comando.ExecuteNonQuery();
+                    transaccion.Commit();
+                }
+
+                // Recargar la página; CargarRegistros ajusta sola la página actual
+                // si el total de páginas se redujo tras el borrado.
+                CargarRegistros();
+
+                MessageBox.Show($"Se eliminaron {eliminados} registro(s).",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar la página: " + ex.Message,
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -542,6 +624,9 @@ namespace BibliotecaApp
                 txtNombre.Focus();
         }
 
+        // ------------------------------------------------------------------
+        //  Selección: solo guarda el ID de la fila seleccionada y sale de modo edición si cambia de fila
+        // ------------------------------------------------------------------
         private void dgvRegistros_CellClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.RowIndex >= dgvRegistros.Rows.Count)
@@ -562,6 +647,10 @@ namespace BibliotecaApp
             idSeleccionado = nuevoId;
             // NO se cargan los datos en los controles aquí; eso se hace al pulsar "Modificar"
         }
+
+        // ------------------------------------------------------------------
+        //  Check-in: registrar entrada a leer
+        // ------------------------------------------------------------------
 
         /// <summary>
         /// CHECK-OUT compartido (Opción B — Libros es la única fuente de verdad):
@@ -692,6 +781,9 @@ namespace BibliotecaApp
             }
         }
 
+        // ------------------------------------------------------------------
+        //  Check-out: marcar devolución del libro
+        // ------------------------------------------------------------------
         /// <summary>
         /// CHECK-OUT (Opción B): registra la devolución en sala y libera UN
         /// ejemplar del título ('En Sala' → 'Disponible') dentro de la MISMA
@@ -765,6 +857,10 @@ namespace BibliotecaApp
             }
         }
 
+        // ------------------------------------------------------------------
+        //  Editar: habilita los campos para edición (botón "Editar")
+        // Carga los datos de la fila seleccionada en los controles
+        // ------------------------------------------------------------------
         private void btnModificar_Click(object sender, EventArgs e)
         {
             // Validar que hay una fila seleccionada
@@ -792,11 +888,9 @@ namespace BibliotecaApp
                 numEdad.Value = edad;
             }
 
-            // Proveedor InvariantCulture: strftime fija 'dd/MM/yyyy' con '/', por lo
-            // que el parseo no debe depender del separador de la región de Windows.
             if (DateTime.TryParseExact(fila.Cells["Fecha"].Value?.ToString(),
-                    "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out DateTime fecha))
+                    "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None,
+                    out DateTime fecha))
             {
                 dtpFecha.Value = fecha;
             }
@@ -808,6 +902,9 @@ namespace BibliotecaApp
             EstablecerModoEdicion(true);
         }
 
+        // ------------------------------------------------------------------
+        //  Guardar Cambios: persiste la edición en BD (botón "Guardar Cambios")
+        // ------------------------------------------------------------------
         private void btnGuardarCambios_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
@@ -869,147 +966,9 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Autenticación de Administrador (mismo modal que "Eliminar") antes de
-        /// eliminar en bloque la página visible. Si el modal no devuelve
-        /// DialogResult.OK (credenciales incorrectas o cierre del diálogo),
-        /// se aborta sin ejecutar nada.
-        /// </summary>
-        private void btnEliminarPagina_Click(object? sender, EventArgs e)
-        {
-            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
-            {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
-            }
-
-            EliminarPaginaActual();
-        }
-
-        /// <summary>
-        /// Elimina en bloque (DELETE parametrizado + transacción) los registros de
-        /// la página visible y recarga la grilla. Si la página eliminada era la
-        /// última, CargarRegistros() retrocede a la nueva última página válida.
-        /// Sincroniza el inventario: cada registro borrado que seguía 'En lectura'
-        /// libera su ejemplar en Libros ('En Sala' → 'Disponible'), igual que el
-        /// borrado individual de la fila.
-        /// </summary>
-        private void EliminarPaginaActual()
-        {
-            // 1) Instantánea de los IDs de la página activa ANTES de tocar la BD
-            var idsPagina = new List<long>();
-            foreach (DataGridViewRow fila in dgvRegistros.Rows)
-            {
-                if (fila.IsNewRow) continue;
-
-                object? valorId = fila.Cells["ID"].Value;
-                if (valorId != null && valorId != DBNull.Value
-                    && long.TryParse(valorId.ToString(), out long id))
-                {
-                    idsPagina.Add(id);
-                }
-            }
-
-            if (idsPagina.Count == 0)
-            {
-                MessageBox.Show("La página actual no tiene registros para eliminar.",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            // 2) Confirmación explícita con la cantidad de registros (eliminación definitiva)
-            DialogResult confirmar = MessageBox.Show(
-                $"Se eliminarán {idsPagina.Count} registro(s) de la página actual.\n" +
-                "Esta acción no se puede deshacer. ¿Continuar?",
-                "Biblioteca CUBO", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-
-            if (confirmar != DialogResult.Yes) return;
-
-            try
-            {
-                using var conexion = ConexionDB.ObtenerConexion();
-                using var transaccion = conexion.BeginTransaction();
-                int eliminados;
-                int liberados = 0;
-                try
-                {
-                    // Lectura autoritativa de estado/título ANTES de borrar cada fila
-                    using var leerEstado = conexion.CreateCommand();
-                    leerEstado.Transaction = transaccion;
-                    leerEstado.CommandText =
-                        "SELECT TituloLibro, HoraRecibido FROM ControlUsuariosSala WHERE ID = $id;";
-
-                    // DELETE parametrizado reutilizando un único parámetro
-                    using var comando = conexion.CreateCommand();
-                    comando.Transaction = transaccion;
-                    comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
-
-                    var parametroLectura = leerEstado.CreateParameter();
-                    parametroLectura.ParameterName = "$id";
-                    leerEstado.Parameters.Add(parametroLectura);
-
-                    var parametro = comando.CreateParameter();
-                    parametro.ParameterName = "$id";
-                    comando.Parameters.Add(parametro);
-
-                    eliminados = 0;
-                    foreach (long id in idsPagina)
-                    {
-                        // 1) Leer estado y título del registro antes de eliminarlo
-                        parametroLectura.Value = id;
-                        string tituloLibro = string.Empty;
-                        bool estabaEnLectura = false;
-
-                        using (var lector = leerEstado.ExecuteReader())
-                        {
-                            if (lector.Read())
-                            {
-                                tituloLibro = lector["TituloLibro"]?.ToString() ?? string.Empty;
-                                estabaEnLectura = string.Equals(
-                                    lector["HoraRecibido"]?.ToString(),
-                                    EstadoEnLectura, StringComparison.OrdinalIgnoreCase);
-                            }
-                        }
-
-                        // 2) Eliminar el registro de la sala
-                        parametro.Value = id;
-                        int borrados = comando.ExecuteNonQuery();
-                        eliminados += borrados;
-
-                        // 3) Sincronizar el inventario: si el registro seguía 'En lectura',
-                        //    liberar su ejemplar ('En Sala' → 'Disponible'). Los ya devueltos
-                        //    liberaron su ejemplar al registrarse la devolución y
-                        //    LiberarEjemplarEnSala es idempotente ante registros legados.
-                        if (borrados > 0 && estabaEnLectura && tituloLibro.Length > 0)
-                        {
-                            LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
-                            liberados++;
-                        }
-                    }
-
-                    transaccion.Commit();
-                }
-                catch
-                {
-                    transaccion.Rollback();
-                    throw; // el catch exterior muestra el error unificado
-                }
-
-                string detalleLiberacion = liberados > 0
-                    ? $" Se liberaron {liberados} ejemplar(es) en el inventario."
-                    : string.Empty;
-                MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos." + detalleLiberacion,
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al eliminar la página: " + ex.Message,
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-
-            // 3) Recargar: recalcula totalPaginas y acomoda paginaActual si era la última
-            CargarRegistros();
-        }
-
+        // ------------------------------------------------------------------
+        //  Eliminar: borra el registro con autenticación de administrador
+        // ------------------------------------------------------------------
         private void btnEliminar_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
@@ -1092,6 +1051,9 @@ namespace BibliotecaApp
             }
         }
 
+        // ------------------------------------------------------------------
+        //  Validación y limpieza
+        // ------------------------------------------------------------------
         private bool HayFilaSeleccionada()
         {
             if (idSeleccionado > 0 && dgvRegistros.CurrentRow != null)
@@ -1164,7 +1126,7 @@ namespace BibliotecaApp
         /// <summary>
         /// Suscribe los eventos de ratón al DataGridView para habilitar
         /// el desplazamiento por arrastre (drag scroll) con cambio de cursor.
-        /// Usa la VScrollBar pública del control, sin reflection.
+        /// W-06: Implementación SIN reflection — usa VScrollBar público del control.
         /// </summary>
         private void ConfigurarDragScroll()
         {

@@ -67,7 +67,7 @@ namespace BibliotecaApp
                 LineAlignment = StringAlignment.Center
             };
 
-            var fuente = EstiloUI.FuenteVacia; // compartida: no Dispose
+            var fuente = EstiloUI.FuenteVacia; // A-0x: instancia cacheada (no Dispose: es compartida)
             var area = e.ClipRectangle;
 
             e.Graphics.DrawString(
@@ -119,8 +119,7 @@ namespace BibliotecaApp
                            Correo                                 AS Correo,
                            TituloLibro                            AS [Título del Libro],
                            strftime('%d/%m/%Y', FechaEntrega)     AS [Entrega Esperada],
-                           CAST(julianday(date('now', 'localtime'))
-                                - julianday(date(FechaEntrega)) AS INTEGER)
+                           CAST(julianday('now') - julianday(FechaEntrega) AS INTEGER)
                                                                    AS [Días de Retraso],
                            CorreoAlertaEnviado
                     FROM PrestamosExternos
@@ -221,6 +220,7 @@ namespace BibliotecaApp
         /// </summary>
         private async void btnNotificar_Click(object sender, EventArgs e)
         {
+            // 1️⃣ VALIDAR QUE HAY FILAS CON CORREOS VÁLIDOS
             var filasValidas = dgvAlertas.Rows
                 .Cast<DataGridViewRow>()
                 .Where(r => !r.IsNewRow)
@@ -240,7 +240,7 @@ namespace BibliotecaApp
                 return;
             }
 
-            // CSV de respaldo en la carpeta temporal
+            // 2️⃣ GENERAR CSV DE RESPALDO EN LA CARPETA TEMPORAL DEL SISTEMA
             string csvPath = null;
             try
             {
@@ -249,11 +249,11 @@ namespace BibliotecaApp
                 csvPath = Path.Combine(tempPath, $"Morosos_Notificados_{timestamp}.csv");
 
                 var sb = new StringBuilder();
-                sb.AppendLine("Usuario,Titulo,Correo");
+                sb.AppendLine("Usuario,Titulo,Correo"); // Encabezados
 
                 foreach (var fila in filasValidas)
                 {
-                    // el CSV exige comillas si el valor trae coma, salto de línea o comillas
+                    // Escapar comillas y envolver en comillas si contiene coma, salto de línea o comillas
                     string Escape(string s) => s.Contains(',') || s.Contains('"') || s.Contains('\n')
                         ? "\"" + s.Replace("\"", "\"\"") + "\""
                         : s;
@@ -267,13 +267,15 @@ namespace BibliotecaApp
             {
                 MessageBox.Show($"No se pudo generar el CSV en la carpeta temporal:\n{exCsv.Message}",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                // seguimos aunque falle: los correos son lo importante
+                // Continuamos para intentar abrir los mailto
             }
 
-            // Un mailto por cada moroso. En fire-and-forget para no congelar la UI.
+            // 3️⃣ CREAR Y LANZAR MAILTO INDIVIDUAL POR CADA USUARIO MOROSO
+            // W-05: Fire-and-forget para no bloquear el hilo de UI al abrir múltiples mailto:
             int emailsEnviados = 0;
             foreach (var fila in filasValidas)
             {
+                // Capturar variables locales para el closure
                 string usuario = fila.Usuario;
                 string correo = fila.Correo;
                 string tituloLibro = fila.TituloLibro;
@@ -282,19 +284,23 @@ namespace BibliotecaApp
                 {
                     try
                     {
-                        string subject = "Aviso de préstamo vencido - Biblioteca CUBO";
-                        string body = $"Estimado/a {usuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.";
+                        string titulo = System.Globalization.CultureInfo.CurrentCulture.TextInfo
+                            .ToTitleCase(tituloLibro.ToLower());
 
-                        // El destinatario principal (To) es la propia biblioteca, para que el
-                        // cliente de correo no falle por el campo "Para" vacío. El usuario
-                        // real se envía en copia oculta (Bcc) vía parámetro bcc=.
-                        string uri = $"mailto:cuboingrigobertoorellana@gmail.com?bcc={Uri.EscapeDataString(correo)}" +
-                                     $"&subject={Uri.EscapeDataString(subject)}" +
+                        string subject = "Aviso de prestamo vencido - Biblioteca CUBO";
+                        string body = $"Estimado/a {usuario},\r\n\r\n" +
+                                      $"El plazo para devolver \"{titulo}\" ha vencido.\r\n" +
+                                      $"Quedamos atentos para recibirlo en el CUBO.\r\n\r\n" +
+                                      $"Gracias.";
+
+                        string uri = $"mailto:{correo}" +
+                                     $"?subject={Uri.EscapeDataString(subject)}" +
                                      $"&body={Uri.EscapeDataString(body)}";
 
                         var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
                         Process.Start(psi);
 
+                        // Incrementar contador de forma thread-safe
                         Interlocked.Increment(ref emailsEnviados);
                     }
                     catch (Exception exMail)
@@ -304,14 +310,15 @@ namespace BibliotecaApp
                 });
             }
 
-            // deja que se lancen antes del resumen
+            // Pequeña pausa para dar tiempo a que se lancen los procesos (fire-and-forget)
             await Task.Delay(100);
 
+            // 4️⃣ CONFIRMACIÓN FINAL
             string msg = $"Se abrieron {emailsEnviados} ventana(s) de correo personalizadas (una por usuario moroso).";
             if (!string.IsNullOrEmpty(csvPath) && File.Exists(csvPath))
                 msg += $"\n\nRespaldo CSV guardado en:\n{csvPath}";
             else
-                msg += "\n\nNo se pudo generar el archivo CSV de respaldo.";
+                msg += "\n\n⚠ No se pudo generar el archivo CSV de respaldo.";
 
             MessageBox.Show(msg, "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -322,15 +329,18 @@ namespace BibliotecaApp
         /// </summary>
         private void DgvAlertas_CellContentClick(object? sender, DataGridViewCellEventArgs e)
         {
+            // Validar que sea clic en la columna de botones y fila válida
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
             if (dgvAlertas.Columns[e.ColumnIndex].Name != "btnNotificarIndividual") return;
 
             var fila = dgvAlertas.Rows[e.RowIndex];
 
+            // Extraer datos de la fila
             string nombreUsuario = fila.Cells["Usuario"].Value?.ToString()?.Trim() ?? "";
             string correo = fila.Cells["Correo"].Value?.ToString()?.Trim() ?? "";
             string tituloLibro = fila.Cells["Título del Libro"].Value?.ToString()?.Trim() ?? "";
 
+            // Validar que hay correo
             if (string.IsNullOrWhiteSpace(correo) || !correo.Contains("@"))
             {
                 MessageBox.Show("El usuario no tiene un correo electrónico válido registrado.",
@@ -340,18 +350,24 @@ namespace BibliotecaApp
 
             try
             {
-                string subject = Uri.EscapeDataString("Aviso de préstamo vencido - Biblioteca CUBO");
-                string body = Uri.EscapeDataString(
-                    $"Estimado/a {nombreUsuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.");
+                string titulo = System.Globalization.CultureInfo.CurrentCulture.TextInfo
+                    .ToTitleCase(tituloLibro.ToLower());
 
-                // El campo "Para" va con la biblioteca y el usuario en copia oculta, para
-                // que el cliente no falle con "Para" vacío. subject y body ya van escapados.
-                string mailtoUri = $"mailto:cuboingrigobertoorellana@gmail.com?bcc={Uri.EscapeDataString(correo)}&subject={subject}&body={body}";
+                string subject = "Aviso de prestamo vencido - Biblioteca CUBO";
+                string body = $"Estimado/a {nombreUsuario},\r\n\r\n" +
+                              $"El plazo para devolver \"{titulo}\" ha vencido.\r\n" +
+                              $"Quedamos atentos para recibirlo en el CUBO.\r\n\r\n" +
+                              $"Gracias.";
 
+                string mailtoUri = $"mailto:{correo}" +
+                                   $"?subject={Uri.EscapeDataString(subject)}" +
+                                   $"&body={Uri.EscapeDataString(body)}";
+
+                // Lanzar cliente de correo por defecto
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
                 Process.Start(psi);
 
-                // solo la alerta de retraso, no la de bienvenida
+                // Persistir en BD: CorreoAlertaEnviado = 1 (solo alerta de retraso; no toca bienvenida)
                 int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
                 using (var conexion = ConexionDB.ObtenerConexion())
                 using (var updateCmd = conexion.CreateCommand())
@@ -361,6 +377,7 @@ namespace BibliotecaApp
                     updateCmd.ExecuteNonQuery();
                 }
 
+                // Feedback visual: cambiar botón a "Enviado" con color verde
                 var celda = dgvAlertas.Rows[e.RowIndex].Cells[e.ColumnIndex];
                 celda.Value = "Enviado";
                 celda.Style.BackColor = Color.LightGreen;
