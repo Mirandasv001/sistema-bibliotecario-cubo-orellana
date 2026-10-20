@@ -14,18 +14,14 @@ namespace BibliotecaApp
         {
             try
             {
-                // C-03/C-04: ruta fija junto al .exe (sin búsquedas ascendentes) y
-                // lectura vía MemoryStream para no bloquear el archivo en disco.
-                string rutaLogo = Path.Combine(AppContext.BaseDirectory, "Recursos", "Logo de inicio.jpg");
-                if (File.Exists(rutaLogo))
-                {
-                    byte[] imageBytes = File.ReadAllBytes(rutaLogo);
-                    using var ms = new MemoryStream(imageBytes);
-                    // Deep copy: el Bitmap copia los píxeles al heap y no depende del
-                    // stream, que se libera al salir del using sin bloquear el .jpg.
-                    using var imgOriginal = Image.FromStream(ms);
-                    pictureBoxLogo.Image = new Bitmap(imgOriginal);
-                }
+                // El logo viaja incrustado en Base64 dentro del ensamblado, por lo que
+                // no se pierde si el instalador despliega el .exe en otra PC.
+                byte[] imageBytes = Convert.FromBase64String(RecursosBase64.LogoInicio);
+                using var ms = new MemoryStream(imageBytes);
+                // Deep copy: el Bitmap copia los píxeles al heap y no depende del
+                // stream, que se libera al salir del using.
+                using var imgOriginal = Image.FromStream(ms);
+                pictureBoxLogo.Image = new Bitmap(imgOriginal);
             }
             catch
             {
