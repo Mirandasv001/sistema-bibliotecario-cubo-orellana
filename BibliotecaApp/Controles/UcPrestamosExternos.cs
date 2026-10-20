@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.Windows.Forms;
 using Microsoft.Data.Sqlite;
 
@@ -1258,18 +1259,19 @@ namespace BibliotecaApp
 
             try
             {
-                // Construir URI mailto: con subject y body según requerimientos exactos
-                // Subject: "Confirmación de préstamo - Biblioteca CUBO"
-                // Body: "Hola [usuario], muchas gracias por elegir la Biblioteca CUBO.\n\nTe confirmamos el préstamo del libro '[libro]'. Te recordamos amablemente que la fecha esperada de devolución o renovación es el [fecha].\n\n¡Esperamos que disfrutes tu lectura!"
-                string subject = Uri.EscapeDataString("Confirmación de préstamo - Biblioteca CUBO");
-                string body = Uri.EscapeDataString(
-                    $"Hola {nombreUsuario}, muchas gracias por elegir la Biblioteca CUBO.\n\n" +
-                    $"Te confirmamos el préstamo del libro '{tituloLibro}'. Te recordamos amablemente que la fecha esperada de devolución o renovación es el {fechaEntrega}.\n\n" +
-                    $"¡Esperamos que disfrutes tu lectura!");
+                string titulo = CultureInfo.CurrentCulture.TextInfo
+                    .ToTitleCase(tituloLibro.ToLower());
 
-                string mailtoUri = $"mailto:{correo}?subject={subject}&body={body}";
+                string subject = "Confirmacion de prestamo - Biblioteca CUBO";
+                string body = $"Hola {nombreUsuario}, muchas gracias por elegir la Biblioteca CUBO.\r\n\r\n" +
+                              $"Te confirmamos el prestamo del libro \"{titulo}\".\r\n" +
+                              $"La fecha esperada de devolucion o renovacion es el {fechaEntrega}.\r\n\r\n" +
+                              "Esperamos que disfrutes tu lectura.";
 
-                // Lanzar cliente de correo por defecto
+                string mailtoUri = $"mailto:{correo}" +
+                                   $"?subject={Uri.EscapeDataString(subject)}" +
+                                   $"&body={Uri.EscapeDataString(body)}";
+
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
                 Process.Start(psi);
 

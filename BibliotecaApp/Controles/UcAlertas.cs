@@ -284,8 +284,14 @@ namespace BibliotecaApp
                 {
                     try
                     {
-                        string subject = "Aviso de préstamo vencido - Biblioteca CUBO";
-                        string body = $"Estimado/a {usuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.";
+                        string titulo = System.Globalization.CultureInfo.CurrentCulture.TextInfo
+                            .ToTitleCase(tituloLibro.ToLower());
+
+                        string subject = "Aviso de prestamo vencido - Biblioteca CUBO";
+                        string body = $"Estimado/a {usuario},\r\n\r\n" +
+                                      $"El plazo para devolver \"{titulo}\" ha vencido.\r\n" +
+                                      $"Quedamos atentos para recibirlo en el CUBO.\r\n\r\n" +
+                                      $"Gracias.";
 
                         string uri = $"mailto:{correo}" +
                                      $"?subject={Uri.EscapeDataString(subject)}" +
@@ -344,12 +350,18 @@ namespace BibliotecaApp
 
             try
             {
-                // Construir URI mailto: individual
-                string subject = Uri.EscapeDataString("Aviso de préstamo vencido - Biblioteca CUBO");
-                string body = Uri.EscapeDataString(
-                    $"Estimado/a {nombreUsuario}, le informamos que el plazo para devolver el material bibliográfico '{tituloLibro}' ha expirado. Le solicitamos amablemente acercarse a las instalaciones del CUBO para devolver el libro a la brevedad. Gracias.");
+                string titulo = System.Globalization.CultureInfo.CurrentCulture.TextInfo
+                    .ToTitleCase(tituloLibro.ToLower());
 
-                string mailtoUri = $"mailto:{correo}?subject={subject}&body={body}";
+                string subject = "Aviso de prestamo vencido - Biblioteca CUBO";
+                string body = $"Estimado/a {nombreUsuario},\r\n\r\n" +
+                              $"El plazo para devolver \"{titulo}\" ha vencido.\r\n" +
+                              $"Quedamos atentos para recibirlo en el CUBO.\r\n\r\n" +
+                              $"Gracias.";
+
+                string mailtoUri = $"mailto:{correo}" +
+                                   $"?subject={Uri.EscapeDataString(subject)}" +
+                                   $"&body={Uri.EscapeDataString(body)}";
 
                 // Lanzar cliente de correo por defecto
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
