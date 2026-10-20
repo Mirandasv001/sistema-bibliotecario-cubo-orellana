@@ -1,4 +1,6 @@
-﻿using System.Data;
+﻿using System.Collections.Generic;
+using System.Data;
+using System.Linq;
 using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
@@ -28,6 +30,9 @@ namespace BibliotecaApp
         private Button? btnAnterior;
         private Button? btnSiguiente;
         private Label? lblPagina;
+
+        // Botón de borrado masivo de la página visible (solo Administrador)
+        private Button? btnEliminarPagina;
 
         // Espaciador invisible que empuja la paginación al extremo derecho del FlowLayoutPanel
         private Control? _espaciadorPaginacion;
@@ -71,6 +76,28 @@ namespace BibliotecaApp
             };
             panelBotones.Controls.Add(flpPaginacion);
             // NO hacer BringToFront() - los botones de acción (Top) deben quedar arriba
+
+            // Botón "Eliminar página": borra en bloque los registros visibles.
+            // Solo lo ve un Administrador; un Operador nunca lo ve.
+            // panelBotones es un panel estándar (no de flujo): la posición visual
+            // depende de Location, no del índice de controles. Se coloca a la
+            // derecha de btnEliminar, con su mismo tamaño y alineado en Y.
+            btnEliminarPagina = new Button
+            {
+                Name = "btnEliminarPagina",
+                Text = "Eliminar página",
+                AutoSize = false,
+                Location = new Point(btnEliminar.Right + 6, btnEliminar.Top),
+                Size = new Size(155, btnEliminar.Height),  // Ancho 155 para que "Eliminar página" se lea completo
+                Margin = new Padding(3, 3, 3, 3)  // Igual que los botones de acción (default WinForms)
+            };
+            EstiloUI.EstilizarBotonSecundario(btnEliminarPagina);
+            btnEliminarPagina.Click += BtnEliminarPagina_Click;
+            btnEliminarPagina.Visible = SesionGlobal.EsAdmin;
+
+            // Mismo contenedor padre que los botones principales.
+            btnEliminar.Parent.Controls.Add(btnEliminarPagina);
+            btnEliminar.Parent.Controls.SetChildIndex(btnEliminarPagina, btnEliminar.Parent.Controls.GetChildIndex(btnEliminar) + 1);
 
             // Crear botones de paginación dinámicamente
             CrearBotonesPaginacion(flpPaginacion);
@@ -439,6 +466,82 @@ namespace BibliotecaApp
             catch (Exception ex)
             {
                 MessageBox.Show("Error al cargar los registros: " + ex.Message,
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Elimina en bloque todos los registros visibles en la página actual del
+        /// DataGridView. Usa transacción y borra por ID con parámetros IN para que
+        /// la operación sea atómica: si algo falla, no se borra nada a medias.
+        /// </summary>
+        private void BtnEliminarPagina_Click(object? sender, EventArgs e)
+        {
+            // Refuerzo de seguridad en el propio manejador (defensa en profundidad),
+            // además de la visibilidad condicional al crear el botón.
+            if (!SesionGlobal.EsAdmin)
+            {
+                MessageBox.Show("Solo un Administrador puede eliminar registros.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Recolectar los IDs de las filas visibles en el grid (página activa).
+            var idsVisibles = new List<int>();
+            foreach (DataGridViewRow fila in dgvRegistros.Rows)
+            {
+                if (fila.IsNewRow) continue;
+                object? valor = fila.Cells["ID"].Value;
+                if (valor != null && int.TryParse(valor.ToString(), out int id))
+                    idsVisibles.Add(id);
+            }
+
+            if (idsVisibles.Count == 0)
+            {
+                MessageBox.Show("No hay registros visibles para eliminar.",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            DialogResult confirmar = MessageBox.Show(
+                $"¿Eliminar los {idsVisibles.Count} registro(s) de la página actual?",
+                "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (confirmar != DialogResult.Yes) return;
+
+            try
+            {
+                int eliminados = 0;
+
+                using (var conexion = ConexionDB.ObtenerConexion())
+                using (var transaccion = conexion.BeginTransaction())
+                {
+                    // Borrado masivo parametrizado con IN (...): un solo DELETE
+                    // atómico dentro de la transacción (sin SQL concatenado).
+                    string parametros = string.Join(",", idsVisibles.Select((_, i) => $"@id{i}"));
+
+                    using var comando = conexion.CreateCommand();
+                    comando.Transaction = transaccion;
+                    comando.CommandText = $"DELETE FROM ControlUsuariosSala WHERE ID IN ({parametros});";
+
+                    for (int i = 0; i < idsVisibles.Count; i++)
+                        comando.Parameters.AddWithValue($"@id{i}", idsVisibles[i]);
+
+                    eliminados = comando.ExecuteNonQuery();
+                    transaccion.Commit();
+                }
+
+                // Recargar la página; CargarRegistros ajusta sola la página actual
+                // si el total de páginas se redujo tras el borrado.
+                CargarRegistros();
+
+                MessageBox.Show($"Se eliminaron {eliminados} registro(s).",
+                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al eliminar la página: " + ex.Message,
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
