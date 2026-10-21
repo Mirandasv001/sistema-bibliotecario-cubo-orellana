@@ -134,7 +134,9 @@ namespace BibliotecaApp
             // Cabecera HTML5 + estilos institucionales
             h.Append("<!DOCTYPE html><html><head><meta charset='utf-8'>");
             h.Append("<style>");
+            h.Append("html,body{max-width:100%;overflow-x:hidden;}");
             h.Append("body{font-family:'Segoe UI',Arial,sans-serif;color:#162945;margin:0;padding:24px;background:#ffffff;line-height:1.5;}");
+            h.Append("img{max-width:100%;height:auto;}");
             h.Append("h1{font-size:26px;color:#162945;margin:0 0 4px 0;}");
             h.Append("h2{font-size:20px;color:#166699;margin:28px 0 8px 0;border-bottom:2px solid #e3ecf3;padding-bottom:4px;}");
             h.Append("h3{font-size:16px;color:#162945;margin:20px 0 6px 0;}");
@@ -146,8 +148,8 @@ namespace BibliotecaApp
             h.Append(".admin{background:#fff4e5;border-left:4px solid #f59e0b;padding:12px 16px;margin:12px 0;border-radius:0 6px 6px 0;}");
             h.Append(".fig{margin:16px 0;text-align:center;}");
             h.Append(".cap{color:#505050;font-size:13px;margin-top:6px;}");
-            h.Append("table{border-collapse:collapse;margin:12px 0;width:100%;}");
-            h.Append("th,td{border:1px solid #d0d7de;padding:8px 10px;text-align:left;font-size:14px;}");
+            h.Append("table{border-collapse:collapse;margin:12px 0;width:100%;table-layout:fixed;}");
+            h.Append("th,td{border:1px solid #d0d7de;padding:8px 10px;text-align:left;font-size:14px;word-wrap:break-word;overflow-wrap:break-word;}");
             h.Append("th{background:#166699;color:#fff;}");
             h.Append("</style></head><body>");
 
@@ -228,12 +230,13 @@ namespace BibliotecaApp
             // 4. PRESTAMOS EXTERNOS
             // ============================================================
             h.Append("<h2>4. PRÉSTAMOS EXTERNOS</h2>");
-            h.Append("<p>Gestión de libros que los usuarios llevan a casa.</p>");
+            h.Append("<p>Gestión de libros que los usuarios llevan a casa. El proceso completo sigue este orden:</p>");
             h.Append("<ul>");
-            h.Append("<li><b>Nuevo préstamo:</b> ingrese los datos de contacto del usuario. El sistema calculará automáticamente 8 días como fecha límite de entrega.</li>");
-            h.Append("<li><b>Notificación de bienvenida:</b> una vez registrado el préstamo, haga clic en <b>Enviar</b> para mandar un correo con los detalles del libro.</li>");
-            h.Append("<li><b>Devoluciones y renovaciones:</b> busque el registro, cambie el Estado en la lista desplegable y asigne el personal responsable.</li>");
-            h.Append("<li><b>Selección rápida desde Inventario:</b> Vaya al Inventario, seleccione un libro disponible haciendo doble clic en su fila, y el sistema lo redirigirá a Préstamos Externos con el código y título del libro ya cargados.</li>");
+            h.Append("<li><b>1. Selección del libro en Inventario:</b> vaya al Inventario y haga doble clic en la fila del libro que se va a prestar; el sistema lo redirigirá a Préstamos Externos con el código y el título del libro ya cargados en el formulario.</li>");
+            h.Append("<li><b>2. Registro de los datos del usuario:</b> complete los campos de contacto del usuario (nombre, teléfono, correo, género, etc.). En cuanto se registran, el sistema calcula automáticamente la <b>fecha de entrega sumando 8 días</b>; este plazo es orientativo y puede ampliarse manualmente según la situación del préstamo.</li>");
+            h.Append("<li><b>3. Registrar el préstamo:</b> pulse el botón <b>Registrar Préstamo</b>. El registro se guarda con el estado <b>Pendiente</b>, que identifica el libro como prestado y aún no devuelto.</li>");
+            h.Append("<li><b>4. Notificación a la persona:</b> pulse <b>Enviar</b> en la fila del préstamo; el sistema redactará automáticamente el correo de bienvenida dirigido a esa persona con los detalles del libro, listo para que usted lo envíe.</li>");
+            h.Append("<li><b>5. Devoluciones y renovaciones:</b> cuando el usuario devuelva o renueve, busque el registro, cambie el <b>Estado</b> en la lista desplegable (Pendiente, Renovado o Entregado) y asigne el personal responsable.</li>");
             h.Append("</ul>");
 
             // ============================================================
