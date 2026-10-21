@@ -186,6 +186,50 @@ namespace BibliotecaApp
             // (sin forzar página 1: aún no hay datos cargados).
             RecalcularTamanoPagina();
             CargarPrestamosActivos();
+
+            // ------------------------------------------------------------
+            // GÉNERO → sección de Datos del Usuario (solo code-behind)
+            // ------------------------------------------------------------
+            if (tlpCampos.Controls["lblGenero"] is Label lblGenero)
+            {
+                // 1) Reduce el ancho de la dirección (de 3 a 2 columnas, unas 250 px
+                //    menos) para liberar el espacio situado a su derecha.
+                tlpCampos.SetColumnSpan(txtDireccion, 2);
+                tlpCampos.PerformLayout();
+
+                // 2) Transfiere los controles al contenedor de datos del usuario.
+                grpDatos.Controls.Add(lblGenero);
+                grpDatos.Controls.Add(cmbGeneroPrestamo);
+                cmbGeneroPrestamo.Dock = DockStyle.None;
+
+                // 3) Posición dinámica calculada a partir de la dirección reducida
+                //    (txtDireccion mide en tlpCampos: se mapea al espacio de grpDatos).
+                bool fijando = false;
+                void ReposicionarGenero()
+                {
+                    if (fijando) return;
+                    fijando = true;
+                    try
+                    {
+                        tlpCampos.PerformLayout();
+                        Point ancla = grpDatos.PointToClient(
+                            tlpCampos.PointToScreen(
+                                new Point(txtDireccion.Right + 15, txtDireccion.Top)));
+
+                        lblGenero.AutoSize = true;
+                        lblGenero.Location = ancla;
+
+                        cmbGeneroPrestamo.Size = new Size(170, 24);
+                        cmbGeneroPrestamo.Location =
+                            new Point(lblGenero.Right + 6, ancla.Y - 1);
+                    }
+                    finally { fijando = false; }
+                }
+
+                ReposicionarGenero();
+                // Reajuste al redimensionar la ventana (evita solapes).
+                grpDatos.Layout += (_, _) => ReposicionarGenero();
+            }
         }
 
         /// <summary>Método público invocado por Form1 al navegar a este apartado.</summary>
