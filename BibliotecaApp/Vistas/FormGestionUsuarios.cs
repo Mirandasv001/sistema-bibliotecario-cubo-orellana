@@ -21,6 +21,10 @@ namespace BibliotecaApp
         public FormGestionUsuarios()
         {
             InitializeComponent();
+
+            // Icono de la ventana = logo de inicio (misma imagen que el .exe)
+            if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
+
             CargarUsuarios();
         }
 

@@ -29,6 +29,9 @@ namespace BibliotecaApp
             _usuarioEsperado = usuarioEsperado;
             _claveEsperada = claveEsperada;
             InitializeComponent();
+
+            // Icono de la ventana = logo de inicio (misma imagen que el .exe)
+            if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
         }
 
         private void InitializeComponent()

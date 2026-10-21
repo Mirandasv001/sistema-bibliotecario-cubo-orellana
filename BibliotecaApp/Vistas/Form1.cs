@@ -31,6 +31,9 @@ namespace BibliotecaApp
 
             InitializeComponent();
 
+            // Icono de la ventana = logo de inicio (misma imagen que el .exe)
+            if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
+
             // Configuración de UI dinámica
             ConfigurarBotonMenu(btnSala, "Control de Sala");
             ConfigurarBotonMenu(btnInventario, "Inventario");
