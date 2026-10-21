@@ -69,9 +69,13 @@ namespace BibliotecaApp
 
         private static string Img(string base64, string mime, int anchoPx)
         {
+            // max-width:100% + height:auto + box-sizing:border-box:
+            // la imagen nunca supera el ancho del contenedor (elimina la barra
+            // horizontal) y el borde se descuenta dentro del ancho.
             return "<img src='" + DataUri(base64, mime) +
-                   "' alt='Imagen del manual' style='width:100%;max-width:" + anchoPx +
-                   "px;height:auto;border:1px solid #d0d7de;border-radius:6px;' />";
+                   "' alt='Imagen del manual' width='" + anchoPx +
+                   "' style='display:block;margin:0 auto;max-width:100%;height:auto;" +
+                   "box-sizing:border-box;border:1px solid #d0d7de;border-radius:6px;' />";
         }
 
         // ------------------------------------------------------------------
@@ -229,6 +233,7 @@ namespace BibliotecaApp
             h.Append("<li><b>Nuevo préstamo:</b> ingrese los datos de contacto del usuario. El sistema calculará automáticamente 8 días como fecha límite de entrega.</li>");
             h.Append("<li><b>Notificación de bienvenida:</b> una vez registrado el préstamo, haga clic en <b>Enviar</b> para mandar un correo con los detalles del libro.</li>");
             h.Append("<li><b>Devoluciones y renovaciones:</b> busque el registro, cambie el Estado en la lista desplegable y asigne el personal responsable.</li>");
+            h.Append("<li><b>Selección rápida desde Inventario:</b> Vaya al Inventario, seleccione un libro disponible haciendo doble clic en su fila, y el sistema lo redirigirá a Préstamos Externos con el código y título del libro ya cargados.</li>");
             h.Append("</ul>");
 
             // ============================================================
