@@ -238,7 +238,7 @@ namespace BibliotecaApp
             h.Append("<li><b>Guardar:</b> presione <b>Aceptar</b> para aplicar el cambio. La nueva contraseña será válida desde el siguiente inicio de sesión.</li>");
             h.Append("</ul>");
 
-            h.Append("<div style='text-align: right; margin-top: 40px; padding-bottom: 20px; font-size: 11px;'><a href='https://github.com/Mirandasv001' style='color: #8cb4d6; text-decoration: none;'>https://github.com/Mirandasv001</a></div>");
+            h.Append("<div style='text-align: right; margin-top: 40px; padding-bottom: 20px; font-size: 11px;'><a href='https://github.com/Mirandasv001' style='color: #8cb4d6; text-decoration: none;'>Dev Erick Miranda</a></div>");
             h.Append("</body></html>");
 
             return h.ToString();
