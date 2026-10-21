@@ -157,13 +157,7 @@ namespace BibliotecaApp
             h.Append("<h2>1. UBICACIÓN FÍSICA DE LOS LIBROS (MÓDULOS)</h2>");
             h.Append("<p>La biblioteca se organiza en <b>estantes completos llamados módulos</b>. A cada estante completo se le asigna la etiqueta <b>M seguida de un número</b>: en este Cubo hay <b>5 módulos</b>, identificados como <b>M1, M2, M3, M4 y M5</b>. Teniendo en cuenta que hay Cubos con menos o más módulos, el sistema siempre numera los estantes en orden a partir de M1 según la cantidad real de módulos del local.</p>");
             h.Append("<p>Dentro de cada módulo, las <b>letras del abecedario</b> (A, B, C, D, E) representan las <b>columnas</b>, y los <b>números 1 a 4</b> representan los <b>estantes o filas</b> de cada columna. La ubicación de un libro se escribe concatenando módulo, columna y fila: <b>M&lt;modulo&gt;&lt;columna&gt;&lt;fila&gt;</b>.</p>");
-            h.Append("<p>Para determinar la ubicación de un libro, siga estas indicaciones:</p>");
-            h.Append("<ul>");
-            h.Append("<li><b>1º Identifique el módulo:</b> localice el estante completo (módulo) donde está el libro. En este Cubo hay 5, que van de M1 a M5; el módulo es la letra M seguida de su número.</li>");
-            h.Append("<li><b>2º Identifique la columna:</b> dentro del módulo, la columna se identifica con una letra del abecedario (A, B, C, D, E). Es la letra intermedia de la referencia.</li>");
-            h.Append("<li><b>3º Identifique el estante (fila):</b> dentro de esa columna, el estante es un número del 1 al 4, contando de arriba hacia abajo. Es el último dígito de la referencia.</li>");
-            h.Append("<li><b>4º Complete la referencia:</b> junte módulo, columna y fila. Por ejemplo, un libro en el módulo 1, columna A, estante 4 tendrá la ubicación <b>M1A4</b>.</li>");
-            h.Append("</ul>");
+            h.Append("<p>Por ejemplo M1A4:</p>");
             h.Append("<div class='fig'>" + Img(RecursosBase64.ModuloCubo, "image/jpeg", 620) +
                      "<div class='cap'>Módulo 1: columnas A–E y estantes 1–4. La casilla resaltada corresponde a la ubicación M1A4.</div></div>");
 
@@ -238,9 +232,23 @@ namespace BibliotecaApp
             h.Append("</ul>");
 
             // ============================================================
-            // 5. ESTADISTICAS
+            // 5. ALERTAS DE VENCIDOS
             // ============================================================
-            h.Append("<h2>5. ESTADÍSTICAS</h2>");
+            h.Append("<h2>5. ALERTAS DE VENCIDOS</h2>");
+            h.Append("<p>Módulo de seguimiento de préstamos vencidos y de la gestión de cobro con los usuarios morosos.</p>");
+            h.Append("<ul>");
+            h.Append("<li><b>Indicador en tiempo real:</b> el menú lateral muestra junto a <b>Alertas de Vencidos</b> la cantidad de préstamos vencidos que requieren atención inmediata.</li>");
+            h.Append("<li><b>Listado de morosos:</b> la tabla presenta Usuario, Teléfono, Correo, Título del Libro, Entrega Esperada y Días de Retraso, con el cálculo dinámico de los días de atraso.</li>");
+            h.Append("<li><b>Notificación por correo:</b> pulse <b>Enviar</b> (por usuario) o <b>Notificar morosos</b> (a todos) para abrir un correo personalizado de recordatorio de entrega al usuario moroso, con asunto y cuerpo ya redactados.</li>");
+            h.Append("<li><b>Estado vacío:</b> cuando no hay atrasos, el sistema indica «No hay usuarios morosos».</li>");
+            h.Append("</ul>");
+            h.Append("<div class='fig'>" + Img(RecursosBase64.AlertasVencidos, "image/jpeg", 760) +
+                     "<div class='cap'>Alertas de vencidos: indicador lateral, días de retraso y botón Enviar para notificar al usuario moroso.</div></div>");
+
+            // ============================================================
+            // 6. ESTADISTICAS
+            // ============================================================
+            h.Append("<h2>6. ESTADÍSTICAS</h2>");
             h.Append("<p>Panel de indicadores con dos gráficas de barras nativas y un filtro de fechas compartido. El módulo analiza por separado el <b>Control de Sala</b> y los <b>Préstamos Externos</b> dentro del rango de fechas seleccionado.</p>");
             h.Append("<ul>");
             h.Append("<li><b>Filtro de fechas:</b> en la parte superior, seleccione el rango <i>Desde</i> y <i>Hasta</i> y haga clic en <b>Filtrar</b>. El mismo rango se aplica a las dos gráficas a la vez.</li>");
@@ -253,9 +261,9 @@ namespace BibliotecaApp
                      "<div class='cap'>Estadísticas: filtro de fechas, 6 tarjetas de resumen y las dos gráficas de barras (Sala y Préstamos).</div></div>");
 
             // ============================================================
-            // 6. CAMBIAR CONTRASENA
+            // 7. CAMBIAR CONTRASENA
             // ============================================================
-            h.Append("<h2>6. CAMBIAR CONTRASEÑA</h2>");
+            h.Append("<h2>7. CAMBIAR CONTRASEÑA</h2>");
             h.Append("<p>Permite actualizar la contraseña de acceso del usuario que tiene la sesión abierta.</p>");
             h.Append("<ul>");
             h.Append("<li><b>Acceso:</b> en el menú lateral, haga clic en <b>Cambiar Contraseña</b>.</li>");
