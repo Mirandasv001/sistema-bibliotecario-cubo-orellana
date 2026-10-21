@@ -3,20 +3,11 @@ using System.Security.Cryptography;
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Helper para hashing seguro de contraseñas usando PBKDF2 (Rfc2898DeriveBytes).
-    /// Compatible con .NET 10, sin dependencias externas.
-    /// Formato de almacenamiento: {iteraciones}.{saltBase64}.{hashBase64}
-    /// </summary>
     public static class PasswordHasher
     {
         private const int SaltSize = 16; // 128 bits
         private const int HashSize = 32; // 256 bits
-        private const int Iterations = 100_000; // Ajustable según hardware
-
-        /// <summary>
-        /// Genera un hash seguro de la contraseña.
-        /// </summary>
+        private const int Iterations = 100_000; 
         public static string Hash(string password)
         {
             if (string.IsNullOrEmpty(password))
@@ -29,13 +20,9 @@ namespace BibliotecaApp
             using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256);
             byte[] hash = pbkdf2.GetBytes(HashSize);
 
-            // Formato: iteraciones.salt.hash (todo en Base64)
             return $"{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
         }
 
-        /// <summary>
-        /// Verifica una contraseña contra su hash almacenado.
-        /// </summary>
         public static bool Verify(string password, string storedHash)
         {
             if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(storedHash))
@@ -60,14 +47,10 @@ namespace BibliotecaApp
             }
             catch
             {
-                // Formato inválido, corrupción, o hash legacy (texto plano)
                 return false;
             }
         }
 
-        /// <summary>
-        /// Detecta si un hash almacenado usa el formato nuevo (PBKDF2) o es texto plano legacy.
-        /// </summary>
         public static bool IsLegacyHash(string storedHash)
         {
             if (string.IsNullOrEmpty(storedHash)) return true;

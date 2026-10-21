@@ -3,16 +3,10 @@ using System.Configuration; // Para ConfigurationManager
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Capa de acceso a datos (SQLite). Crea la base 'biblioteca.db', las tablas
-    /// del sistema e importa el catálogo de libros desde el CSV al arrancar.
-    /// </summary>
     public static class ConexionDB
     {
         private const string NombreBaseDatos = "biblioteca.db";
 
-        // C-01: carpeta de datos en %APPDATA%, escribible por usuarios sin privilegios
-        // (a diferencia de Program Files, donde el instalador coloca el .exe).
         private static readonly string CarpetaDatos =
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -22,7 +16,6 @@ namespace BibliotecaApp
         {
             get
             {
-                // Garantiza que la carpeta exista antes de devolver la ruta (idempotente)
                 Directory.CreateDirectory(CarpetaDatos);
                 return Path.Combine(CarpetaDatos, NombreBaseDatos);
             }
@@ -35,13 +28,8 @@ namespace BibliotecaApp
                 Mode = SqliteOpenMode.ReadWriteCreate
             }.ToString();
 
-        /// <summary>
-        /// Ruta opcional del CSV de catálogo. Si es null, usa búsqueda automática.
-        /// Configurable via app.config: <add key="CatalogoCsvPath" value="ruta\archivo.csv" />
-        /// </summary>
         public static string? CatalogoCsvPath { get; set; } = null;
 
-        /// <summary>Abre y devuelve una conexión SQLite ya abierta.</summary>
         public static SqliteConnection ObtenerConexion()
         {
             var conexion = new SqliteConnection(CadenaConexion);
@@ -49,12 +37,6 @@ namespace BibliotecaApp
             return conexion;
         }
 
-        /// <summary>
-        /// Inicializa la base de datos: tablas + importación del catálogo.
-        /// C-02: todo el proceso secuencial corre dentro de UNA sola transacción;
-        /// si cualquier paso falla se revierte el conjunto completo para no
-        /// dejar la BD a medias (schema + datos).
-        /// </summary>
         public static void Inicializar()
         {
             using var conexion = ObtenerConexion();
@@ -75,9 +57,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Inserta los usuarios por defecto si la tabla está vacía.
-        /// </summary>
         private static void SeedUsuarios(SqliteConnection conexion)
         {
             using var check = conexion.CreateCommand();
@@ -101,11 +80,6 @@ namespace BibliotecaApp
             cmd.ExecuteNonQuery();
         }
 
-        /// <summary>
-        /// Migra bases creadas con el esquema anterior: si la tabla
-        /// ControlUsuariosSala aún tiene la columna 'Taller', la elimina
-        /// preservando todas las filas. Además, añade la columna 'Estado' si no existe.
-        /// </summary>
         private static void MigrarEsquemaControlSala(SqliteConnection conexion, SqliteTransaction transaccion)
         {
             var columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -119,7 +93,6 @@ namespace BibliotecaApp
                 }
             }
 
-            // 1. Eliminar columna 'Taller' si existe (migración legacy)
             if (columnas.Contains("Taller"))
             {
                 try
@@ -130,8 +103,6 @@ namespace BibliotecaApp
                 }
                 catch (SqliteException)
                 {
-                    // Plan B para versiones antiguas de SQLite: reconstruir la tabla
-                    // dentro de la transacción global (C-02: sin transacción propia).
                     const string nuevaTabla = @"
                         CREATE TABLE ControlUsuariosSala_Nueva (
                             ID             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,7 +155,6 @@ namespace BibliotecaApp
                 }
             }
 
-            // 2. Añadir columna 'Estado' si no existe
             if (!columnas.Contains("Estado"))
             {
                 try
@@ -193,7 +163,6 @@ namespace BibliotecaApp
                     agregar.CommandText = "ALTER TABLE ControlUsuariosSala ADD COLUMN Estado TEXT DEFAULT 'Pendiente';";
                     agregar.ExecuteNonQuery();
 
-                    // Actualizar registros existentes: 'En lectura' -> 'Pendiente', resto -> 'Entregado'
                     using var actualizar = conexion.CreateCommand();
                     actualizar.CommandText = @"
                         UPDATE ControlUsuariosSala
@@ -206,8 +175,6 @@ namespace BibliotecaApp
                 }
                 catch (SqliteException)
                 {
-                    // Si falla ALTER TABLE (SQLite muy antiguo), reconstruir tabla completa
-                    // dentro de la transacción global (C-02: sin transacción propia).
                     const string nuevaTabla = @"
                         CREATE TABLE ControlUsuariosSala_Nueva (
                             ID             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -261,11 +228,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Agrega campos de versiones nuevas sin perder préstamos existentes.
-        /// Los préstamos antiguos permanecen sin código porque no hay forma
-        /// segura de deducir qué copia física les correspondía.
-        /// </summary>
         private static void MigrarEsquemaPrestamos(SqliteConnection conexion)
         {
             var columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -306,7 +268,6 @@ namespace BibliotecaApp
                 agregar.ExecuteNonQuery();
             }
 
-            // Género del usuario (campo opcional del formulario de préstamo)
             if (!columnas.Contains("Genero"))
             {
                 using var agregar = conexion.CreateCommand();
@@ -314,8 +275,6 @@ namespace BibliotecaApp
                 agregar.ExecuteNonQuery();
             }
 
-            // Estados de correo separados: bienvenida (préstamo) y alerta de retraso (vencidos).
-            // Antes compartían una sola columna "Notificado", lo que cruzaba los estados entre módulos.
             if (!columnas.Contains("CorreoBienvenidaEnviado"))
             {
                 using var agregar = conexion.CreateCommand();
@@ -335,9 +294,6 @@ namespace BibliotecaApp
             indice.ExecuteNonQuery();
         }
 
-        // ------------------------------------------------------------------
-        //  Estructura
-        // ------------------------------------------------------------------
         private static void CrearTablas(SqliteConnection conexion)
         {
             const string sqlLibros = @"
@@ -397,17 +353,12 @@ namespace BibliotecaApp
                     Rol            TEXT NOT NULL DEFAULT 'Operador'
                 );";
 
-            // Clave/valor para banderas de negocio persistentes.
-            // Se usa, entre otras, para recordar que el admin vació el inventario
-            // y evitar que la importación automática del CSV lo repueble al arrancar.
             const string sqlConfiguracion = @"
                 CREATE TABLE IF NOT EXISTS Configuracion (
                     Clave TEXT PRIMARY KEY,
                     Valor TEXT
                 );";
 
-            // Catálogo de módulos del filtro de Inventario: el combo se llena desde
-            // aquí (no desde Libros) y el admin puede agregar/eliminar módulos.
             const string sqlUbicacionesConfig = @"
                 CREATE TABLE IF NOT EXISTS UbicacionesConfig (
                     NombreUbicacion TEXT PRIMARY KEY
@@ -424,7 +375,6 @@ namespace BibliotecaApp
             indice.CommandText = "CREATE INDEX IF NOT EXISTS IX_Libros_Titulo ON Libros(Titulo);";
             indice.ExecuteNonQuery();
 
-            // Semilla de UbicacionesConfig: módulos por defecto (M1..M5) solo si está vacía
             using (var cmdConteo = conexion.CreateCommand())
             {
                 cmdConteo.CommandText = "SELECT COUNT(*) FROM UbicacionesConfig;";
@@ -444,16 +394,8 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Bandera: inventario vaciado manualmente por el administrador
-        // ------------------------------------------------------------------
         private const string ClaveInventarioVaciado = "InventarioVaciado";
 
-        /// <summary>
-        /// Marca (o desmarca) que el administrador vació el inventario a mano.
-        /// Mientras la marca esté en '1', el arranque NO repuebla la tabla Libros
-        /// desde el CSV, de modo que el vaciado persiste entre sesiones.
-        /// </summary>
         public static void MarcarInventarioVaciado(bool vaciado)
         {
             using var conexion = ObtenerConexion();
@@ -464,7 +406,6 @@ namespace BibliotecaApp
             cmd.ExecuteNonQuery();
         }
 
-        /// <summary>Lee la bandera de forma atómica sobre la conexión ya abierta.</summary>
         private static bool InventarioVaciadoPorUsuario(SqliteConnection conexion)
         {
             using var cmd = conexion.CreateCommand();
@@ -475,14 +416,8 @@ namespace BibliotecaApp
             return string.Equals(valor as string, "1", StringComparison.OrdinalIgnoreCase);
         }
 
-        // ------------------------------------------------------------------
-        //  Importación del catálogo CSV
-        // ------------------------------------------------------------------
         private static void ImportarCatalogoDesdeCsv(SqliteConnection conexion, SqliteTransaction transaccion)
         {
-            // Si el administrador vació el inventario explícitamente, NO se
-            // repuebla desde el CSV: el vaciado debe sobrevivir al reinicio.
-            // Se restaura con la importación manual de un CSV desde el inventario.
             if (InventarioVaciadoPorUsuario(conexion)) return;
 
             string? rutaCsv = BuscarArchivoCsv();
@@ -491,9 +426,6 @@ namespace BibliotecaApp
             var filas = LectorCsv.Leer(rutaCsv);
             if (filas.Count == 0) return;
 
-            // C-02: se ejecuta dentro de la transacción global de Inicializar
-            // (el Commit / Rollback lo gestiona Inicializar; aquí no se crea
-            // una transacción propia porque SQLite admite una por conexión).
             using var comando = conexion.CreateCommand();
             comando.Transaction = transaccion;
             comando.CommandText = @"
@@ -530,13 +462,11 @@ namespace BibliotecaApp
             System.Diagnostics.Debug.WriteLine($"Catálogo CUBO: {insertados} libros insertados desde CSV.");
         }
 
-        // C-03: nombre real del archivo de catálogo (se copia junto al .exe vía csproj)
         private const string NombreCatalogoCsv =
             "CATÁLOGO BIBLIOTECA CUBO SITIO DEL NIÑO - ORIGINAL-2026 .xlsx - INVENTARIO TOTAL (1).csv";
 
         private static string? BuscarArchivoCsv()
         {
-            // W-07: Prioridad 1 - Ruta configurable via app.config / property
             if (!string.IsNullOrWhiteSpace(CatalogoCsvPath) && File.Exists(CatalogoCsvPath))
                 return CatalogoCsvPath;
 

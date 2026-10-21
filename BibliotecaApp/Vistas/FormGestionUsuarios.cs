@@ -6,10 +6,6 @@ using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Formulario para gestión de contraseñas de usuarios (Solo Administrador).
-    /// Permite cambiar la contraseña de cualquier usuario del sistema.
-    /// </summary>
     public class FormGestionUsuarios : Form
     {
         private ComboBox _cmbUsuarios;
@@ -22,7 +18,6 @@ namespace BibliotecaApp
         {
             InitializeComponent();
 
-            // Icono de la ventana = logo de inicio (misma imagen que el .exe)
             if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
 
             CargarUsuarios();
@@ -37,9 +32,6 @@ namespace BibliotecaApp
             this._btnGuardar = new Button();
             this.SuspendLayout();
 
-            // 
-            // _cmbUsuarios
-            // 
             this._cmbUsuarios.DropDownHeight = 200;
             this._cmbUsuarios.DropDownStyle = ComboBoxStyle.DropDownList;
             this._cmbUsuarios.Font = new Font("Segoe UI", 10F);
@@ -47,9 +39,6 @@ namespace BibliotecaApp
             this._cmbUsuarios.Name = "_cmbUsuarios";
             this._cmbUsuarios.Size = new Size(450, 28);
             this._cmbUsuarios.TabIndex = 0;
-            // 
-            // _txtNuevaPassword
-            // 
             this._txtNuevaPassword.Font = new Font("Segoe UI", 10F);
             this._txtNuevaPassword.Location = new Point(20, 165);
             this._txtNuevaPassword.Name = "_txtNuevaPassword";
@@ -57,9 +46,6 @@ namespace BibliotecaApp
             this._txtNuevaPassword.Size = new Size(450, 27);
             this._txtNuevaPassword.TabIndex = 1;
             this._txtNuevaPassword.UseSystemPasswordChar = true;
-            // 
-            // _txtConfirmarPassword
-            // 
             this._txtConfirmarPassword.Font = new Font("Segoe UI", 10F);
             this._txtConfirmarPassword.Location = new Point(20, 235);
             this._txtConfirmarPassword.Name = "_txtConfirmarPassword";
@@ -67,9 +53,6 @@ namespace BibliotecaApp
             this._txtConfirmarPassword.Size = new Size(450, 27);
             this._txtConfirmarPassword.TabIndex = 2;
             this._txtConfirmarPassword.UseSystemPasswordChar = true;
-            // 
-            // _btnCancelar
-            // 
             this._btnCancelar.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             this._btnCancelar.DialogResult = DialogResult.Cancel;
             this._btnCancelar.Location = new Point(250, 390);
@@ -78,9 +61,6 @@ namespace BibliotecaApp
             this._btnCancelar.TabIndex = 4;
             this._btnCancelar.Text = "Cancelar";
             this._btnCancelar.UseVisualStyleBackColor = true;
-            // 
-            // _btnGuardar
-            // 
             this._btnGuardar.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             this._btnGuardar.Location = new Point(370, 390);
             this._btnGuardar.Name = "_btnGuardar";
@@ -89,9 +69,6 @@ namespace BibliotecaApp
             this._btnGuardar.Text = "Guardar";
             this._btnGuardar.UseVisualStyleBackColor = true;
             this._btnGuardar.Click += new EventHandler(this.BtnGuardar_Click);
-            // 
-            // FormGestionUsuarios
-            // 
             this.AcceptButton = this._btnGuardar;
             this.BackColor = Color.FromArgb(244, 246, 249);
             this.CancelButton = this._btnCancelar;
@@ -190,7 +167,6 @@ namespace BibliotecaApp
 
         private void BtnGuardar_Click(object? sender, EventArgs e)
         {
-            // Validar selección de usuario (manejo robusto de SelectedValue)
             object selectedValue = _cmbUsuarios.SelectedValue;
             if (selectedValue == null || selectedValue == DBNull.Value)
             {
@@ -199,7 +175,6 @@ namespace BibliotecaApp
                 return;
             }
 
-            // Extracción robusta del ID (maneja DataRowView, int, long, etc.)
             int idUsuario;
             try
             {

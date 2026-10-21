@@ -2,10 +2,6 @@
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Lector de archivos CSV compatible con RFC-4180 (campos entre comillas,
-    /// comillas escapadas duplicadas y saltos de línea dentro del campo).
-    /// </summary>
     public static class LectorCsv
     {
         public static List<string[]> Leer(string ruta)
@@ -80,24 +76,15 @@ namespace BibliotecaApp
             return filas;
         }
 
-        /// <summary>
-        /// Garantiza la lectura correcta de ñ y tildes: si el archivo es UTF-8 válido
-        /// (con o sin BOM) se lee como UTF-8; si contiene bytes inválidos, cae a
-        /// Windows-1252 (ANSI latino, típico de exportaciones antiguas de Excel).
-        /// Nunca se usa Encoding.Default, que depende del idioma del Windows.
-        /// </summary>
         public static Encoding DetectarCodificacion(string ruta)
         {
             byte[] bytes = File.ReadAllBytes(ruta);
 
-            // BOM UTF-8 (EF BB BF)
             if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
                 return new UTF8Encoding(true);
 
             try
             {
-                // Validación estricta: lanza DecoderFallbackException si hay
-                // secuencias que no corresponden a UTF-8.
                 new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes);
                 return new UTF8Encoding(false);
             }

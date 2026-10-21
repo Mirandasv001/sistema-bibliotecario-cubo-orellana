@@ -6,10 +6,6 @@ using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Ventana principal (dashboard): menú lateral + panel central donde se
-    /// instancia el apartado (UserControl) seleccionado.
-    /// </summary>
     public partial class Form1 : Form
     {
         private readonly System.Windows.Forms.Timer _timerAlertas;
@@ -24,14 +20,10 @@ namespace BibliotecaApp
 
         public Form1()
         {
-            // Refuerzo de codificación para cualquier salida de diagnóstico por consola.
-            // NOTA: esto NO afecta al renderizado de labels (WinForms ya es Unicode);
-            // la corrección definitiva está en el encoding de los archivos fuente y del CSV.
             try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { /* sin consola adjunta */ }
 
             InitializeComponent();
 
-            // Icono de la ventana = logo de inicio (misma imagen que el .exe)
             if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
 
             // Configuración de UI dinámica
@@ -42,14 +34,11 @@ namespace BibliotecaApp
             ConfigurarBotonMenu(btnGuiaUso, "Guía de Uso");
             ConfigurarBotonMenu(btnEstadisticas, "Estadísticas");
 
-            // Botón Cambiar Contraseña (antes "Gestión de Usuarios", solo para Admin)
             _btnGestionUsuarios = new Button();
             ConfigurarBotonMenu(_btnGestionUsuarios, "Cambiar Contraseña");
             _btnGestionUsuarios.Click += (_, _) => MostrarGestionUsuarios();
             panelNav.Controls.Add(_btnGestionUsuarios);
-            _btnGestionUsuarios.BringToFront(); // Lo coloca al final (arriba de Cerrar Sesión)
-
-            // Suscripción de eventos de navegación
+            _btnGestionUsuarios.BringToFront(); 
             btnSala.Click += (_, _) => MostrarApartadoSala();
             btnPrestamos.Click += (_, _) => MostrarApartadoPrestamos();
             btnInventario.Click += (_, _) => MostrarApartadoInventario();
@@ -63,9 +52,6 @@ namespace BibliotecaApp
             _timerAlertas.Tick += (_, _) => ActualizarContadorAlertas();
         }
 
-        // ------------------------------------------------------------------
-        //  Inicio
-        // ------------------------------------------------------------------
         private void Form1_Load(object sender, EventArgs e)
         {
             CargarLogo();
@@ -82,17 +68,12 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>Carga el logo CUBO desde recursos incrustados, sin depender de disco.</summary>
         private void CargarLogo()
         {
             try
             {
-                // El logo viaja incrustado en Base64 dentro del ensamblado, por lo que
-                // no se pierde si el instalador despliega el .exe en otra PC.
                 byte[] imageBytes = Convert.FromBase64String(RecursosBase64.LogoInicio);
                 using var ms = new MemoryStream(imageBytes);
-                // Deep copy: el Bitmap copia los píxeles al heap y no depende del
-                // stream, que se libera al salir del using.
                 using var imgOriginal = Image.FromStream(ms);
                 pictureBoxLogo.Image = new Bitmap(imgOriginal);
             }
@@ -102,9 +83,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Navegación entre apartados
-        // ------------------------------------------------------------------
         private void MostrarApartadoSala()
         {
             if (_vistaSala == null)
@@ -204,27 +182,13 @@ namespace BibliotecaApp
             _vistaGuiaUso?.Hide();
         }
 
-        /// <summary>
-        /// Sincroniza las vistas dependientes inmediatamente después de un
-        /// cambio de préstamo, sin esperar al siguiente tick del temporizador.
-        /// </summary>
         public void NotificarCambioPrestamos()
         {
             ActualizarContadorAlertas();
-            // W-10: Verificar !IsDisposed para evitar ObjectDisposedException
             if (_vistaAlertas is { IsDisposed: false }) _vistaAlertas.Actualizar();
             if (_vistaInventario is { IsDisposed: false }) _vistaInventario.Actualizar();
         }
 
-        // ------------------------------------------------------------------
-        //  Flujo ágil: Inventario (doble clic) → Préstamos Externos
-        // ------------------------------------------------------------------
-
-        /// <summary>
-        /// Método público invocado por UcInventario al hacer doble clic en un
-        /// ejemplar disponible. Cambia la vista activa a Préstamos Externos y
-        /// le inyecta el Código y el Título para agilizar el registro.
-        /// </summary>
         public void CargarPrestamoDesdeInventario(string codigo, string titulo)
         {
             MostrarApartadoPrestamos();
@@ -262,14 +226,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  NOTIFICACIONES DE PRÉSTAMOS VENCIDOS (bolita roja / badge)
-        // ====================================================================
-
-        /// <summary>
-        /// Consulta cuántos préstamos están vencidos (EstadoLibro = 'Pendiente'
-        /// y pasada la FechaEntrega esperada) y actualiza el badge del botón.
-        /// </summary>
         private void ActualizarContadorAlertas()
         {
             try
@@ -302,7 +258,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>Dibuja la "bolita roja" con el número de morosos sobre btnAlertas.</summary>
         private void btnAlertas_Paint(object? sender, PaintEventArgs e)
         {
             if (_conteoMorosos <= 0) return;
@@ -328,10 +283,6 @@ namespace BibliotecaApp
                 new RectangleF(x, y, badgeSize, badgeSize), formato);
         }
 
-        // ====================================================================
-        //  CERRAR SESIÓN
-        // ====================================================================
-
         private void btnCerrarSesion_Click(object? sender, EventArgs e)
         {
             DialogResult resultado = MessageBox.Show(
@@ -346,14 +297,8 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  CAMBIAR CONTRASEÑA (antes Gestión de Usuarios, Solo Admin)
-        // ====================================================================
         private void MostrarGestionUsuarios()
         {
-            // Validación previa por texto: evita abrir el formulario por accidente.
-            // Mini-modal code-behind (450x240, CenterParent) que exige escribir
-            // exactamente "cambiar contraseña" antes de continuar.
             using (var confirmacion = new Form
             {
                 Text = "Confirmación",
@@ -418,9 +363,7 @@ namespace BibliotecaApp
 
                 confirmacion.Controls.AddRange(new Control[] { lblAviso, txtFrase, btnContinuar, btnCancelar });
                 confirmacion.AcceptButton = btnContinuar; // Enter valida
-                confirmacion.CancelButton = btnCancelar;  // Esc cancela
-
-                // SOLO con la frase correcta se procede al formulario original
+                confirmacion.CancelButton = btnCancelar;  
                 if (confirmacion.ShowDialog(this) != DialogResult.OK)
                     return;
             }

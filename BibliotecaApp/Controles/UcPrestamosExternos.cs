@@ -7,51 +7,36 @@ using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Apartado B: préstamos de libros para llevar a casa, renovaciones y devoluciones.
-    /// El ComboBox muestra solo Títulos (con autocompletado). El Codigo único del
-    /// ejemplar físico se resuelve en la BD al momento de cada operación.
-    /// </summary>
     public partial class UcPrestamosExternos : UserControl // HERNCIA
     {
         private int? _prstamoEditandoId = null;
         
         // Variables de paginación
         private int paginaActual = 1;
-        private int tamanoPagina = 11; // Valor inicial/respaldo; CalcularTamanoPagina() lo ajusta a la altura real de pantalla
+        private int tamanoPagina = 11; 
         private int totalPaginas = 1;
         
-        // Botones de paginación (creados dinámicamente para no tocar Designer)
         private Button? btnAnterior;
         private Button? btnSiguiente;
         private Label? lblPagina;
         
-        // Botones de administración (creados dinámicamente para no tocar Designer)
         private Button? btnEliminar;
         private Button? btnLimpiar;
 
         // Espaciador invisible que empuja la paginación al extremo derecho de flpBotones
         private Control? _espaciadorPaginacion;
 
-        // Campo Género (creado dinámicamente para no tocar Designer).
-        // null! en la declaración: la asignación real ocurre en CrearCampoGenero(),
-        // invocado desde el constructor, para no emitir CS8618.
         private ComboBox cmbGeneroPrestamo = null!;
 
         public UcPrestamosExternos()
         {
             InitializeComponent();
 
-            // Configurar filas dinámicas (rescatado del diseñador para evitar errores)
             for (int i = 0; i < 8; i++)
             {
                 tlpCampos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
 
-            // TÍTULO DEL MÓDULO: texto conciso y fuente cacheada de 11pt
-            // (EstiloUI.FuenteSubtitulo en lugar de la fuente grande de
-            // TituloSeccion), centrado verticalmente en panelEncabezado (35 px)
-            // para no quedar flotando respecto a los controles colindantes.
             lblSubtitulo.Text = "Control de Préstamos y Devoluciones";
             lblSubtitulo.Font = EstiloUI.FuenteSubtitulo;
             Size tamSubtitulo = lblSubtitulo.GetPreferredSize(Size.Empty);
@@ -61,7 +46,6 @@ namespace BibliotecaApp
             splitPrestamos.Dock = DockStyle.Fill;
             splitPrestamos.Orientation = Orientation.Horizontal;
 
-            // Ajuste a contenido real (eliminada sección Renovación/Devolución) + 30px margen botones
             splitPrestamos.SplitterDistance = 410;
 
             splitPrestamos.Panel2.AutoScroll = false;
@@ -70,13 +54,6 @@ namespace BibliotecaApp
             pnlBotonesAccion.Dock = DockStyle.Top;
             pnlContenedorGrid.Dock = DockStyle.Fill;
 
-            // LAYOUT RESPONSIVO: el grid debe llegar hasta el borde inferior del
-            // UserControl (sin espacio en blanco debajo). Se sustituye el Dock por
-            // Anchor completo + altura manual calculada sobre su contenedor
-            // (equivalente a this.ClientSize.Height - dgv.Location.Y, adaptado al
-            // anidamiento real: el grid vive dentro de pnlContenedorGrid, dentro
-            // de splitPrestamos.Panel2). La paginación no se toca: el evento
-            // SizeChanged → RecalcularTamanoPagina se sigue disparando al estirarse.
             dgvPrestamos.Dock = DockStyle.None;
             dgvPrestamos.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dgvPrestamos.Location = new Point(0, 0);
@@ -94,27 +71,15 @@ namespace BibliotecaApp
             // Suscribir evento CellFormatting para coloreo dinámico de la columna Estado
             dgvPrestamos.CellFormatting += DgvPrestamos_CellFormatting_Estado;
 
-            // PAGINACIÓN DINÁMICA: al cambiar el tamaño del DataGridView (ventana,
-            // barra lateral o splitter) se recalcula el tamaño de página con la
-            // altura real y se recarga la página actual; si paginaActual queda
-            // fuera del nuevo total, CargarPrestamosActivos retrocede sola a la
-            // última página válida.
             dgvPrestamos.SizeChanged += DgvPrestamos_SizeChanged;
 
-            // Selección uniforme en TODA fila: azul oscuro institucional + texto blanco.
-            // Es la fuente que consultan los manejadores CellFormatting (override).
             dgvPrestamos.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
             dgvPrestamos.DefaultCellStyle.SelectionForeColor = Color.White;
 
-            // Crear botones de administración (Eliminar y Limpiar) dinámicamente.
-            // Se agregan ANTES que la paginación para que queden junto a "Modificar".
             CrearBotonesAdministracion();
 
-            // Crear botones de paginación dinámicamente (sin tocar Designer).
-            // Van al FINAL de la fila y un espaciador los empuja al extremo derecho.
             CrearBotonesPaginacion();
 
-            // Campo Género (Label + ComboBox) en code-behind: fila libre 8 de tlpCampos
             CrearCampoGenero();
 
             // Asegurar que la columna Notificado exista en la BD
@@ -124,10 +89,6 @@ namespace BibliotecaApp
             pnlBotonesAccion.BringToFront();
         }
 
-        /// <summary>
-        /// Agrega la columna Notificado a la tabla PrestamosExternos si no existe.
-        /// SQLite lanza error si la columna ya existe; lo manejamos explícitamente.
-        /// </summary>
         private void AsegurarColumnaNotificado()
         {
             try
@@ -139,8 +100,6 @@ namespace BibliotecaApp
             }
             catch (SqliteException ex) when (ex.SqliteErrorCode == 1 || ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
             {
-                // La columna ya existe (SQLite error code 1 = SQLITE_ERROR para duplicate column).
-                // No es un error, continuamos flujo normal.
             }
             catch (Exception ex)
             {
@@ -154,8 +113,6 @@ namespace BibliotecaApp
         {
             AplicarPlaceholders();
 
-            // Fecha de Préstamo: sin restricción de MinDate (puede ser cualquier fecha)
-            // Fecha de Entrega Esperada: nunca menor a la Fecha de Préstamo
             dtpFechaEntrega.MinDate = dtpFechaPrestamo.Value;
 
             dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, DateTime.Today);
@@ -181,22 +138,13 @@ namespace BibliotecaApp
             // Panel de campos sin scrollbar gris: Panel1 mide lo que realmente necesita
             AjustarSplitterAContenido();
 
-            // Paginación dinámica: recálculo con la altura real del control,
-            // justo antes de cargar los datos de la primera página
-            // (sin forzar página 1: aún no hay datos cargados).
             RecalcularTamanoPagina();
             CargarPrestamosActivos();
 
-            // ------------------------------------------------------------
-            // GÉNERO → a la par de Dirección, dentro de Datos del Usuario
-            // ------------------------------------------------------------
             if (tlpCampos.Controls["lblGenero"] is Label lblGenero)
             {
-                // 1) Dirección ocupa UNA sola columna: mismo ancho que Correo (col. 3).
                 tlpCampos.SetColumnSpan(txtDireccion, 1);
 
-                // 2) Género entra en las columnas libres 4 y 5 de la MISMA fila,
-                //    de modo que queda a la par de Dirección.
                 int filaUsuario = tlpCampos.GetRow(txtDireccion);
 
                 tlpCampos.SetColumn(lblGenero, 4);
@@ -205,7 +153,6 @@ namespace BibliotecaApp
                 tlpCampos.SetColumn(cmbGeneroPrestamo, 5);
                 tlpCampos.SetRow(cmbGeneroPrestamo, filaUsuario);
 
-                // 3) Mismo estilo que el resto de campos de la fila.
                 cmbGeneroPrestamo.Dock = DockStyle.Fill;
                 cmbGeneroPrestamo.Margin = new Padding(3, 0, 15, 4);
 
@@ -213,28 +160,14 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>Método público invocado por Form1 al navegar a este apartado.</summary>
         public void Actualizar()
         {
-            // Recalcular por si la ventana cambió mientras el módulo estaba oculto;
-            // si la capacidad de filas cambió, se vuelve a la página 1.
             if (CalcularTamanoPagina()) paginaActual = 1;
             CargarPrestamosActivos();
         }
 
-        /// <summary>
-        /// SIN BARRA DE SCROLL GRIS EN EL PANEL DE CAMPOS: splitPrestamos.Panel1
-        /// tiene AutoScroll = true y altura fija (SplitterDistance = 410). Si
-        /// encabezado + campos + botones superan esos 410px (placeholders, DPI
-        /// 125%/150%, fuentes), WinForms pinta un scrollbar vertical en el
-        /// lateral DERECHO de los campos. Este método ajusta la altura del
-        /// panel a lo que realmente necesita para que el scroll nunca aparezca,
-        /// garantizando siempre un mínimo para el grid inferior (Panel2MinSize).
-        /// Idempotente: solo escribe si el valor cambia.
-        /// </summary>
         private void AjustarSplitterAContenido()
         {
-            // Forzar layout para leer las alturas actuales de los controles Dock=Top
             splitPrestamos.Panel1.PerformLayout();
 
             int altoRequerido = panelEncabezado.Height
@@ -251,15 +184,6 @@ namespace BibliotecaApp
                 splitPrestamos.SplitterDistance = deseado;
         }
 
-        // ====================================================================
-        //  FLUJO ÁGIL — carga directa desde Inventario
-        // ====================================================================
-
-        /// <summary>
-        /// Método público invocado por Form1.CargarPrestamoDesdeInventario.
-        /// Precarga el Código y el Título del ejemplar y bloquea ambos campos
-        /// para que el operador solo complete los datos del usuario.
-        /// </summary>
         public void CargarDesdeInventario(string codigo, string titulo)
         {
             txtCodigoLibro.Text = codigo;
@@ -269,10 +193,6 @@ namespace BibliotecaApp
             txtNombre.Focus();
         }
 
-        // ====================================================================
-        //  BÚSQUEDA RÁPIDA POR CÓDIGO DEL EJEMPLAR
-        // ====================================================================
-
         private void txtCodigoLibro_KeyPress(object? sender, KeyPressEventArgs e)
         {
             if (e.KeyChar != (char)Keys.Enter) return;
@@ -280,11 +200,6 @@ namespace BibliotecaApp
             BuscarLibroPorCodigo();
         }
 
-        /// <summary>
-        /// Busca el ejemplar por su Código único. Si existe y está 'Disponible'
-        /// autocompleta el Título y bloquea ambos campos; en caso contrario
-        /// limpia el campo y muestra una alerta visual en lblAvisoCodigo.
-        /// </summary>
         private void BuscarLibroPorCodigo()
         {
             string codigo = txtCodigoLibro.Text.Trim();
@@ -374,9 +289,6 @@ namespace BibliotecaApp
             lblAvisoCodigo.Text = "";
         }
 
-        // ------------------------------------------------------------------
-        //  Placeholders nativos (Win32 EM_SETCUEBANNER)
-        // ------------------------------------------------------------------
         private void AplicarPlaceholders()
         {
             EstiloUI.EstablecerPlaceholder(txtDui, "Ej: 00000000-0");
@@ -384,15 +296,8 @@ namespace BibliotecaApp
             EstiloUI.EstablecerPlaceholder(txtTelefono, "Ej: 2222-2222");
         }
 
-        /// <summary>
-        /// Crea el campo Género (Label + ComboBox) en code-behind y lo coloca en
-        /// la MISMA fila que "Fecha de Entrega Esperada", columnas 2 y 3 (libres),
-        /// alineado justo debajo de "Personal que Prestó". Sin crear filas nuevas
-        /// ni modificar el archivo .Designer.cs.
-        /// </summary>
         private void CrearCampoGenero()
         {
-            // Estilo idéntico al de las etiquetas del Designer (CrearEtiqueta)
             var lblGenero = EstiloUI.CrearEtiqueta("Género:");
             lblGenero.Name = "lblGenero";
 
@@ -403,21 +308,12 @@ namespace BibliotecaApp
             };
             cmbGeneroPrestamo.Items.AddRange(new object[] { "Masculino", "Femenino" });
             EstiloUI.EstilizarEntrada(cmbGeneroPrestamo); // DropDownList + Flat + márgenes uniformes
-            cmbGeneroPrestamo.Margin = new Padding(3, 0, 15, 4); // mismo margen que el resto de campos
-
-            // Fila de "Fecha de Entrega Esperada" (dtpFechaEntrega), columnas 2 y 3
+            cmbGeneroPrestamo.Margin = new Padding(3, 0, 15, 4); 
             int filaEntrega = tlpCampos.GetRow(dtpFechaEntrega);
             tlpCampos.Controls.Add(lblGenero, 2, filaEntrega);
             tlpCampos.Controls.Add(cmbGeneroPrestamo, 3, filaEntrega);
         }
 
-        // ====================================================================
-        //  CONSULTA DE CÓDIGOS — resolver ejemplar físico desde el título
-        // ====================================================================
-
-        /// <summary>
-        /// Devuelve el Codigo del primer ejemplar disponible de un título, o null si no hay stock.
-        /// </summary>
         private static string? ObtenerCodigoDisponible(SqliteConnection conexion, string titulo)
         {
             using var cmd = conexion.CreateCommand();
@@ -429,9 +325,6 @@ namespace BibliotecaApp
             return cmd.ExecuteScalar()?.ToString();
         }
 
-        /// <summary>
-        /// Devuelve el Codigo del primer ejemplar en estado Prestado de un título, o null.
-        /// </summary>
         private static string? ObtenerCodigoPrestado(SqliteConnection conexion, string titulo)
         {
             using var cmd = conexion.CreateCommand();
@@ -443,10 +336,6 @@ namespace BibliotecaApp
             return cmd.ExecuteScalar()?.ToString();
         }
 
-        // ====================================================================
-        //  CARGA DE PRÉSTAMOS ACTIVOS (DataGridView)
-        // ====================================================================
-
         private void CargarPrestamosActivos()
         {
             try
@@ -455,7 +344,6 @@ namespace BibliotecaApp
 
                 using var comando = conexion.CreateCommand();
 
-                // --- Paginación: calcula total de páginas y offset defensivo ---
                 CalcularTotalPaginas();
                 if (paginaActual > totalPaginas) paginaActual = totalPaginas;
                 if (paginaActual <= 0) paginaActual = 1;
@@ -497,7 +385,6 @@ namespace BibliotecaApp
 
                 dgvPrestamos.DataSource = tabla;
 
-                // --- UI de paginación (botones dinámicos) ---
                 if (lblPagina != null) lblPagina.Text = $"Página {paginaActual} de {totalPaginas}";
                 if (btnAnterior != null) btnAnterior.Enabled = (paginaActual > 1);
                 if (btnSiguiente != null) btnSiguiente.Enabled = (paginaActual < totalPaginas);
@@ -505,7 +392,6 @@ namespace BibliotecaApp
                 // El texto de lblPagina es AutoSize y cambia de ancho: reajustar espaciador
                 ActualizarEspaciadorPaginacion();
 
-                // Asegurar que la columna CorreoBienvenidaEnviado exista en el grid (AutoGenerateColumns = false)
                 if (!dgvPrestamos.Columns.Contains("CorreoBienvenidaEnviado"))
                 {
                     var colNotificado = new DataGridViewTextBoxColumn
@@ -518,7 +404,6 @@ namespace BibliotecaApp
                     dgvPrestamos.Columns.Add(colNotificado);
                 }
 
-                // --- Trazabilidad: quién renovó / quién devolvió (columnas por código) ---
                 if (!dgvPrestamos.Columns.Contains("PersonalRenovo"))
                 {
                     var colPersonalRenovo = new DataGridViewTextBoxColumn
@@ -558,13 +443,10 @@ namespace BibliotecaApp
                         MinimumWidth = 85,
                         SortMode = DataGridViewColumnSortMode.Automatic
                     };
-                    // Inserción forzada justo después de "Telefono" (antes de
-                    // "TituloLibro") en lugar de añadirla al final del grid.
                     int index = dgvPrestamos.Columns["Telefono"]?.Index ?? dgvPrestamos.Columns.Count - 1;
                     dgvPrestamos.Columns.Insert(index + 1, colGenero);
                 }
 
-                // Agregar columna de botón "Notificar" si no existe
                 if (!dgvPrestamos.Columns.Contains("btnMensaje"))
                 {
                     var btnCol = new DataGridViewButtonColumn
@@ -580,12 +462,8 @@ namespace BibliotecaApp
                     dgvPrestamos.Columns.Add(btnCol);
                 }
 
-                // --- Orden lógico de columnas (code-behind, sin tocar Designer) ---
-                // ... -> Fecha Préstamo -> Personal que Prestó -> Fecha Renovación ->
-                //      Personal Renovó -> Entrega Esperada -> Personal Devolvió -> Estado
                 ReordenarColumnasGrid();
 
-                // --- Columnas de fecha más compactas (evita que la tabla se amontone) ---
                 foreach (var nombreColFecha in new[]
                          {
                              "FechaPrestamo", "FechaRenovacion", "Entrega Esperada"
@@ -604,7 +482,6 @@ namespace BibliotecaApp
                         // Valor por defecto
                         row.Cells["btnMensaje"].Value = "Enviar";
 
-                        // Si CorreoBienvenidaEnviado == 1, mostrar estado "Enviado" con color verde
                         var notificadoObj = row.Cells["CorreoBienvenidaEnviado"].Value;
                         if (notificadoObj != null && notificadoObj != DBNull.Value)
                         {
@@ -613,7 +490,6 @@ namespace BibliotecaApp
                                 row.Cells["btnMensaje"].Value = "Enviado";
                                 row.Cells["btnMensaje"].Style.BackColor = Color.LightGreen;
                                 row.Cells["btnMensaje"].Style.ForeColor = Color.DarkGreen;
-                                // Selección: sin override → hereda el azul uniforme del grid
                             }
                         }
                     }
@@ -630,18 +506,8 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  PAGINACIÓN (botones creados dinámicamente en code-behind)
-        // ====================================================================
-
-        /// <summary>
-        /// Crea los botones de paginación (Anterior / Siguiente / lblPagina)
-        /// sin tocar el archivo Designer.cs. Se colocan al FINAL de flpBotones,
-        /// precedidos por un espaciador que los empuja al extremo derecho.
-        /// </summary>
         private void CrearBotonesPaginacion()
         {
-            // --- Espaciador invisible: ocupa el hueco sobrante de la fila ---
             _espaciadorPaginacion = new Label
             {
                 Name = "espaciadorPaginacion",
@@ -652,7 +518,6 @@ namespace BibliotecaApp
             };
             flpBotones.Controls.Add(_espaciadorPaginacion);
 
-            // --- Botón "Anterior": estilo minimalista, icono cuadrado 35px ---
             btnAnterior = new Button
             {
                 Name = "btnAnterior",
@@ -668,7 +533,6 @@ namespace BibliotecaApp
             btnAnterior.Size = new Size(35, 40);
             btnAnterior.Click += btnAnterior_Click;
 
-            // --- Etiqueta de página ---
             lblPagina = new Label
             {
                 Name = "lblPagina",
@@ -679,7 +543,6 @@ namespace BibliotecaApp
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
 
-            // --- Botón "Siguiente": estilo minimalista, icono cuadrado 35px ---
             btnSiguiente = new Button
             {
                 Name = "btnSiguiente",
@@ -694,12 +557,10 @@ namespace BibliotecaApp
             btnSiguiente.Size = new Size(35, 40);
             btnSiguiente.Click += btnSiguiente_Click;
 
-            // Orden de izquierda a derecha en la esquina: btnAnterior -> lblPagina -> btnSiguiente
             flpBotones.Controls.Add(btnAnterior);
             flpBotones.Controls.Add(lblPagina);
             flpBotones.Controls.Add(btnSiguiente);
 
-            // W-11: WeakReference en lambda Resize para evitar retención de 'this'
             var weakThis = new WeakReference<UcPrestamosExternos>(this);
             EventHandler resizeHandler = null;
             resizeHandler = (_, _) =>
@@ -707,16 +568,12 @@ namespace BibliotecaApp
                 if (weakThis.TryGetTarget(out var target))
                     target.ActualizarEspaciadorPaginacion();
                 else
-                    flpBotones.Resize -= resizeHandler; // Auto-limpieza si target recolectado
+                    flpBotones.Resize -= resizeHandler; 
             };
             flpBotones.Resize += resizeHandler;
             ActualizarEspaciadorPaginacion();
         }
 
-        /// <summary>
-        /// Calcula el ancho sobrante de flpBotones y se lo asigna al espaciador,
-        /// de modo que la paginación quede pegada al borde derecho de la barra.
-        /// </summary>
         private void ActualizarEspaciadorPaginacion()
         {
             if (_espaciadorPaginacion == null || !flpBotones.IsHandleCreated) return;
@@ -728,17 +585,13 @@ namespace BibliotecaApp
                 ocupado += c.Width + c.Margin.Horizontal;
             }
 
-            // 35 px de margen derecho: evita que la paginación choque contra el
-            // borde visible del FlowLayoutPanel y se desborde de la barra.
             const int margenDerecho = 35;
 
             int disponible = flpBotones.ClientSize.Width - ocupado
                              - _espaciadorPaginacion.Margin.Horizontal - margenDerecho;
 
-            // Nunca se aplica un ancho negativo (ventana demasiado angosta)
             int nuevoAncho = disponible < 0 ? 0 : disponible;
 
-            // Evita ciclos de layout: solo escribe si el valor realmente cambió
             if (_espaciadorPaginacion.Width != nuevoAncho)
                 _espaciadorPaginacion.Width = nuevoAncho;
         }
@@ -761,10 +614,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Calcula totalPaginas según los registros activos de la BD.
-        /// Nunca devuelve 0 páginas (mínimo 1).
-        /// </summary>
         private void CalcularTotalPaginas()
         {
             try
@@ -776,7 +625,7 @@ namespace BibliotecaApp
                 var resultado = comando.ExecuteScalar();
                 int totalRegistros = (resultado != null && resultado != DBNull.Value) ? Convert.ToInt32(resultado) : 0;
 
-                if (tamanoPagina <= 0) tamanoPagina = 25; // Fallback de seguridad
+                if (tamanoPagina <= 0) tamanoPagina = 25; 
 
                 totalPaginas = (int)Math.Ceiling((double)totalRegistros / tamanoPagina);
                 if (totalPaginas <= 0) totalPaginas = 1;
@@ -787,34 +636,19 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// PAGINACIÓN DINÁMICA: calcula cuántas filas caben realmente en el
-        /// DataGridView con la altura real disponible en pantalla:
-        ///   filasPosibles = (altura cliente − altura encabezado) / alto de fila
-        ///   tamanoPagina  = Math.Max(1, filasPosibles)
-        /// Sin margen inferior: la última fila visible llega al borde inferior
-        /// del grid (elimina el espacio en blanco de la parte inferior).
-        /// Seguro: si el control aún no tiene layout conserva el tamaño actual,
-        /// y RowTemplate.Height tiene fallback si aún no está definido.
-        /// </summary>
         private void RecalcularTamanoPagina()
         {
             int altoFila = dgvPrestamos.RowTemplate.Height > 0
                 ? dgvPrestamos.RowTemplate.Height
-                : 20; // fallback si el alto de fila aún no está definido
+                : 20; 
 
             int disponibles = dgvPrestamos.ClientSize.Height - dgvPrestamos.ColumnHeadersHeight;
-            if (disponibles <= 0) return; // sin layout todavía: conservar tamaño actual
+            if (disponibles <= 0) return; 
 
             int filasPosibles = disponibles / altoFila;
             tamanoPagina = Math.Max(1, filasPosibles); // nunca menos de 1 fila por página
         }
 
-        /// <summary>
-        /// Devuelve true si el tamaño de página cambió respecto al anterior
-        /// (el llamador decide si reiniciar la página y recargar).
-        /// Delega en RecalcularTamanoPagina para usar una única fórmula.
-        /// </summary>
         private bool CalcularTamanoPagina()
         {
             int anterior = tamanoPagina;
@@ -822,15 +656,6 @@ namespace BibliotecaApp
             return tamanoPagina != anterior;
         }
 
-        /// <summary>
-        /// SizeChanged del DataGridView (ventana, barra lateral o splitter):
-        /// recalcula el tamaño de página con la altura real y recarga la página
-        /// actual. No se fuerza la página 1: CargarPrestamosActivos ya acomoda
-        /// paginaActual a la última página válida si supera el nuevo total.
-        /// Solo recarga si la capacidad de filas cambió: durante el arrastre del
-        /// resize se disparan decenas de eventos y recargar en cada uno
-        /// golpearía la BD sin necesidad.
-        /// </summary>
         private void DgvPrestamos_SizeChanged(object? sender, EventArgs e)
         {
             if (IsDisposed || Disposing) return;
@@ -842,12 +667,6 @@ namespace BibliotecaApp
             CargarPrestamosActivos(); // recalcula totalPaginas y acomoda paginaActual
         }
 
-        /// <summary>
-        /// Ordena las columnas del DataGridView en el orden lógico de negocio
-        /// (solo por código, sin tocar Designer.cs):
-        /// ... -> Fecha Préstamo -> Personal que Prestó -> Fecha Renovación ->
-        /// Personal Renovó -> Entrega Esperada -> Personal Devolvió -> Estado.
-        /// </summary>
         private void ReordenarColumnasGrid()
         {
             string[] ordenDeseado =
@@ -865,14 +684,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  BOTONES DE ADMINISTRACIÓN (Eliminar / Limpiar) — solo administrador
-        // ====================================================================
-
-        /// <summary>
-        /// Crea btnEliminar y btnLimpiar dinámicamente (sin tocar Designer)
-        /// y los agrega a flpBotones. La visibilidad por rol se aplica en el Load.
-        /// </summary>
         private void CrearBotonesAdministracion()
         {
             btnEliminar = new Button
@@ -882,7 +693,7 @@ namespace BibliotecaApp
                 AutoSize = true,
                 Margin = new Padding(5, 0, 5, 5),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
-                Visible = false // Solo administrador (se muestra en Load)
+                Visible = false 
             };
             EstiloUI.EstilizarBotonSecundario(btnEliminar);
             btnEliminar.Click += btnEliminar_Click;
@@ -894,7 +705,7 @@ namespace BibliotecaApp
                 AutoSize = true,
                 Margin = new Padding(5, 0, 5, 5),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
-                Visible = false // Solo administrador (se muestra en Load)
+                Visible = false 
             };
             EstiloUI.EstilizarBotonSecundario(btnLimpiar);
             btnLimpiar.Click += btnLimpiar_Click;
@@ -903,16 +714,8 @@ namespace BibliotecaApp
             flpBotones.Controls.Add(btnLimpiar);
         }
 
-        /// <summary>
-        /// Elimina (DELETE) el préstamo seleccionado. Acción exclusiva de administrador:
-        /// pide autenticación con FormAutenticacion (AdminCubo / Admin123$) y solo
-        /// permite eliminar registros en estado 'Entregado'. Los usuarios normales
-        /// jamás usan DELETE (solo UPDATE).
-        /// </summary>
         private void btnEliminar_Click(object? sender, EventArgs e)
         {
-            // W-02: Capturar valores de la fila ANTES de cualquier MessageBox/Dialog
-            // para evitar race condition si el usuario cambia de fila mientras el dialog está abierto.
             if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
             {
                 MessageBox.Show("Seleccione un préstamo de la lista para eliminar.",
@@ -924,7 +727,6 @@ namespace BibliotecaApp
             string estado = dgvPrestamos.CurrentRow.Cells["Estado"].Value?.ToString()?.Trim() ?? "";
             string tituloFila = dgvPrestamos.CurrentRow.Cells["TituloLibro"].Value?.ToString() ?? "";
 
-            // Solo se pueden eliminar préstamos ya entregados (cerrados).
             if (!string.Equals(estado, "Entregado", StringComparison.OrdinalIgnoreCase))
             {
                 MessageBox.Show("Solo se pueden eliminar préstamos con estado 'Entregado'.\n" +
@@ -933,7 +735,6 @@ namespace BibliotecaApp
                 return;
             }
 
-            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
@@ -950,14 +751,9 @@ namespace BibliotecaApp
             {
                 using var conexion = ConexionDB.ObtenerConexion();
 
-                // DELETE + UPDATE de inventario como una sola unidad: si algo falla,
-                // no se borra el préstamo y tampoco se altera la disponibilidad.
                 using var transaccion = conexion.BeginTransaction();
                 try
                 {
-                    // Resolver el ejemplar ANTES del DELETE (después ya no existirá
-                    // el registro). Compatibilidad con préstamos antiguos sin
-                    // CodigoLibro: se toma el ejemplar 'Prestado' de ese título.
                     string? codigoLibro;
                     using (var obtenerCodigo = conexion.CreateCommand())
                     {
@@ -988,7 +784,6 @@ namespace BibliotecaApp
 
                         if (cmd.ExecuteNonQuery() == 0)
                         {
-                            // Rollback: el using de la transacción no dejará nada a medias.
                             transaccion.Rollback();
                             MessageBox.Show("No se pudo eliminar el préstamo (ya no existe o no está en estado 'Entregado').",
                                 "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -996,10 +791,6 @@ namespace BibliotecaApp
                         }
                     }
 
-                    // Re-sincronizar el Inventario: el ejemplar del préstamo borrado
-                    // debe quedar 'Disponible'. El NOT EXISTS evita liberarlo si otro
-                    // préstamo activo (Pendiente/Renovado) sigue reteniéndolo, cosa
-                    // que ocurriría si el mismo ejemplar ya fue prestado de nuevo.
                     if (!string.IsNullOrEmpty(codigoLibro))
                     {
                         using var liberar = conexion.CreateCommand();
@@ -1038,32 +829,18 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Elimina de la BD todos los préstamos mostrados en la página ACTIVA del
-        /// grid. Exige autenticación de Administrador (mismo modal que "Eliminar
-        /// préstamo"); si el modal no devuelve DialogResult.OK (credenciales
-        /// incorrectas o cierre del diálogo), se aborta sin ejecutar nada.
-        /// </summary>
         private void btnLimpiar_Click(object? sender, EventArgs e)
         {
-            // --- Autenticación de seguridad (mismo modal que Inventario: AdminCubo / Admin123$) ---
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
             }
 
-            // Solo llega aquí con autenticación aprobada (DialogResult.OK)
             EliminarPaginaActual();
         }
 
-        /// <summary>
-        /// Elimina en bloque (DELETE parametrizado + transacción) los registros de
-        /// la página visible y recarga el grid. Si la página eliminada era la
-        /// última, CargarPrestamosActivos() regresa a la nueva última página.
-        /// </summary>
         private void EliminarPaginaActual()
         {
-            // 1) Instantánea de los IDs de la página activa ANTES de tocar la BD
             var idsPagina = new List<long>();
             foreach (DataGridViewRow fila in dgvPrestamos.Rows)
             {
@@ -1084,7 +861,6 @@ namespace BibliotecaApp
                 return;
             }
 
-            // 2) Confirmación (la eliminación es definitiva)
             DialogResult confirmar = MessageBox.Show(
                 $"Se eliminarán {idsPagina.Count} registro(s) de la página actual.\n" +
                 "Esta acción no se puede deshacer. ¿Continuar?",
@@ -1120,7 +896,7 @@ namespace BibliotecaApp
                 catch
                 {
                     transaccion.Rollback();
-                    throw; // el catch exterior muestra el error unificado
+                    throw; 
                 }
 
                 MessageBox.Show($"{eliminados} registro(s) eliminado(s) de la base de datos.",
@@ -1132,18 +908,9 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
-            // 3) Recargar: recalcula totalPaginas y acomoda paginaActual si era la última
             CargarPrestamosActivos();
         }
 
-        // ====================================================================
-        //  EVENTOS DEL DataGridView (nombres exactos que exige el Designer)
-        // ====================================================================
-
-        /// <summary>
-        /// Bloquea/habilita las acciones de la fila seleccionada según el estado:
-        /// un préstamo 'Entregado' no puede renovarse ni notificarse.
-        /// </summary>
         private void DgvPrestamos_SelectionChanged(object? sender, EventArgs e)
         {
             try
@@ -1169,14 +936,13 @@ namespace BibliotecaApp
                     bool filaEntregada = string.Equals(est, "Entregado", StringComparison.OrdinalIgnoreCase);
 
                     var celdaBtn = fila.Cells["btnMensaje"];
-                    celdaBtn.ReadOnly = filaEntregada; // Bloquea el clic de "Enviar"
+                    celdaBtn.ReadOnly = filaEntregada; 
 
                     if (filaEntregada)
                     {
                         celdaBtn.Value = "Entregado";
                         celdaBtn.Style.BackColor = Color.FromArgb(204, 255, 204);
                         celdaBtn.Style.ForeColor = Color.DarkGreen;
-                        // Selección: sin override → hereda el azul uniforme del grid
                     }
                     else if (celdaBtn.Value?.ToString() == "Entregado")
                     {
@@ -1198,9 +964,6 @@ namespace BibliotecaApp
         {
             if (e.RowIndex < 0) return;
 
-            // OVERRIDE UNIFORME DE SELECCIÓN: toda celda de la fila seleccionada
-            // adopta el azul oscuro del grid con texto blanco, ignorando el color
-            // personalizado de la celda (Estado, botón Notificar, etc.).
             e.CellStyle.SelectionBackColor = dgvPrestamos.DefaultCellStyle.SelectionBackColor;
             e.CellStyle.SelectionForeColor = Color.White;
 
@@ -1209,25 +972,15 @@ namespace BibliotecaApp
             // La columna Estado la pinta DgvPrestamos_CellFormatting_Estado
             if (col.Name == "Estado") return;
 
-            // El botón "Notificar" conserva sus colores propios (Enviado / Entregado)
             if (col.Name == "btnMensaje") return;
 
-            // Resto de la fila: siempre fondo blanco (la selección ya quedó fijada arriba)
             e.CellStyle.BackColor = Color.White;
         }
 
-        /// <summary>
-        /// Colorea únicamente la celda de la columna "Estado":
-        /// Pendiente = rojo (255,204,204) · Renovado = celeste (204,235,255) ·
-        /// Entregado = verde (204,255,204).
-        /// </summary>
         private void DgvPrestamos_CellFormatting_Estado(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.RowIndex < 0) return;
 
-            // OVERRIDE UNIFORME DE SELECCIÓN (antes de los colores por estado):
-            // en selección, la celda "Estado" ignora su color propio y adopta
-            // el azul oscuro de la fila con texto blanco → legibilidad garantizada.
             e.CellStyle.SelectionBackColor = dgvPrestamos.DefaultCellStyle.SelectionBackColor;
             e.CellStyle.SelectionForeColor = Color.White;
 
@@ -1252,14 +1005,9 @@ namespace BibliotecaApp
                     return; // Sin color para estados no reconocidos
             }
 
-            // Solo el color de reposo; la selección queda uniforme en azul (arriba).
             e.CellStyle.BackColor = colorFondo;
         }
 
-        /// <summary>
-        /// Maneja el clic en la columna de botones "Notificar" para abrir un mailto: individual
-        /// con los datos del préstamo (nombre, correo, título, fecha de entrega).
-        /// </summary>
         private void DgvPrestamos_CellContentClick(object? sender, DataGridViewCellEventArgs e)
         {
             // Validar que sea clic en la columna de botones y fila válida
@@ -1300,14 +1048,10 @@ namespace BibliotecaApp
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
                 Process.Start(psi);
 
-                // Feedback visual: cambiar botón a "Enviado" con color verde
                 var celda = dgvPrestamos.Rows[e.RowIndex].Cells[e.ColumnIndex];
                 celda.Value = "Enviado";
                 celda.Style.BackColor = Color.LightGreen;
                 celda.Style.ForeColor = Color.DarkGreen;
-                // Selección: sin override → hereda el azul uniforme del grid
-
-                // Persistir en BD: CorreoBienvenidaEnviado = 1 (solo bienvenida; no toca alertas)
                 int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
                 using (var conexion = ConexionDB.ObtenerConexion())
                 using (var updateCmd = conexion.CreateCommand())
@@ -1323,10 +1067,6 @@ namespace BibliotecaApp
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        // ====================================================================
-        //  REGISTRAR PRÉSTAMO
-        // ====================================================================
 
         private void btnRegistrar_Click(object sender, EventArgs e)
         {
@@ -1346,17 +1086,10 @@ namespace BibliotecaApp
                 RegistrarPrestamo();
         }
 
-        /// <summary>
-        /// Inserta un nuevo préstamo y marca como "Prestado" el primer ejemplar
-        /// disponible del título seleccionado. El Codigo se resuelve en tiempo real.
-        /// Duplica la validación de la UI por seguridad y nunca lanza una excepción
-        /// sin controlar: captura SqliteException y cualquier otra Exception.
-        /// </summary>
         private void RegistrarPrestamo()
         {
             string titulo = txtTituloLibro.Text.Trim();
 
-            // Validación preventiva extra (aunque ValidarFormulario ya corrió).
             if (string.IsNullOrWhiteSpace(titulo))
             {
                 MessageBox.Show("Seleccione o escriba el título del libro.",
@@ -1415,10 +1148,6 @@ namespace BibliotecaApp
                         insertar.Parameters.AddWithValue("$fechaPrestamo", dtpFechaPrestamo.Value.ToString("yyyy-MM-dd"));
                         insertar.Parameters.AddWithValue("$personalPresto", txtPersonalPresto.Text.Trim());
                         insertar.Parameters.AddWithValue("$fechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
-                        // ALTA: el estado de un préstamo NUEVO es SIEMPRE 'Pendiente'.
-                        // txtEstado es un TextBox de solo lectura que refleja el estado
-                        // de la fila cargada para editar; leerlo aquí hacía que un alta
-                        // heredara 'Entregado' y Alertas de Vencidos lo ignorara.
                         insertar.Parameters.AddWithValue("$estado", "Pendiente");
                         insertar.Parameters.AddWithValue("$codigo", codigo);
                         insertar.ExecuteNonQuery();
@@ -1474,14 +1203,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  ACTUALIZAR PRÉSTAMO (modo edición)
-        // ====================================================================
-
-        /// <summary>
-        /// Actualiza un préstamo existente. Si cambió el título, libera el ejemplar
-        /// viejo y marca uno nuevo — ambos por Codigo único.
-        /// </summary>
         private void ActualizarPrestamo(int id)
         {
             string tituloNuevo = txtTituloLibro.Text.Trim();
@@ -1490,7 +1211,6 @@ namespace BibliotecaApp
             {
                 using var conexion = ConexionDB.ObtenerConexion();
 
-                // Título actual del préstamo (antes de editar).
                 string tituloViejo = "";
                 using (var cmd = conexion.CreateCommand())
                 {
@@ -1500,15 +1220,11 @@ namespace BibliotecaApp
                     if (r != null) tituloViejo = r.ToString() ?? "";
                 }
 
-                // Renovación: SOLO se actualizan fecha/personal de renovación y el
-                // estado a 'Renovado'. No se ejecuta devolución ni se borra el registro.
                 if (string.Equals(txtEstado.Text, "Renovado", StringComparison.OrdinalIgnoreCase))
                 {
                     using var transaccion = conexion.BeginTransaction();
                     try
                     {
-                        // Trazabilidad: en modo edición no hay popup, se registra
-                        // el usuario en sesión como responsable de la renovación.
                         RenovarPrestamo(conexion, transaccion, id, DateTime.Now,
                             string.IsNullOrWhiteSpace(SesionGlobal.NombreUsuario)
                                 ? "Sistema"
@@ -1538,12 +1254,9 @@ namespace BibliotecaApp
                 }
                 else
                 {
-                    // Título distinto: liberar ejemplar viejo + marcar ejemplar nuevo.
-                    // W-09: Validación de stock DENTRO de la transacción para evitar race condition.
                     using var transaccion = conexion.BeginTransaction();
                     try
                     {
-                        // Resolver ejemplar viejo: prioridad al CodigoLibro del préstamo; fallback por título.
                         string? codigoViejo;
                         using (var cmdViejo = conexion.CreateCommand())
                         {
@@ -1556,7 +1269,6 @@ namespace BibliotecaApp
                         if (string.IsNullOrEmpty(codigoViejo))
                             codigoViejo = ObtenerCodigoPrestado(conexion, tituloViejo);
 
-                        // Resolver ejemplar nuevo: debe estar 'Disponible'.
                         string? codigoNuevo = ObtenerCodigoDisponible(conexion, tituloNuevo);
 
                         if (codigoNuevo == null)
@@ -1628,10 +1340,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Ejecuta el UPDATE de los campos del formulario en PrestamosExternos.
-        /// Se separa para reutilizar dentro de transacciones con manejo de inventario.
-        /// </summary>
         private void ActualizarDatosPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id)
         {
             using var cmd = conexion.CreateCommand();
@@ -1667,11 +1375,6 @@ namespace BibliotecaApp
             cmd.ExecuteNonQuery();
         }
 
-        /// <summary>
-        /// Renovación exclusiva: actualiza FechaRenovacion, PersonalRenovo,
-        /// la nueva Fecha de Entrega Esperada y EstadoLibro = 'Renovado'.
-        /// No toca inventario ni ejecuta lógica de devolución.
-        /// </summary>
         private void RenovarPrestamo(SqliteConnection conexion, SqliteTransaction transaccion, int id, DateTime fechaRenovacion, string personalRenovo)
         {
             using var cmd = conexion.CreateCommand();
@@ -1690,14 +1393,6 @@ namespace BibliotecaApp
             cmd.ExecuteNonQuery();
         }
 
-        // ====================================================================
-        //  DEVOLUCIÓN
-        // ====================================================================
-
-        /// <summary>
-        /// Marca el préstamo como "Entregado" y libera el ejemplar físico (por Codigo).
-        /// Usa fecha del sistema y popup para el nombre del personal.
-        /// </summary>
         private void btnDevolver_Click(object sender, EventArgs e)
         {
             if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
@@ -1757,8 +1452,6 @@ namespace BibliotecaApp
                             throw new InvalidOperationException("El préstamo ya fue devuelto o ya no existe.");
                     }
 
-                    // Resolución robusta del código del ejemplar (igual que en Eliminar):
-                    // 1) CodigoLibro del préstamo; 2) fallback por título + estado 'Prestado'.
                     if (string.IsNullOrEmpty(codigoLibro))
                     {
                         string tituloFila = dgvPrestamos.CurrentRow?.Cells["TituloLibro"]?.Value?.ToString() ?? "";
@@ -1772,9 +1465,6 @@ namespace BibliotecaApp
                         codigoLibro = obtenerPorTitulo.ExecuteScalar()?.ToString();
                     }
 
-                    // Re-sincronizar Inventario: el ejemplar devuelto pasa a 'Disponible'.
-                    // El NOT EXISTS evita liberarlo si OTRO préstamo activo (Pendiente/Renovado)
-                    // ya está reteniendo ese mismo ejemplar (p.ej. se prestó de nuevo).
                     if (!string.IsNullOrEmpty(codigoLibro))
                     {
                         using var liberar = conexion.CreateCommand();
@@ -1819,9 +1509,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Muestra un modal estilo InputBox para solicitar el nombre del personal.
-        /// </summary>
         private string ObtenerNombrePersonal(string accion)
         {
             using var form = new Form
@@ -1875,9 +1562,6 @@ namespace BibliotecaApp
             return form.ShowDialog(this) == DialogResult.OK ? txt.Text.Trim() : string.Empty;
         }
 
-        /// <summary>
-        /// Renueva el préstamo seleccionado: fecha actual, personal por popup, estado = Renovado.
-        /// </summary>
         private void btnRenovarFila_Click(object sender, EventArgs e)
         {
             if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
@@ -1925,10 +1609,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  MODIFICAR — carga el registro en el formulario
-        // ====================================================================
-
         private void btnModificar_Click(object sender, EventArgs e)
         {
             if (dgvPrestamos.CurrentRow == null || dgvPrestamos.CurrentRow.Cells["ID"].Value == null)
@@ -1942,10 +1622,6 @@ namespace BibliotecaApp
             CargarPrestamoParaEditar(id);
         }
 
-        /// <summary>
-        /// Carga un préstamo existente en los controles del formulario.
-        /// El ComboBox se selecciona por Text (título) ya que es una lista simple.
-        /// </summary>
         private void CargarPrestamoParaEditar(int id)
         {
             try
@@ -1976,8 +1652,6 @@ namespace BibliotecaApp
                 txtTelefono.Text = fila["Telefono"]?.ToString() ?? "";
                 txtDireccion.Text = fila["Direccion"]?.ToString() ?? "";
 
-                // Género: seleccionar del combo si coincide; si está vacío o es
-                // desconocido (registros previos a la columna), queda sin selección.
                 string generoFila = fila["Genero"]?.ToString() ?? "";
                 cmbGeneroPrestamo.SelectedIndex = -1;
                 int indiceGenero = cmbGeneroPrestamo.FindStringExact(generoFila);
@@ -1987,8 +1661,6 @@ namespace BibliotecaApp
                 string tituloLibro = fila["TituloLibro"]?.ToString() ?? "";
                 string codigoLibro = fila["CodigoLibro"]?.ToString() ?? "";
 
-                // Fechas desde la BD protegidas con FechaSegura: la BD puede contener
-                // fechas no inicializadas (0001-01-01) que el control no admite.
                 if (DateTime.TryParse(fila["FechaPrestamo"]?.ToString(), out var fp))
                     dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, fp);
 
@@ -1999,7 +1671,6 @@ namespace BibliotecaApp
                 if (DateTime.TryParse(fila["FechaEntrega"]?.ToString(), out var fe))
                     dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, fe);
 
-                // Seleccionar el título en el ComboBox (por texto).
                 txtTituloLibro.Text = tituloLibro;
                 txtCodigoLibro.Text = codigoLibro;
                 if (!string.IsNullOrWhiteSpace(codigoLibro))
@@ -2017,15 +1688,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ====================================================================
-        //  VALIDACIÓN Y LIMPIEZA
-        // ====================================================================
-
-        /// <summary>
-        /// Valida los campos obligatorios del formulario usando
-        /// string.IsNullOrWhiteSpace. Si algo falta, muestra una advertencia
-        /// amigable y detiene el flujo devolviendo false (nunca rompe el programa).
-        /// </summary>
         private bool ValidarFormulario()
         {
             if (string.IsNullOrWhiteSpace(txtNombre.Text))
@@ -2037,8 +1699,6 @@ namespace BibliotecaApp
             if (string.IsNullOrWhiteSpace(txtPersonalPresto.Text))
                 return Notificar("Escriba el personal que realiza el préstamo.", txtPersonalPresto);
 
-            // Fechas: los DateTimePicker siempre tienen una fecha válida, pero
-            // reforzamos que el rango tenga coherencia.
             if (dtpFechaEntrega.Value.Date < dtpFechaPrestamo.Value.Date)
                 return Notificar("La fecha de entrega no puede ser anterior a la de préstamo.", dtpFechaEntrega);
 
@@ -2053,22 +1713,10 @@ namespace BibliotecaApp
             return false;
         }
 
-        /// <summary>
-        /// Fecha mínima que admite un DateTimePicker (límite nativo del control).
-        /// Asignaciones por debajo de esta fecha lanzan ArgumentOutOfRangeException
-        /// con el mensaje "DateTimePicker no admite fechas anteriores a 1/1/1753".
-        /// </summary>
         private static readonly DateTime MinFechaSoportada = new DateTime(1753, 1, 1);
 
-        /// <summary>
-        /// Devuelve <paramref name="valor"/> si el control la admite; si no,
-        /// un valor de rescate seguro (DateTime.Now, nunca por debajo del mínimo
-        /// admisible). Evita ArgumentOutOfRangeException al asignar DateTimePicker.Value.
-        /// </summary>
         private static DateTime FechaSegura(DateTimePicker control, DateTime valor)
         {
-            // Piso real: el mayor entre el límite nativo (1753) y el MinDate
-            // dinámico actual del control (p. ej. "entrega ≥ préstamo").
             DateTime piso = control.MinDate > MinFechaSoportada ? control.MinDate : MinFechaSoportada;
 
             if (valor >= piso && valor <= control.MaxDate)
@@ -2081,30 +1729,14 @@ namespace BibliotecaApp
             return rescate;
         }
 
-        /// <summary>
-        /// Autocompletado inteligente: al elegir la fecha de préstamo, sugiere
-        /// la entrega esperada sumando exactamente 8 días. El control
-        /// dtpFechaEntrega permanece habilitado para ajuste manual.
-        /// Además, actualiza el MinDate de la fecha de entrega para que nunca
-        /// sea anterior a la fecha de préstamo.
-        /// </summary>
         private void dtpFechaPrestamo_ValueChanged(object? sender, EventArgs e)
         {
             dtpFechaEntrega.MinDate = dtpFechaPrestamo.Value;
             dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, dtpFechaPrestamo.Value.AddDays(8));
         }
 
-        /// <summary>
-        /// Vacia todos los campos del formulario a su estado inicial seguro:
-        /// TextBox, DateTimePickers, estado 'Pendiente', código del ejemplar
-        /// (variable de selección equivalente) y desbloqueo de campos.
-        /// No dispara búsquedas en BD: no existe ningún TextChanged en el módulo
-        /// y txtCodigoLibro_KeyPress solo reacciona a la tecla Enter.
-        /// </summary>
         private void LimpiarCampos()
         {
-            // Todos los TextBox del formulario (DUI, Nombre, Teléfono, Correo,
-            // Dirección, Personal que Prestó y Título):
             foreach (var caja in new[] { txtNombre, txtCorreo, txtDui, txtTelefono,
                      txtDireccion, txtPersonalPresto })
             {
@@ -2112,28 +1744,15 @@ namespace BibliotecaApp
             }
             txtTituloLibro.Text = string.Empty;
 
-            // El estado vuelve a 'Pendiente' al preparar un préstamo nuevo: si no,
-            // seguía mostrando el estado de la última fila cargada con "Modificar"
-            // (p. ej. 'Entregado') y el formulario quedaba engañoso.
             txtEstado.Text = "Pendiente";
 
-            // Género: sin selección (campo opcional) para el próximo préstamo
             cmbGeneroPrestamo.SelectedIndex = -1;
 
-            // DateTimePickers a su valor predeterminado seguro (mismo que UcPrestamosExternos_Load).
-            // Reset de MinDate al límite NATIVO admitido por el control (1/1/1753).
-            // CORRECCIÓN QA: antes se usaba DateTime.MinValue, que lanzaba
-            // ArgumentOutOfRangeException al pulsar "Actualizar Préstamo":
-            // "DateTimePicker no admite fechas anteriores a 1/1/1753 (value = 1/1/0001)".
             dtpFechaEntrega.MinDate = MinFechaSoportada;
-            dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, DateTime.Today);   // dispara ValueChanged → recalcula entrega
+            dtpFechaPrestamo.Value = FechaSegura(dtpFechaPrestamo, DateTime.Today);   
             dtpFechaEntrega.Value = FechaSegura(dtpFechaEntrega, DateTime.Today.AddDays(8));
-            // Restaurar la invariante "entrega ≥ préstamo" aunque ValueChanged
-            // no se haya disparado (el valor de préstamo no había cambiado).
             dtpFechaEntrega.MinDate = dtpFechaPrestamo.Value;
 
-            // Código del ejemplar: limpia el campo, borra el aviso y desbloquea
-            // los campos de libro (equivalente a reiniciar 'codigoEjemplarSeleccionado').
             LimpiarEstadoCodigo();
         }
 
@@ -2141,8 +1760,6 @@ namespace BibliotecaApp
         {
             LimpiarCampos();
 
-            // Reinicio de la variable de selección: sale del modo edición
-            // (equivalente a 'idPrestamoSeleccionado = 0').
             _prstamoEditandoId = null;
 
             btnRegistrar.Text = "Registrar Préstamo";

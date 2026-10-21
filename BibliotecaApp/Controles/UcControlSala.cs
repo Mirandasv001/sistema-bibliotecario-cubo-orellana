@@ -5,33 +5,24 @@ using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Apartado A: control de lectura en sala con flujo Check-in / Check-out y
-    /// CRUD completo sobre la tabla ControlUsuariosSala.
-    /// </summary>
     public partial class UcControlSala : UserControl
     {
-        /// <summary>ID de la fila seleccionada en el grid (0 = ninguna).</summary>
         private int idSeleccionado;
 
         private const string EstadoEnLectura = "En lectura";
         private const string EstadoPendiente = "Pendiente";
         private const string EstadoEntregado = "Entregado";
 
-        /// <summary>Indica si estamos en modo edición (true) o visualización (false).</summary>
         private bool modoEdicion = false;
 
-        // Variables de paginación (estilo minimalista igual que UcPrestamosExternos)
         private int paginaActual = 1;
-        private int tamanoPagina = 11; // Valor inicial/respaldo; CalcularTamanoPagina() lo ajusta a la altura real de pantalla
+        private int tamanoPagina = 11; 
         private int totalPaginas = 1;
 
-        // Botones de paginación (creados dinámicamente para no tocar Designer)
         private Button? btnAnterior;
         private Button? btnSiguiente;
         private Label? lblPagina;
 
-        // Botón de borrado masivo de la página visible (solo Administrador)
         private Button? btnEliminarPagina;
 
         // Espaciador invisible que empuja la paginación al extremo derecho del FlowLayoutPanel
@@ -41,28 +32,16 @@ namespace BibliotecaApp
         {
             InitializeComponent();
 
-            // Género: únicamente "Masculino" y "Femenino" (se elimina la opción "Otro").
-            // Se limpian y repueblan los ítems en code-behind para sobreescribir
-            // cualquier cosa que venga del diseñador, sin tocar el .Designer.cs.
-            // SelectedIndex -1: sin preselección, la validación pide elegir género.
             cboGenero.Items.Clear();
             cboGenero.Items.Add("Masculino");
             cboGenero.Items.Add("Femenino");
             cboGenero.SelectedIndex = -1;
 
-            // El ComboBox de títulos debe reflejar siempre la BD real: otros
-            // módulos (p. ej. "Vaciar Inventario" en UcInventario) pueden borrar
-            // libros mientras esta pantalla está oculta. Al volver a mostrarla se
-            // fuerza la recarga para no conservar títulos en memoria obsoletos.
             this.VisibleChanged += UcControlSala_VisibleChanged;
 
-            // Ajustar panelBotones para que crezca y acomode tanto botones de acción (arriba) como paginación (abajo)
             panelBotones.AutoSize = true;
             panelBotones.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            panelBotones.Dock = DockStyle.Top; // Mantener dock superior para que el SplitContainer lo respete
-
-            // Crear FlowLayoutPanel para paginación (estilo minimalista igual que UcPrestamosExternos)
-            // Se agrega al final de panelBotones para que quede DEBAJO de los botones de acción
+            panelBotones.Dock = DockStyle.Top; 
             var flpPaginacion = new FlowLayoutPanel
             {
                 Name = "flpPaginacion",
@@ -75,21 +54,14 @@ namespace BibliotecaApp
                 BackColor = Color.Transparent
             };
             panelBotones.Controls.Add(flpPaginacion);
-            // NO hacer BringToFront() - los botones de acción (Top) deben quedar arriba
-
-            // Botón "Eliminar página": borra en bloque los registros visibles.
-            // Solo lo ve un Administrador; un Operador nunca lo ve.
-            // panelBotones es un panel estándar (no de flujo): la posición visual
-            // depende de Location, no del índice de controles. Se coloca a la
-            // derecha de btnEliminar, con su mismo tamaño y alineado en Y.
             btnEliminarPagina = new Button
             {
                 Name = "btnEliminarPagina",
                 Text = "Eliminar página",
                 AutoSize = false,
                 Location = new Point(btnEliminar.Right + 6, btnEliminar.Top),
-                Size = new Size(155, btnEliminar.Height),  // Ancho 155 para que "Eliminar página" se lea completo
-                Margin = new Padding(3, 3, 3, 3)  // Igual que los botones de acción (default WinForms)
+                Size = new Size(155, btnEliminar.Height),  
+                Margin = new Padding(3, 3, 3, 3)  
             };
             EstiloUI.EstilizarBotonSecundario(btnEliminarPagina);
             btnEliminarPagina.Click += BtnEliminarPagina_Click;
@@ -102,53 +74,26 @@ namespace BibliotecaApp
             // Crear botones de paginación dinámicamente
             CrearBotonesPaginacion(flpPaginacion);
 
-            // Configurar color de selección del DataGridView (azul oscuro institucional igual que UcPrestamosExternos)
             dgvRegistros.DefaultCellStyle.SelectionBackColor = EstiloUI.Acento;
             dgvRegistros.DefaultCellStyle.SelectionForeColor = Color.White;
 
-            // ESTÉTICA: ocultar la barra de encabezados de fila (Row Headers).
-            // La columna gris izquierda no aporta funcionalidad al flujo y solo
-            // consume espacio visual. Se fija aquí en code-behind (idempotente)
-            // para que el invariante no dependa del archivo Designer.
             dgvRegistros.RowHeadersVisible = false;
 
-            // PAGINACIÓN DINÁMICA: al cambiar el tamaño del DataGridView (ventana
-            // o splitter) se recalcula el tamaño de página con la altura real y se
-            // recarga la página actual; si paginaActual queda fuera del nuevo
-            // total, CargarRegistros retrocede sola a la última página válida.
             dgvRegistros.SizeChanged += DgvRegistros_SizeChanged;
         }
 
-        /// <summary>
-        /// Recarga el ComboBox de títulos desde la base de datos real.
-        /// Método público: puede invocarse desde otros controles cuando el
-        /// inventario cambia.
-        /// </summary>
         public void RecargarLibros()
         {
             CargarTitulosDeLibros();
         }
 
-        /// <summary>
-        /// Configura eventos adicionales del DataGridView (CellFormatting para colores).
-        /// </summary>
         private void ConfigurarEventosGrid()
         {
             dgvRegistros.CellFormatting += DgvRegistros_CellFormatting;
         }
 
-        // ====================================================================
-        //  PAGINACIÓN (botones creados dinámicamente en code-behind)
-        //  Estilo minimalista idéntico a UcPrestamosExternos
-        // ====================================================================
-
-        /// <summary>
-        /// Crea los botones de paginación (Anterior / Siguiente / lblPagina)
-        /// sin tocar el archivo Designer.cs. Se colocan en el FlowLayoutPanel proporcionado.
-        /// </summary>
         private void CrearBotonesPaginacion(FlowLayoutPanel flpPaginacion)
         {
-            // --- Espaciador invisible: ocupa el hueco sobrante de la fila ---
             _espaciadorPaginacion = new Label
             {
                 Name = "espaciadorPaginacion",
@@ -159,7 +104,6 @@ namespace BibliotecaApp
             };
             flpPaginacion.Controls.Add(_espaciadorPaginacion);
 
-            // --- Botón "Anterior": estilo minimalista, icono cuadrado 35px ---
             btnAnterior = new Button
             {
                 Name = "btnAnterior",
@@ -175,7 +119,6 @@ namespace BibliotecaApp
             btnAnterior.Size = new Size(35, 40);
             btnAnterior.Click += btnAnterior_Click;
 
-            // --- Etiqueta de página ---
             lblPagina = new Label
             {
                 Name = "lblPagina",
@@ -186,7 +129,6 @@ namespace BibliotecaApp
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
 
-            // --- Botón "Siguiente": estilo minimalista, icono cuadrado 35px ---
             btnSiguiente = new Button
             {
                 Name = "btnSiguiente",
@@ -201,20 +143,14 @@ namespace BibliotecaApp
             btnSiguiente.Size = new Size(35, 40);
             btnSiguiente.Click += btnSiguiente_Click;
 
-            // Orden de izquierda a derecha en la esquina: btnAnterior -> lblPagina -> btnSiguiente
             flpPaginacion.Controls.Add(btnAnterior);
             flpPaginacion.Controls.Add(lblPagina);
             flpPaginacion.Controls.Add(btnSiguiente);
 
-            // Reajustar el espaciador cuando cambie el ancho (resize)
             flpPaginacion.Resize += (_, _) => ActualizarEspaciadorPaginacion(flpPaginacion);
             ActualizarEspaciadorPaginacion(flpPaginacion);
         }
 
-        /// <summary>
-        /// Calcula el ancho sobrante del FlowLayoutPanel y se lo asigna al espaciador,
-        /// de modo que la paginación quede pegada al borde derecho.
-        /// </summary>
         private void ActualizarEspaciadorPaginacion(FlowLayoutPanel flpPaginacion)
         {
             if (_espaciadorPaginacion == null || !flpPaginacion.IsHandleCreated) return;
@@ -256,10 +192,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Calcula totalPaginas según los registros de la BD.
-        /// Nunca devuelve 0 páginas (mínimo 1).
-        /// </summary>
         private void CalcularTotalPaginas()
         {
             try
@@ -271,7 +203,7 @@ namespace BibliotecaApp
                 var resultado = comando.ExecuteScalar();
                 int totalRegistros = (resultado != null && resultado != DBNull.Value) ? Convert.ToInt32(resultado) : 0;
 
-                if (tamanoPagina <= 0) tamanoPagina = 25; // Fallback de seguridad
+                if (tamanoPagina <= 0) tamanoPagina = 25; 
 
                 totalPaginas = (int)Math.Ceiling((double)totalRegistros / tamanoPagina);
                 if (totalPaginas <= 0) totalPaginas = 1;
@@ -282,34 +214,19 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// PAGINACIÓN DINÁMICA: calcula cuántas filas caben realmente en el
-        /// DataGridView con la altura real disponible en pantalla:
-        ///   filasPosibles = (altura cliente − altura encabezado) / alto de fila
-        ///   tamanoPagina  = Math.Max(1, filasPosibles)
-        /// Sin margen inferior: la última fila visible llega al borde inferior
-        /// del grid (elimina el espacio en blanco de la parte inferior).
-        /// Seguro: si el control aún no tiene layout conserva el tamaño actual,
-        /// y RowTemplate.Height tiene fallback si aún no está definido.
-        /// </summary>
         private void RecalcularTamanoPagina()
         {
             int altoFila = dgvRegistros.RowTemplate.Height > 0
                 ? dgvRegistros.RowTemplate.Height
-                : 20; // fallback si el alto de fila aún no está definido
+                : 20; 
 
             int disponibles = dgvRegistros.ClientSize.Height - dgvRegistros.ColumnHeadersHeight;
-            if (disponibles <= 0) return; // sin layout todavía: conservar tamaño actual
+            if (disponibles <= 0) return; 
 
             int filasPosibles = disponibles / altoFila;
             tamanoPagina = Math.Max(1, filasPosibles); // nunca menos de 1 fila por página
         }
 
-        /// <summary>
-        /// Devuelve true si el tamaño de página cambió respecto al anterior
-        /// (el llamador decide si reiniciar la página y recargar).
-        /// Delega en RecalcularTamanoPagina para usar una única fórmula.
-        /// </summary>
         private bool CalcularTamanoPagina()
         {
             int anterior = tamanoPagina;
@@ -317,14 +234,6 @@ namespace BibliotecaApp
             return tamanoPagina != anterior;
         }
 
-        /// <summary>
-        /// SizeChanged del DataGridView (ventana o splitter): recalcula el
-        /// tamaño de página con la altura real y recarga la página actual. No se
-        /// fuerza la página 1: CargarRegistros ya acomoda paginaActual a la
-        /// última página válida si supera el nuevo total. Solo recarga si la
-        /// capacidad de filas cambió: durante el arrastre del resize se disparan
-        /// decenas de eventos y recargar en cada uno golpearía la BD sin necesidad.
-        /// </summary>
         private void DgvRegistros_SizeChanged(object? sender, EventArgs e)
         {
             if (IsDisposed || Disposing) return;
@@ -338,7 +247,6 @@ namespace BibliotecaApp
 
         private void UcControlSala_VisibleChanged(object? sender, EventArgs e)
         {
-            // Solo al hacerse visible (VisibleChanged también dispara al ocultarse)
             if (this.Visible)
                 RecargarLibros();
         }
@@ -347,29 +255,19 @@ namespace BibliotecaApp
         {
             dtpFecha.Value = DateTime.Today;
             CargarTitulosDeLibros();
-            // Paginación dinámica: recálculo con la altura real del control,
-            // justo antes de cargar los datos de la primera página
-            // (sin forzar página 1: aún no hay datos cargados).
             RecalcularTamanoPagina();
             CargarRegistros();
             ConfigurarEventosGrid();
-            ConfigurarDragScroll(); // ← Habilita arrastre vertical con cursor
-            // Los campos están habilitados por defecto para nueva inserción.
-            // El modo edición solo se activa al pulsar "Editar" con una fila seleccionada.
+            ConfigurarDragScroll(); 
             LimpiarCampos();
         }
 
-        // ------------------------------------------------------------------
-        //  Carga de datos
-        // ------------------------------------------------------------------
         private void CargarTitulosDeLibros()
         {
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var comando = conexion.CreateCommand();
-                // Opción B (B-1): solo títulos con ejemplares 'Disponible';
-                // quedan fuera 'Prestado' (a domicilio) y 'En Sala' (en lectura).
                 comando.CommandText = "SELECT Titulo FROM Libros WHERE Disponibilidad = 'Disponible' ORDER BY Titulo;";
 
                 object? guardado = cboLibro.SelectedItem;
@@ -392,10 +290,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Muestra los registros históricos de la tabla ControlUsuariosSala
-        /// con paginación (LIMIT/OFFSET), para permitir gestión completa (incl. borrado).
-        /// </summary>
         private void CargarRegistros()
         {
             try
@@ -404,7 +298,6 @@ namespace BibliotecaApp
 
                 using var comando = conexion.CreateCommand();
 
-                // --- Paginación: calcula total de páginas y offset defensivo ---
                 CalcularTotalPaginas();
                 if (paginaActual > totalPaginas) paginaActual = totalPaginas;
                 if (paginaActual <= 0) paginaActual = 1;
@@ -436,13 +329,10 @@ namespace BibliotecaApp
 
                 dgvRegistros.DataSource = tabla;
 
-                // --- UI de paginación (botones dinámicos) ---
                 if (lblPagina != null) lblPagina.Text = $"Página {paginaActual} de {totalPaginas}";
                 if (btnAnterior != null) btnAnterior.Enabled = (paginaActual > 1);
                 if (btnSiguiente != null) btnSiguiente.Enabled = (paginaActual < totalPaginas);
 
-                // El texto de lblPagina es AutoSize y cambia de ancho: reajustar espaciador
-                // Buscar el FlowLayoutPanel que contiene los botones de paginación
                 var flpPaginacion = panelBotones.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
                 if (flpPaginacion != null)
                     ActualizarEspaciadorPaginacion(flpPaginacion);
@@ -470,15 +360,8 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Elimina en bloque todos los registros visibles en la página actual del
-        /// DataGridView. Usa transacción y borra por ID con parámetros IN para que
-        /// la operación sea atómica: si algo falla, no se borra nada a medias.
-        /// </summary>
         private void BtnEliminarPagina_Click(object? sender, EventArgs e)
         {
-            // Refuerzo de seguridad en el propio manejador (defensa en profundidad),
-            // además de la visibilidad condicional al crear el botón.
             if (!SesionGlobal.EsAdmin)
             {
                 MessageBox.Show("Solo un Administrador puede eliminar registros.",
@@ -486,7 +369,6 @@ namespace BibliotecaApp
                 return;
             }
 
-            // Recolectar los IDs de las filas visibles en el grid (página activa).
             var idsVisibles = new List<int>();
             foreach (DataGridViewRow fila in dgvRegistros.Rows)
             {
@@ -517,8 +399,6 @@ namespace BibliotecaApp
                 using (var conexion = ConexionDB.ObtenerConexion())
                 using (var transaccion = conexion.BeginTransaction())
                 {
-                    // Borrado masivo parametrizado con IN (...): un solo DELETE
-                    // atómico dentro de la transacción (sin SQL concatenado).
                     string parametros = string.Join(",", idsVisibles.Select((_, i) => $"@id{i}"));
 
                     using var comando = conexion.CreateCommand();
@@ -532,8 +412,6 @@ namespace BibliotecaApp
                     transaccion.Commit();
                 }
 
-                // Recargar la página; CargarRegistros ajusta sola la página actual
-                // si el total de páginas se redujo tras el borrado.
                 CargarRegistros();
 
                 MessageBox.Show($"Se eliminaron {eliminados} registro(s).",
@@ -546,16 +424,10 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Evento CellFormatting: aplica colores a la columna Estado según su valor.
-        /// Selección uniforme: en fila seleccionada TODA celda adopta el azul oscuro
-        /// institucional con texto blanco, ignorando el color propio del Estado.
-        /// </summary>
         private void DgvRegistros_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
 
-            // OVERRIDE UNIFORME DE SELECCIÓN (antes de aplicar los colores por estado):
             e.CellStyle.SelectionBackColor = dgvRegistros.DefaultCellStyle.SelectionBackColor;
             e.CellStyle.SelectionForeColor = Color.White;
 
@@ -582,15 +454,10 @@ namespace BibliotecaApp
                 return; // Sin color para estados no reconocidos
             }
 
-            // Solo el color de reposo; la selección queda uniforme en azul (arriba).
             e.CellStyle.BackColor = colorFondo;
             e.CellStyle.ForeColor = colorTexto;
         }
 
-        /// <summary>
-        /// Alterna entre modo edición y modo solo lectura.
-        /// </summary>
-        /// <param name="modoEdicionActivo">True = habilitar edición (Guardar Cambios), False = solo lectura (Editar)</param>
         private void EstablecerModoEdicion(bool modoEdicionActivo)
         {
             modoEdicion = modoEdicionActivo;
@@ -624,9 +491,6 @@ namespace BibliotecaApp
                 txtNombre.Focus();
         }
 
-        // ------------------------------------------------------------------
-        //  Selección: solo guarda el ID de la fila seleccionada y sale de modo edición si cambia de fila
-        // ------------------------------------------------------------------
         private void dgvRegistros_CellClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.RowIndex >= dgvRegistros.Rows.Count)
@@ -645,21 +509,8 @@ namespace BibliotecaApp
             }
 
             idSeleccionado = nuevoId;
-            // NO se cargan los datos en los controles aquí; eso se hace al pulsar "Modificar"
         }
 
-        // ------------------------------------------------------------------
-        //  Check-in: registrar entrada a leer
-        // ------------------------------------------------------------------
-
-        /// <summary>
-        /// CHECK-OUT compartido (Opción B — Libros es la única fuente de verdad):
-        /// libera UN ejemplar del título ('En Sala' → 'Disponible') con la
-        /// subquery indicada. Idempotente: si no hay ejemplares 'En Sala' de ese
-        /// título (p. ej. registros legados anteriores a la sincronización), la
-        /// subquery devuelve NULL y no se modifica nada. Debe ejecutarse dentro
-        /// de la transacción indicada.
-        /// </summary>
         private static void LiberarEjemplarEnSala(SqliteConnection conexion, SqliteTransaction transaccion, string titulo)
         {
             using var cmd = conexion.CreateCommand();
@@ -674,12 +525,6 @@ namespace BibliotecaApp
             cmd.ExecuteNonQuery();
         }
 
-        /// <summary>
-        /// CHECK-IN (Opción B): registra la lectura tomando UN ejemplar del
-        /// inventario ('Disponible' → 'En Sala') dentro de la MISMA transacción
-        /// que el INSERT. La tabla de la sala no guarda CodigoLibro, por lo que
-        /// el ejemplar se resuelve por título.
-        /// </summary>
         private void btnRegistrar_Click(object sender, EventArgs e)
         {
             if (!ValidarFormulario()) return;
@@ -692,7 +537,6 @@ namespace BibliotecaApp
                 using var transaccion = conexion.BeginTransaction();
                 try
                 {
-                    // 1) Resolver un ejemplar disponible del título
                     string? codigo;
                     using (var cmdCodigo = conexion.CreateCommand())
                     {
@@ -714,7 +558,6 @@ namespace BibliotecaApp
                         return;
                     }
 
-                    // 2) Marcar el ejemplar como 'En Sala' (guard de estado incluido)
                     using (var cmdTomar = conexion.CreateCommand())
                     {
                         cmdTomar.Transaction = transaccion;
@@ -733,7 +576,6 @@ namespace BibliotecaApp
                         }
                     }
 
-                    // 3) INSERT original de la sala
                     using (var insertar = conexion.CreateCommand())
                     {
                         insertar.Transaction = transaccion;
@@ -781,15 +623,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Check-out: marcar devolución del libro
-        // ------------------------------------------------------------------
-        /// <summary>
-        /// CHECK-OUT (Opción B): registra la devolución en sala y libera UN
-        /// ejemplar del título ('En Sala' → 'Disponible') dentro de la MISMA
-        /// transacción. El guard superior garantiza que solo se libere si el
-        /// registro estaba 'En lectura' (los ya entregados no liberan de nuevo).
-        /// </summary>
         private void btnMarcarDevolucion_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
@@ -829,7 +662,6 @@ namespace BibliotecaApp
                         afectados = comando.ExecuteNonQuery();
                     }
 
-                    // Liberar UN ejemplar del título (idempotente si no hay 'En Sala')
                     if (afectados > 0 && tituloLibro.Length > 0)
                         LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
 
@@ -857,10 +689,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Editar: habilita los campos para edición (botón "Editar")
-        // Carga los datos de la fila seleccionada en los controles
-        // ------------------------------------------------------------------
         private void btnModificar_Click(object sender, EventArgs e)
         {
             // Validar que hay una fila seleccionada
@@ -902,17 +730,11 @@ namespace BibliotecaApp
             EstablecerModoEdicion(true);
         }
 
-        // ------------------------------------------------------------------
-        //  Guardar Cambios: persiste la edición en BD (botón "Guardar Cambios")
-        // ------------------------------------------------------------------
         private void btnGuardarCambios_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
             if (!ValidarFormulario()) return;
 
-            // Opción B: una lectura ACTIVA no puede cambiar de libro (el ejemplar
-            // quedó tomado como 'En Sala' al registrarla). Debe registrarse antes
-            // la devolución. Los registros ya entregados sí pueden cambiar de título.
             string estadoRegistro = dgvRegistros.CurrentRow?
                 .Cells["HoraRecibido"].Value?.ToString() ?? string.Empty;
             string tituloEnGrilla = dgvRegistros.CurrentRow?
@@ -966,14 +788,10 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Eliminar: borra el registro con autenticación de administrador
-        // ------------------------------------------------------------------
         private void btnEliminar_Click(object sender, EventArgs e)
         {
             if (!HayFilaSeleccionada()) return;
 
-            // Usar FormAutenticacion unificado (AdminCubo / Admin123$)
             using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
             {
                 if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
@@ -1017,8 +835,6 @@ namespace BibliotecaApp
                         afectados = comando.ExecuteNonQuery();
                     }
 
-                    // Solo libera si el registro borrado seguía 'En lectura';
-                    // los ya entregados liberaron su ejemplar al devolverlos.
                     if (afectados > 0 && estabaEnLectura && tituloLibro.Length > 0)
                         LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
 
@@ -1051,9 +867,6 @@ namespace BibliotecaApp
             }
         }
 
-        // ------------------------------------------------------------------
-        //  Validación y limpieza
-        // ------------------------------------------------------------------
         private bool HayFilaSeleccionada()
         {
             if (idSeleccionado > 0 && dgvRegistros.CurrentRow != null)
@@ -1115,19 +928,10 @@ namespace BibliotecaApp
             txtNombre.Focus();
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // DRAG SCROLL — Arrastre vertical del DataGridView (estilo táctil)
-        // ═══════════════════════════════════════════════════════════════════
-
         private bool _dragScrollActivo;
         private Point _dragScrollInicio;
         private int _scrollOffsetInicial;
 
-        /// <summary>
-        /// Suscribe los eventos de ratón al DataGridView para habilitar
-        /// el desplazamiento por arrastre (drag scroll) con cambio de cursor.
-        /// W-06: Implementación SIN reflection — usa VScrollBar público del control.
-        /// </summary>
         private void ConfigurarDragScroll()
         {
             dgvRegistros.MouseDown += DgvRegistros_MouseDown;
@@ -1154,10 +958,6 @@ namespace BibliotecaApp
             var vScroll = GetVScrollBar();
             if (vScroll == null || !vScroll.Visible) return;
 
-            // SOLO iniciar drag-scroll si se hace click en:
-            // - Fondo vacío (HitTestType.None)
-            // - Encabezado de fila (HitTestType.RowHeader)
-            // NO en celdas (para no interferir con selección)
             var hit = dgvRegistros.HitTest(e.X, e.Y);
             if (hit.Type != DataGridViewHitTestType.None && hit.Type != DataGridViewHitTestType.RowHeader)
                 return;
@@ -1176,7 +976,6 @@ namespace BibliotecaApp
             var vScroll = GetVScrollBar();
             if (vScroll == null) return;
 
-            // Scroll suave por píxeles usando el Value del VScrollBar público
             int deltaY = _dragScrollInicio.Y - e.Location.Y;
             int nuevoValor = _scrollOffsetInicial + deltaY;
 
@@ -1204,11 +1003,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Limpia suscripciones a eventos para evitar fugas de memoria
-        /// (C-04: VisibleChanged suscrito en constructor sin desuscribir).
-        /// Usamos HandleDestroyed en lugar de Dispose para no colisionar con el Designer.
-        /// </summary>
         protected override void OnHandleDestroyed(EventArgs e)
         {
             this.VisibleChanged -= UcControlSala_VisibleChanged;

@@ -6,122 +6,58 @@ using System.Windows.Forms;
 
 namespace BibliotecaApp
 {
-    /// <summary>Paleta y helpers visuales compartidos por toda la aplicación.</summary>
     public static class EstiloUI
     {
-        // ═══════════════════════════════════════════════════════════════════
-        // PALETA INSTITUCIONAL (Nombres originales intactos, valores modernizados)
-        // ═══════════════════════════════════════════════════════════════════
-
-        /// <summary>Azul institucional oscuro y elegante — #1B2B42.</summary>
-        public static readonly Color FondoOscuro = Color.FromArgb(0x1B, 0x2B, 0x42);       // Antes: 27,36,55
-
-        /// <summary>Hover sobre azul oscuro — tono ligeramente más claro.</summary>
-        public static readonly Color HoverOscuro = Color.FromArgb(0x3A, 0x50, 0x6B);        // Antes: 45,60,90
-
-        /// <summary>Azul de acento (botones primarios) — #3A506B.</summary>
-        public static readonly Color Acento = Color.FromArgb(0x3A, 0x50, 0x6B);             // Antes: 79,107,237
-
-        /// <summary>Hover de acento — tono más brillante.</summary>
-        public static readonly Color AcentoHover = Color.FromArgb(0x4A, 0x60, 0x7B);         // Antes: 99,125,245
-
-        /// <summary>Gris ultra suave para fondo de paneles — #F4F6F9.</summary>
-        public static readonly Color FondoClaro = Color.FromArgb(0xF4, 0xF6, 0xF9);          // Sin cambios
-
-        /// <summary>Fondo moderno profesional — AliceBlue (#F0F8FF), armoniza con el menú lateral azul.</summary>
+        public static readonly Color FondoOscuro = Color.FromArgb(0x1B, 0x2B, 0x42);       
+        public static readonly Color HoverOscuro = Color.FromArgb(0x3A, 0x50, 0x6B);        
+        public static readonly Color Acento = Color.FromArgb(0x3A, 0x50, 0x6B);             
+        public static readonly Color AcentoHover = Color.FromArgb(0x4A, 0x60, 0x7B);         
+        public static readonly Color FondoClaro = Color.FromArgb(0xF4, 0xF6, 0xF9);          
         public static readonly Color FondoPergamino = Color.AliceBlue;
 
-        /// <summary>Blanco puro para tarjetas e inputs.</summary>
         public static readonly Color Blanco = Color.White;
 
-        /// <summary>Gris casi negro para texto principal — #2B2D42 (mejor legibilidad).</summary>
-        public static readonly Color TextoOscuro = Color.FromArgb(0x2B, 0x2D, 0x42);        // Antes: 40,46,58
-
-        /// <summary>Gris medio para bordes sutiles.</summary>
-        public static readonly Color GrisBorde = Color.FromArgb(0xCF, 0xD8, 0xE3);           // Antes: 210,215,224
-
-        /// <summary>Hover botón secundario — gris muy suave.</summary>
-        public static readonly Color HoverSecundario = Color.FromArgb(0xED, 0xF0, 0xF4);     // Antes: 237,240,244
-
-        /// <summary>Borde en hover botón secundario.</summary>
-        public static readonly Color BordeSecundarioHover = Color.FromArgb(0xB4, 0xB9, 0xC2); // Antes: 180,185,194
-
-        /// <summary>Rojo suave para alertas (se mantiene).</summary>
-        public static readonly Color AlertaRojo = Color.FromArgb(0xFF, 0xCD, 0xCD);          // Sin cambios
-
-
-        // ═══════════════════════════════════════════════════════════════════
-        // TIPOGRAFÍA (Nombres y firmas originales intactos, valores modernizados)
-        // ═══════════════════════════════════════════════════════════════════
-
-        /// <summary>Familia base: Segoe UI (requerido por diseño corporativo).</summary>
+        public static readonly Color TextoOscuro = Color.FromArgb(0x2B, 0x2D, 0x42);        
+        public static readonly Color GrisBorde = Color.FromArgb(0xCF, 0xD8, 0xE3);           
+        public static readonly Color HoverSecundario = Color.FromArgb(0xED, 0xF0, 0xF4);     
+        public static readonly Color BordeSecundarioHover = Color.FromArgb(0xB4, 0xB9, 0xC2); 
+        public static readonly Color AlertaRojo = Color.FromArgb(0xFF, 0xCD, 0xCD);          
         public const string FuenteBase = "Segoe UI";
 
-        // ═══════════════════════════════════════════════════════════════════
-        // A-01/A-02/A-03: TIPOGRAFÍAS CACHEADAS A NIVEL DE PROCESO
-        // Compartir estas instancias evita agotar los handles GDI+ que producía
-        // crear una nueva Font en cada estilo o repintado. No se hacen Dispose:
-        // viven mientras viva la aplicación (verificado: Control.Dispose en
-        // WinForms .NET no dispone la Font asignada a un control).
-        // ═══════════════════════════════════════════════════════════════════
-
-        /// <summary>Normal — 10 pt, Regular, Segoe UI.</summary>
         public static readonly Font FuenteNormal = new Font(FuenteBase, 10f, FontStyle.Regular, GraphicsUnit.Point);
 
-        /// <summary>Título de sección — 14 pt, Bold, Segoe UI.</summary>
         public static readonly Font FuenteTitulo = new Font(FuenteBase, 14f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Subtítulo — 11 pt, Bold, Segoe UI.</summary>
         public static readonly Font FuenteSubtitulo = new Font(FuenteBase, 11f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Etiquetas de campo — 9.5 pt, Regular, Segoe UI (más legible).</summary>
         public static readonly Font FuenteEtiqueta = new Font(FuenteBase, 9.5f, FontStyle.Regular, GraphicsUnit.Point);
 
-        /// <summary>Botones (menú lateral y primarios) — 10 pt, Bold, Segoe UI.</summary>
         public static readonly Font FuenteBoton = new Font(FuenteBase, 10f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Tarjetas de resumen: título — 9 pt, Bold.</summary>
         public static readonly Font FuenteTituloTarjeta = new Font(FuenteBase, 9f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Tarjetas de resumen: cifra grande — 28 pt, Bold.</summary>
         public static readonly Font FuenteCifraGrande = new Font(FuenteBase, 28f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Gráficas: valores — 11 pt, Bold.</summary>
         public static readonly Font FuenteGraficaValor = new Font(FuenteBase, 11f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Gráficas: categorías del eje — 10 pt, Bold.</summary>
         public static readonly Font FuenteGraficaCategoria = new Font(FuenteBase, 10f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Gráficas: título — 12 pt, Bold.</summary>
         public static readonly Font FuenteGraficaTitulo = new Font(FuenteBase, 12f, FontStyle.Bold, GraphicsUnit.Point);
 
-        /// <summary>Gráficas: mensaje "No hay registros" — 11 pt, Italic.</summary>
         public static readonly Font FuenteSinDatos = new Font(FuenteBase, 11f, FontStyle.Italic, GraphicsUnit.Point);
 
-        /// <summary>Estado vacío de grillas (UcAlertas) — 14 pt, Italic.</summary>
         public static readonly Font FuenteVacia = new Font(FuenteBase, 14f, FontStyle.Italic, GraphicsUnit.Point);
 
-        /// <summary>Título de sección — instancia cacheada <see cref="FuenteTitulo"/>.</summary>
         public static Font TituloSeccion() => FuenteTitulo;
 
-        /// <summary>Subtítulo — instancia cacheada <see cref="FuenteSubtitulo"/>.</summary>
         public static Font Subtitulo() => FuenteSubtitulo;
 
-        /// <summary>Etiquetas de campo — instancia cacheada <see cref="FuenteEtiqueta"/>.</summary>
         public static Font Etiqueta() => FuenteEtiqueta;
 
-        /// <summary>Botones de menú lateral — instancia cacheada <see cref="FuenteBoton"/>.</summary>
         public static Font BotonMenu() => FuenteBoton;
 
-        /// <summary>Botón principal — instancia cacheada <see cref="FuenteBoton"/>.</summary>
         public static Font BotonPrincipal() => FuenteBoton;
 
-
-        // ═══════════════════════════════════════════════════════════════════
-        // BOTONES (FlatDesign + Hover via MouseEnter/MouseLeave)
-        // ═══════════════════════════════════════════════════════════════════
-
-        /// <summary>Botón primario: fondo azul institucional, texto blanco, Flat, sin bordes, hover a Acento.</summary>
         public static void EstilizarBotonPrimario(Button boton)
         {
             if (boton == null) return;
@@ -138,7 +74,6 @@ namespace BibliotecaApp
             boton.Height = 40;
             boton.UseVisualStyleBackColor = false;
 
-            // W-16: Evitar suscripciones múltiples - remover handlers previos antes de agregar
             boton.MouseEnter -= BotonPrimario_MouseEnter;
             boton.MouseLeave -= BotonPrimario_MouseLeave;
             boton.MouseEnter += BotonPrimario_MouseEnter;
@@ -155,7 +90,6 @@ namespace BibliotecaApp
             if (sender is Button btn) btn.BackColor = FondoOscuro;
         }
 
-        /// <summary>Botón secundario: fondo gris claro, texto azul oscuro, Flat, sin bordes, hover sutil.</summary>
         public static void EstilizarBotonSecundario(Button boton)
         {
             if (boton == null) return;
@@ -172,7 +106,6 @@ namespace BibliotecaApp
             boton.Height = 40;
             boton.UseVisualStyleBackColor = false;
 
-            // W-16: Evitar suscripciones múltiples - remover handlers previos antes de agregar
             boton.MouseEnter -= BotonSecundario_MouseEnter;
             boton.MouseLeave -= BotonSecundario_MouseLeave;
             boton.MouseEnter += BotonSecundario_MouseEnter;
@@ -189,12 +122,6 @@ namespace BibliotecaApp
             if (sender is Button btn) btn.BackColor = Color.FromArgb(0xE2, 0xEA, 0xFC);
         }
 
-
-        // ═══════════════════════════════════════════════════════════════════
-        // ETIQUETAS Y ENTRADAS (API original intacta)
-        // ═══════════════════════════════════════════════════════════════════
-
-        /// <summary>Crea una etiqueta de campo con el estilo estándar.</summary>
         public static Label CrearEtiqueta(string texto)
         {
             return new Label
@@ -207,12 +134,11 @@ namespace BibliotecaApp
             };
         }
 
-        /// <summary>Configura una entrada de datos (TextBox/ComboBox) con apariencia uniforme y moderna.</summary>
         public static void EstilizarEntrada(Control control)
         {
             if (control == null) return;
 
-            control.Font = FuenteNormal; // A-0x: instancia cacheada (10 pt, Segoe UI)
+            control.Font = FuenteNormal; 
             control.ForeColor = TextoOscuro;                                                 // #2B2D42
             control.BackColor = Blanco;
             control.Margin = new Padding(3, 0, 12, 6);
@@ -228,12 +154,6 @@ namespace BibliotecaApp
             }
         }
 
-
-        // ═══════════════════════════════════════════════════════════════════
-        // PLACEHOLDERS NATIVOS (Win32) — API original intacta
-        // ═══════════════════════════════════════════════════════════════════
-
-        /// <summary>Aplica un placeholder nativo (EM_SETCUEBANNER) a un TextBox.</summary>
         public static void EstablecerPlaceholder(TextBox textBox, string texto)
         {
             NativeMethods.SendMessage(
@@ -243,7 +163,6 @@ namespace BibliotecaApp
                 texto);
         }
 
-        /// <summary>Elimina tildes y diacríticos de un texto.</summary>
         public static string RemoverTildes(string texto)
         {
             if (string.IsNullOrEmpty(texto)) return texto;
@@ -262,11 +181,6 @@ namespace BibliotecaApp
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // P/Invoke Win32 para Placeholders nativos en TextBox
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// <summary>Funciones nativas de user32.dll para cue banner (placeholder).</summary>
     internal static class NativeMethods
     {
         public const int EM_SETCUEBANNER = 0x1501;

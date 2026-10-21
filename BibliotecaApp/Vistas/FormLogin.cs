@@ -8,7 +8,6 @@ namespace BibliotecaApp
         {
             InitializeComponent();
 
-            // Icono de la ventana = logo de inicio (misma imagen que el .exe)
             if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
 
             CargarLogo();
@@ -18,12 +17,8 @@ namespace BibliotecaApp
         {
             try
             {
-                // El logo viaja incrustado en Base64 dentro del ensamblado, por lo que
-                // no se pierde si el instalador despliega el .exe en otra PC.
                 byte[] imageBytes = Convert.FromBase64String(RecursosBase64.LogoInicio);
                 using var ms = new MemoryStream(imageBytes);
-                // Deep copy: el Bitmap copia los píxeles al heap y no depende del
-                // stream, que se libera al salir del using.
                 using var imgOriginal = Image.FromStream(ms);
                 pictureBoxLogo.Image = new Bitmap(imgOriginal);
             }
@@ -71,11 +66,9 @@ namespace BibliotecaApp
                     string storedHash = reader.GetString(0);
                     string rol = reader.GetString(1);
 
-                    // Verificar contraseña (soporta hash PBKDF2 y legacy texto plano)
                     bool passwordValid;
                     if (PasswordHasher.IsLegacyHash(storedHash))
                     {
-                        // Migración silenciosa: texto plano -> hash
                         passwordValid = (storedHash == password);
                         if (passwordValid)
                         {

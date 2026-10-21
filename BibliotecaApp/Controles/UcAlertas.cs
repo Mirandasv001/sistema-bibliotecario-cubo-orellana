@@ -9,18 +9,12 @@ using Microsoft.Data.Sqlite;
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Apartado: alertas de préstamos vencidos. Consulta los préstamos
-    /// activos (EstadoLibro = 'Pendiente') cuya fecha esperada ya pasó y
-    /// muestra a los usuarios morosos con sus datos de contacto y días de retraso.
-    /// </summary>
     public partial class UcAlertas : UserControl
     {
         public UcAlertas()
         {
             InitializeComponent();
 
-            // Botón "Notificar morosos" creado por código (evita tocar el diseñador)
             var btnNotificar = new Button
             {
                 Name = "btnNotificar",
@@ -43,7 +37,6 @@ namespace BibliotecaApp
             // Suscribir evento de clic en botones de la grilla
             dgvAlertas.CellContentClick += DgvAlertas_CellContentClick;
 
-            // Estado vacío: "No hay usuarios morosos" dibujado con GDI+ cuando no hay filas
             dgvAlertas.Paint += DgvAlertas_Paint;
         }
 
@@ -52,11 +45,6 @@ namespace BibliotecaApp
             CargarMorosos();
         }
 
-        /// <summary>
-        /// Estado vacío (Empty State) dibujado con GDI+: si la grilla no tiene filas,
-        /// pinta "No hay usuarios morosos" centrado (texto gris, cursiva, 14 pt, al
-        /// estilo del módulo de Estadísticas). Desaparece solo al llenarse la grilla.
-        /// </summary>
         private void DgvAlertas_Paint(object? sender, PaintEventArgs e)
         {
             if (dgvAlertas.Rows.Count > 0) return; // hay datos: nada que pintar
@@ -67,7 +55,7 @@ namespace BibliotecaApp
                 LineAlignment = StringAlignment.Center
             };
 
-            var fuente = EstiloUI.FuenteVacia; // A-0x: instancia cacheada (no Dispose: es compartida)
+            var fuente = EstiloUI.FuenteVacia; 
             var area = e.ClipRectangle;
 
             e.Graphics.DrawString(
@@ -78,34 +66,11 @@ namespace BibliotecaApp
                 formato);
         }
 
-        /// <summary>Método público invocado por Form1 al navegar a este apartado.</summary>
         public void Actualizar()
         {
             CargarMorosos();
         }
 
-        /// <summary>
-        /// Trae los préstamos activos y vencidos, con el cálculo dinámico de los
-        /// días de retraso.
-        ///
-        /// CORRECCIÓN (producto cartesiano):
-        /// Antes cruzábamos 'PrestamosExternos' con 'Libros' mediante
-        ///   LEFT JOIN Libros l ON l.Titulo = p.TituloLibro
-        /// Pero un mismo título tiene MUCHAS copias físicas en 'Libros' (cada una
-        /// con su Codigo único). Ese enlace por Título multiplicaba cada préstamo
-        /// por el número de copias → filas duplicadas visualmente.
-        ///
-        /// La tabla 'PrestamosExternos' YA guarda internamente el NombreUsuario,
-        /// Telefono, Correo y TituloLibro del ejemplar prestado. Por eso NO
-        /// necesitamos cruzar con 'Libros': un SELECT directo a 'PrestamosExternos'
-        /// devuelve estrictamente UNA fila por cada préstamo activo vencido.
-        ///
-        /// Regla de oro de las BD: si ya tienes los datos que necesitas en una
-        /// tabla, NO la cruces con otra solo por comodidad — un JOIN innecesario
-        /// por una columna no única (como el título) es una fuente clásica de
-        /// duplicación. El JOIN solo tiene sentido si relacionas por clave única
-        /// (ej. un futuro campo 'Codigo_Ejemplar' en el préstamo), no por título.
-        /// </summary>
         private void CargarMorosos()
         {
             try
@@ -138,7 +103,6 @@ namespace BibliotecaApp
                 if (dgvAlertas.Columns["ID"] != null)
                     dgvAlertas.Columns["ID"]!.Visible = false;
 
-                // Mapear columna CorreoAlertaEnviado (oculta) para persistencia
                 if (!dgvAlertas.Columns.Contains("CorreoAlertaEnviado"))
                 {
                     var colNotificado = new DataGridViewTextBoxColumn
@@ -151,7 +115,6 @@ namespace BibliotecaApp
                     dgvAlertas.Columns.Add(colNotificado);
                 }
 
-                // Agregar columna de botón "Notificar" individual si no existe
                 if (!dgvAlertas.Columns.Contains("btnNotificarIndividual"))
                 {
                     var btnCol = new DataGridViewButtonColumn
@@ -175,7 +138,6 @@ namespace BibliotecaApp
                         // Valor por defecto
                         row.Cells["btnNotificarIndividual"].Value = "Enviar";
 
-                        // Si CorreoAlertaEnviado == 1, mostrar estado "Enviado" con color verde
                         var notificadoObj = row.Cells["CorreoAlertaEnviado"].Value;
                         if (notificadoObj != null && notificadoObj != DBNull.Value)
                         {
@@ -202,11 +164,6 @@ namespace BibliotecaApp
             }
         }
 
-        /// <summary>
-        /// Red de seguridad: ante cualquier fallo de formato/mapeo de una celda,
-        /// cancela la excepción para que la aplicación no se congele ni muestre
-        /// el cuadro de diálogo predeterminado de Windows.
-        /// </summary>
         private void dgvAlertas_DataError(object? sender, DataGridViewDataErrorEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine(
@@ -214,13 +171,8 @@ namespace BibliotecaApp
             e.ThrowException = false;
         }
 
-        /// <summary>
-        /// Notifica a los usuarios morosos por correo (mailto individual por usuario) y genera un CSV de respaldo en la carpeta temporal.
-        /// Requiere que exista un botón llamado 'btnNotificar' suscrito a este evento.
-        /// </summary>
         private async void btnNotificar_Click(object sender, EventArgs e)
         {
-            // 1️⃣ VALIDAR QUE HAY FILAS CON CORREOS VÁLIDOS
             var filasValidas = dgvAlertas.Rows
                 .Cast<DataGridViewRow>()
                 .Where(r => !r.IsNewRow)
@@ -240,7 +192,6 @@ namespace BibliotecaApp
                 return;
             }
 
-            // 2️⃣ GENERAR CSV DE RESPALDO EN LA CARPETA TEMPORAL DEL SISTEMA
             string csvPath = null;
             try
             {
@@ -270,8 +221,6 @@ namespace BibliotecaApp
                 // Continuamos para intentar abrir los mailto
             }
 
-            // 3️⃣ CREAR Y LANZAR MAILTO INDIVIDUAL POR CADA USUARIO MOROSO
-            // W-05: Fire-and-forget para no bloquear el hilo de UI al abrir múltiples mailto:
             int emailsEnviados = 0;
             foreach (var fila in filasValidas)
             {
@@ -300,7 +249,6 @@ namespace BibliotecaApp
                         var psi = new ProcessStartInfo(uri) { UseShellExecute = true };
                         Process.Start(psi);
 
-                        // Incrementar contador de forma thread-safe
                         Interlocked.Increment(ref emailsEnviados);
                     }
                     catch (Exception exMail)
@@ -310,10 +258,8 @@ namespace BibliotecaApp
                 });
             }
 
-            // Pequeña pausa para dar tiempo a que se lancen los procesos (fire-and-forget)
             await Task.Delay(100);
 
-            // 4️⃣ CONFIRMACIÓN FINAL
             string msg = $"Se abrieron {emailsEnviados} ventana(s) de correo personalizadas (una por usuario moroso).";
             if (!string.IsNullOrEmpty(csvPath) && File.Exists(csvPath))
                 msg += $"\n\nRespaldo CSV guardado en:\n{csvPath}";
@@ -323,10 +269,6 @@ namespace BibliotecaApp
             MessageBox.Show(msg, "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        /// <summary>
-        /// Maneja el clic en la columna de botones "Notificar" individual por cada moroso.
-        /// Abre un mailto: personalizado y da feedback visual en la celda.
-        /// </summary>
         private void DgvAlertas_CellContentClick(object? sender, DataGridViewCellEventArgs e)
         {
             // Validar que sea clic en la columna de botones y fila válida
@@ -367,7 +309,6 @@ namespace BibliotecaApp
                 var psi = new ProcessStartInfo(mailtoUri) { UseShellExecute = true };
                 Process.Start(psi);
 
-                // Persistir en BD: CorreoAlertaEnviado = 1 (solo alerta de retraso; no toca bienvenida)
                 int idPrestamo = Convert.ToInt32(fila.Cells["ID"].Value);
                 using (var conexion = ConexionDB.ObtenerConexion())
                 using (var updateCmd = conexion.CreateCommand())
@@ -377,7 +318,6 @@ namespace BibliotecaApp
                     updateCmd.ExecuteNonQuery();
                 }
 
-                // Feedback visual: cambiar botón a "Enviado" con color verde
                 var celda = dgvAlertas.Rows[e.RowIndex].Cells[e.ColumnIndex];
                 celda.Value = "Enviado";
                 celda.Style.BackColor = Color.LightGreen;

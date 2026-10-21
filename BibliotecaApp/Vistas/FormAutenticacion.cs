@@ -4,9 +4,6 @@ using System.Windows.Forms;
 
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Formulario de autenticación reutilizable - DISEÑO IDÉNTICO AL DE CONTROL DE SALA
-    /// </summary>
     public class FormAutenticacion : Form
     {
         private readonly string _usuarioEsperado;
@@ -14,23 +11,14 @@ namespace BibliotecaApp
         private TextBox _txtUsuario;
         private TextBox _txtClave;
 
-        /// <summary>
-        /// Indica si la autenticación fue exitosa.
-        /// </summary>
         public bool Autenticado { get; private set; }
 
-        /// <summary>
-        /// Crea una instancia del formulario de autenticación con diseño IDÉNTICO a Control de Sala.
-        /// </summary>
-        /// <param name="usuarioEsperado">Usuario válido esperado (ej. "UserCubo" o "AdminCubo")</param>
-        /// <param name="claveEsperada">Contraseña válida esperada (ej. "1234$" o "Admin123$")</param>
         public FormAutenticacion(string usuarioEsperado, string claveEsperada)
         {
             _usuarioEsperado = usuarioEsperado;
             _claveEsperada = claveEsperada;
             InitializeComponent();
 
-            // Icono de la ventana = logo de inicio (misma imagen que el .exe)
             if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
         }
 
@@ -73,7 +61,6 @@ namespace BibliotecaApp
             };
             EstiloUI.EstilizarEntrada(_txtClave);
 
-            // Botón Aceptar (IDÉNTICO a Control de Sala)
             var btnAceptar = new Button
             {
                 Text = "Aceptar",

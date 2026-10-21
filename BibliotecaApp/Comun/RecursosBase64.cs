@@ -1,13 +1,7 @@
 namespace BibliotecaApp
 {
-    /// <summary>
-    /// Recursos graficos incrustados en Base64. Garantiza que las imagenes viajen
-    /// dentro del ensamblado y no se pierdan al compilar el instalador para otra PC.
-    /// Las imagenes de la guia se generan comprimidas (JPEG) desde la carpeta Recursos/.
-    /// </summary>
     public static class RecursosBase64
     {
-        /// <summary>Logo CUBO (Logo de inicio.jpg), convertido a Base64.</summary>
         public const string LogoInicio =
                 "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEP" +
                 "ERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4e" +
@@ -1000,7 +994,6 @@ namespace BibliotecaApp
                 "vKNZA0C7o6NtoqoMIb5K9OmYKpXQayaR2Q11mdasq66Tig3B0Z9gFZdBvwN30vNRvXQajadOrQze" +
                 "1dBVWsO3+60Xf/8AFP8A/9k=";
 
-        /// <summary>Diagrama de ubicacion fisica M1 (MODULO CUBO.jpg), comprimido.</summary>
         public const string ModuloCubo =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAYEBQUFBAYFBQUHBgYHCQ8KCQgICRMNDgsPFhMXFxYT" +
             "FRUYGyMeGBohGhUVHikfISQlJygnGB0rLismLiMmJyb/2wBDAQYHBwkICRIKChImGRUZJiYmJiYm" +
@@ -2659,7 +2652,6 @@ namespace BibliotecaApp
             "Kj5fU/lRRQADb6n8qX5fU/lRRQAfL6n8qPl9T+VFFAANp7n8qQ7fU/lRRQAfL6n8qX5fU/lRRQAf" +
             "L6n8qRscY9KKKAP/2Q==";
 
-        /// <summary>Formato de inventario CON encabezados (formato_excel 1.png), comprimido.</summary>
         public const string FormatoExcel =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQ" +
             "EhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAg" +
@@ -6322,7 +6314,6 @@ namespace BibliotecaApp
             "zh1PUHmqGh+HNB8NQTwaFpUNhFO4eRYy3zMBgHkntQBQ0a+8VzaHYzXGk2ckz26s7S3rI7ErySvl" +
             "cH2orpw2SflHQ+tFAH//2Q==";
 
-        /// <summary>Formato de inventario SIN encabezados (formato sin encabezados 2.png), comprimido.</summary>
         public const string FormatoCsv =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQ" +
             "EhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAg" +
@@ -9507,8 +9498,6 @@ namespace BibliotecaApp
             "p/yBNR/69Zf/AEA0UUwM/wAI/wDIheHP+wXa/wDolK26KKHuD3CiiikAUUUUAFFFFABRRRQBs6d/" +
             "x5D/AHjRRRXpU/hR2Q+FH//Z";
 
-
-        /// <summary>Inventario cargado tras la importacion (Inventario cargado 5.png), comprimido.</summary>
         public const string InventarioCargado =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQ" +
             "EhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAg" +
@@ -12727,7 +12716,6 @@ namespace BibliotecaApp
             "mWUzrHuwzK/CE7icDPU8niu1pKKYC0UlFAC0UlFAC0UlFAC0UlFAC0UlFAC0UlFAHNaIrf8ACO6d" +
             "8p/49o+3+yK1IVYScg9D/KsnRf8AkXtO/wCvaP8A9BFacH+s/A/yoA//2Q==";
 
-        /// <summary>Dialogo Guardar como CSV (guardar como csv 3.png), comprimido.</summary>
         public const string GuardarCsv =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQ" +
             "EhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAg" +
@@ -13894,7 +13882,6 @@ namespace BibliotecaApp
             "kHjDVdyxswP2luCB9aKK83MZyhH3XY82nUm52bZ5p/wu/wCLX/Q/at/39/8ArUf8Lv8Ai1n/AJH7" +
             "Vv8Av7/9aiiub2k+7PsfZw7I/9k=";
 
-        /// <summary>Pantalla de Inventario con el boton Importar CSV (Inventario.jpg), comprimido.</summary>
         public const string BotonImportar =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQ" +
             "EhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAg" +
@@ -15034,7 +15021,6 @@ namespace BibliotecaApp
             "Ckyc0UUALRRRQAUhoooAWiiigAooooAKKKKACkBOetFFAC0goooACTnrS0UUAFIaKKAFpBRRQAEn" +
             "PWkyfWiigBQTnrS0UUAISaATnrRRQAtFFFACCloooAKKKKACiiigD//Z";
 
-        /// <summary>Panel de estadisticas (Estadistica 7.png), comprimido.</summary>
         public const string Estadistica =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQ" +
             "EhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAg" +
@@ -15923,7 +15909,6 @@ namespace BibliotecaApp
             "uR/dFGR/dFHMHKxKKXI/uijI/uijmDlYlFLkf3RRkf3RRzBysSilyP7ooyP7oo5g5WJRS5H90UZH" +
             "90UcwcrEopcj+6KMj+6KOYOViUUuR/dFGR/dFHMHKxKU9F+lGR/dFDcgcY4o5h8rP//Z";
 
-        /// <summary>Captura de alertas de prestamos vencidos (Alertas de vencidos.jpg), comprimido.</summary>
         public const string AlertasVencidos =
             "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAUEBAQEAwUEBAQGBQUGCA0ICAcHCBALDAkNExAUExIQ" +
             "EhIUFx0ZFBYcFhISGiMaHB4fISEhFBkkJyQgJh0gISD/2wBDAQUGBggHCA8ICA8gFRIVICAgICAg" +
