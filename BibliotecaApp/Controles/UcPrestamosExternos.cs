@@ -188,47 +188,28 @@ namespace BibliotecaApp
             CargarPrestamosActivos();
 
             // ------------------------------------------------------------
-            // GÉNERO → sección de Datos del Usuario (solo code-behind)
+            // GÉNERO → a la par de Dirección, dentro de Datos del Usuario
             // ------------------------------------------------------------
             if (tlpCampos.Controls["lblGenero"] is Label lblGenero)
             {
-                // 1) Reduce el ancho de la dirección (de 3 a 2 columnas, unas 250 px
-                //    menos) para liberar el espacio situado a su derecha.
-                tlpCampos.SetColumnSpan(txtDireccion, 2);
+                // 1) Dirección ocupa UNA sola columna: mismo ancho que Correo (col. 3).
+                tlpCampos.SetColumnSpan(txtDireccion, 1);
+
+                // 2) Género entra en las columnas libres 4 y 5 de la MISMA fila,
+                //    de modo que queda a la par de Dirección.
+                int filaUsuario = tlpCampos.GetRow(txtDireccion);
+
+                tlpCampos.SetColumn(lblGenero, 4);
+                tlpCampos.SetRow(lblGenero, filaUsuario);
+
+                tlpCampos.SetColumn(cmbGeneroPrestamo, 5);
+                tlpCampos.SetRow(cmbGeneroPrestamo, filaUsuario);
+
+                // 3) Mismo estilo que el resto de campos de la fila.
+                cmbGeneroPrestamo.Dock = DockStyle.Fill;
+                cmbGeneroPrestamo.Margin = new Padding(3, 0, 15, 4);
+
                 tlpCampos.PerformLayout();
-
-                // 2) Transfiere los controles al contenedor de datos del usuario.
-                grpDatos.Controls.Add(lblGenero);
-                grpDatos.Controls.Add(cmbGeneroPrestamo);
-                cmbGeneroPrestamo.Dock = DockStyle.None;
-
-                // 3) Posición dinámica calculada a partir de la dirección reducida
-                //    (txtDireccion mide en tlpCampos: se mapea al espacio de grpDatos).
-                bool fijando = false;
-                void ReposicionarGenero()
-                {
-                    if (fijando) return;
-                    fijando = true;
-                    try
-                    {
-                        tlpCampos.PerformLayout();
-                        Point ancla = grpDatos.PointToClient(
-                            tlpCampos.PointToScreen(
-                                new Point(txtDireccion.Right + 15, txtDireccion.Top)));
-
-                        lblGenero.AutoSize = true;
-                        lblGenero.Location = ancla;
-
-                        cmbGeneroPrestamo.Size = new Size(170, 24);
-                        cmbGeneroPrestamo.Location =
-                            new Point(lblGenero.Right + 6, ancla.Y - 1);
-                    }
-                    finally { fijando = false; }
-                }
-
-                ReposicionarGenero();
-                // Reajuste al redimensionar la ventana (evita solapes).
-                grpDatos.Layout += (_, _) => ReposicionarGenero();
             }
         }
 
