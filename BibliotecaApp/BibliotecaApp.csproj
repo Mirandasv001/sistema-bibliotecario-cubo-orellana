@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Icono de la aplicación: el mismo logo de inicio (Recursos\app.ico) -->
+    <ApplicationIcon>Recursos\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,8 +33,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <!-- Recursos gráficos: se copian junto al .exe preservando la subcarpeta Recursos\,
-         porque las rutas de logo ahora son fijas (sin búsquedas ascendentes) -->
-    <None Update="Recursos\*.jpg">
+         porque las rutas de logo ahora son fijas (sin búsquedas ascendentes).
+         Se copian .jpg, .png y .ico: el instalador necesita Recursos\app.ico para el
+         icono del Setup y de los accesos directos. El CSV del catálogo NO va aquí
+         (se publica en la raíz junto al .exe, que es donde lo lee el programa). -->
+    <None Update="Recursos\*.jpg;Recursos\*.png;Recursos\*.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

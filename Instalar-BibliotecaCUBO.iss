@@ -15,8 +15,10 @@
 #define AppPublisher "Erick Miranda"
 #define AppExeName "BibliotecaApp.exe"
 
-; Carpeta física de publicación (salida de: dotnet publish -c Release -r win-x64 --self-contained true)
-#define PublishDir "C:\Users\erick\OneDrive\Documents\Proyecto-Cubo\sistema-bibliotecario-cubo-orellana\BibliotecaApp\bin\Release\net10.0-windows\win-x64\publish"
+; Carpeta de publicación: RUTA RELATIVA al propio .iss (que vive en la raíz del
+; repo), así el instalador se compila en cualquier PC sin editar el script.
+; Sale de: dotnet publish -c Release -r win-x64 --self-contained true
+#define PublishDir "BibliotecaApp\bin\Release\net10.0-windows\win-x64\publish"
 
 [Setup]
 AppId={{8F2C6A1E-4D3B-4E9A-9C7D-1B5E2F8A3C4D}
