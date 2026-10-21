@@ -67,9 +67,28 @@ namespace BibliotecaApp
         private string _nombrePrestGenero2 = "Femenino";
 
         // Colores por género (configurables)
-        private static readonly Color ColorGenero1 = Color.FromArgb(52, 152, 219);  // Azul
+        private static readonly Color ColorGenero1 = Color.FromArgb(52, 152, 219);  // Azul celeste
         private static readonly Color ColorGenero2 = Color.FromArgb(231, 76, 60);   // Rojo
         private static readonly Color ColorTotal = Color.FromArgb(27, 43, 66);      // Azul oscuro
+
+        /// <summary>
+        /// Color FIJO por nombre: Masculino = celeste, Femenino = rojo y
+        /// Total = azul oscuro. Cualquier otro género usa un gris neutro,
+        /// de modo que el color no dependa del orden en que salgan los datos.
+        /// </summary>
+        private static Color ColorPorGenero(string? nombre)
+        {
+            if (string.Equals(nombre, "Masculino", StringComparison.OrdinalIgnoreCase)) return ColorGenero1;
+            if (string.Equals(nombre, "Femenino", StringComparison.OrdinalIgnoreCase)) return ColorGenero2;
+            if (string.Equals(nombre, "Total", StringComparison.OrdinalIgnoreCase)) return ColorTotal;
+            return Color.FromArgb(120, 130, 140);
+        }
+
+        /// <summary>Aplica el color fijo a la línea superior de la tarjeta.</summary>
+        private static void ActualizarAcento(Panel tarjeta, Color color)
+        {
+            if (tarjeta.Tag is Panel acento) acento.BackColor = color;
+        }
 
         public UcEstadisticas()
         {
@@ -173,13 +192,13 @@ namespace BibliotecaApp
 
             // --- Mitad IZQUIERDA: Control de Sala (3 tarjetas) ---
             var cardTotal = CrearTarjetaResumen("Total de lectores en sala", "0", ColorTotal, out _lblTotalVisitasTitulo, out _lblTotalVisitasValor);
-            var cardGenero1 = CrearTarjetaResumen(_nombreGenero1, "0", ColorGenero1, out _lblGenero1Titulo, out _lblGenero1Valor);
-            var cardGenero2 = CrearTarjetaResumen(_nombreGenero2, "0", ColorGenero2, out _lblGenero2Titulo, out _lblGenero2Valor);
+            var cardGenero1 = CrearTarjetaResumen(_nombreGenero1, "0", ColorPorGenero(_nombreGenero1), out _lblGenero1Titulo, out _lblGenero1Valor);
+            var cardGenero2 = CrearTarjetaResumen(_nombreGenero2, "0", ColorPorGenero(_nombreGenero2), out _lblGenero2Titulo, out _lblGenero2Valor);
 
             // --- Mitad DERECHA: Préstamos Externos (3 tarjetas nuevas) ---
             var cardPrestTotal = CrearTarjetaResumen("Total Préstamos", "0", ColorTotal, out _lblTotalPrestamosTitulo, out _lblTotalPrestamosValor);
-            var cardPrestGenero1 = CrearTarjetaResumen(_nombrePrestGenero1, "0", ColorGenero1, out _lblPrestGenero1Titulo, out _lblPrestGenero1Valor);
-            var cardPrestGenero2 = CrearTarjetaResumen(_nombrePrestGenero2, "0", ColorGenero2, out _lblPrestGenero2Titulo, out _lblPrestGenero2Valor);
+            var cardPrestGenero1 = CrearTarjetaResumen(_nombrePrestGenero1, "0", ColorPorGenero(_nombrePrestGenero1), out _lblPrestGenero1Titulo, out _lblPrestGenero1Valor);
+            var cardPrestGenero2 = CrearTarjetaResumen(_nombrePrestGenero2, "0", ColorPorGenero(_nombrePrestGenero2), out _lblPrestGenero2Titulo, out _lblPrestGenero2Valor);
 
             // Orden: 3 primeras = Sala (izquierda), 3 siguientes = Préstamos (derecha)
             _tarjetas = new[] { cardTotal, cardGenero1, cardGenero2,
@@ -242,6 +261,7 @@ namespace BibliotecaApp
                 BackColor = colorAcento
             };
             panel.Controls.Add(borderTop);
+            panel.Tag = borderTop; // acento accesible para recolorear según el género real
 
             lblTitulo = new Label
             {
@@ -402,6 +422,17 @@ namespace BibliotecaApp
             _lblPrestGenero1Valor.Text = _valorPrestGenero1.ToString("N0");
             _lblPrestGenero2Titulo.Text = _nombrePrestGenero2;
             _lblPrestGenero2Valor.Text = _valorPrestGenero2.ToString("N0");
+
+            // Acento de cada tarjeta con el color FIJO del género que representa
+            if (_tarjetas.Length >= 6)
+            {
+                ActualizarAcento(_tarjetas[0], ColorTotal);
+                ActualizarAcento(_tarjetas[1], ColorPorGenero(_nombreGenero1));
+                ActualizarAcento(_tarjetas[2], ColorPorGenero(_nombreGenero2));
+                ActualizarAcento(_tarjetas[3], ColorTotal);
+                ActualizarAcento(_tarjetas[4], ColorPorGenero(_nombrePrestGenero1));
+                ActualizarAcento(_tarjetas[5], ColorPorGenero(_nombrePrestGenero2));
+            }
 
             // Forzar repintado de AMBAS gráficas desde cero
             _pnlGraficaSala.Invalidate();
@@ -566,8 +597,8 @@ namespace BibliotecaApp
                 string etiqueta = entradas[i].Key;
                 int valor = entradas[i].Value;
 
-                // 1ª barra = Total (azul oscuro); los géneros alternan azul/rojo
-                Color colorBarra = i == 0 ? ColorTotal : (i % 2 == 1 ? ColorGenero1 : ColorGenero2);
+                // Color FIJO por género: Total azul, Masculino celeste, Femenino rojo
+                Color colorBarra = ColorPorGenero(etiqueta);
                 using var brushBarra = new SolidBrush(colorBarra);
 
                 int xBarra = inicioX + i * (anchoBarra + espacioEntreBarras);
