@@ -72,16 +72,14 @@ namespace BibliotecaApp
         private static readonly Color ColorTotal = Color.FromArgb(27, 43, 66);      // Azul oscuro
 
         /// <summary>
-        /// Color FIJO por nombre: Masculino = celeste, Femenino = rojo y
-        /// Total = azul oscuro. Cualquier otro género usa un gris neutro,
-        /// de modo que el color no dependa del orden en que salgan los datos.
+        /// Color FIJO por nombre: Total = azul oscuro, Femenino = rojo y
+        /// Masculino = celeste. El color no depende del orden de los datos.
         /// </summary>
         private static Color ColorPorGenero(string? nombre)
         {
-            if (string.Equals(nombre, "Masculino", StringComparison.OrdinalIgnoreCase)) return ColorGenero1;
-            if (string.Equals(nombre, "Femenino", StringComparison.OrdinalIgnoreCase)) return ColorGenero2;
             if (string.Equals(nombre, "Total", StringComparison.OrdinalIgnoreCase)) return ColorTotal;
-            return Color.FromArgb(120, 130, 140);
+            if (string.Equals(nombre, "Femenino", StringComparison.OrdinalIgnoreCase)) return ColorGenero2;
+            return ColorGenero1; // Masculino
         }
 
         /// <summary>Aplica el color fijo a la línea superior de la tarjeta.</summary>
