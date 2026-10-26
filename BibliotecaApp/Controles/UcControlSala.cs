@@ -65,6 +65,9 @@ namespace BibliotecaApp
             };
             EstiloUI.EstilizarBotonSecundario(btnEliminarPagina);
             btnEliminarPagina.Click += BtnEliminarPagina_Click;
+
+            // Visibilidad por rol: ambos borrados solo para Administradores
+            btnEliminar.Visible = SesionGlobal.EsAdmin;
             btnEliminarPagina.Visible = SesionGlobal.EsAdmin;
 
             // Mismo contenedor padre que los botones principales.
@@ -260,6 +263,11 @@ namespace BibliotecaApp
             ConfigurarEventosGrid();
             ConfigurarDragScroll(); 
             LimpiarCampos();
+
+            // Se reevalúa al cargar: el rol puede haber cambiado entre sesiones
+            bool esAdmin = SesionGlobal.EsAdmin;
+            btnEliminar.Visible = esAdmin;
+            if (btnEliminarPagina != null) btnEliminarPagina.Visible = esAdmin;
         }
 
         private void CargarTitulosDeLibros()
