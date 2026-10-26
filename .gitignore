@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Artefactos del instalador: publicacion self-contained (131 MB) y los setups
+# compilados (45 MB cada uno). El script setup.iss y LEEME.txt si se versionan.
+instalador/app/
+instalador/bin/
+instalador/*.exe
