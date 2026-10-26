@@ -16,8 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Catálogo CSV ubicado junto a la solución -->
-    <None Include="..\*.csv" Link="%(Filename)%(Extension)">
+    <!-- Catálogo CSV ubicado junto a la solución. Se publica con nombre ASCII
+         (catalogo_cubo.csv) junto al .exe: los instaladores pueden descomprimir
+         con otro codepage y el nombre original lleva Á y ñ. -->
+    <None Include="..\*.csv" Link="catalogo_cubo.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <Compile Update="Properties\Resources.Designer.cs">
@@ -29,14 +31,11 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <None Update="images (2).jpg">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <!-- Recursos gráficos: se copian junto al .exe preservando la subcarpeta Recursos\,
          porque las rutas de logo ahora son fijas (sin búsquedas ascendentes).
-         Se copian .jpg, .png y .ico: el instalador necesita Recursos\app.ico para el
-         icono del Setup y de los accesos directos. El CSV del catálogo NO va aquí
-         (se publica en la raíz junto al .exe, que es donde lo lee el programa). -->
+         Se copia .ico para que el Setup y los accesos directos tengan su icono.
+         El logo de las ventanas NO se lee de disco: va embebido en RecursosBase64
+         y en los .resx, así que la app no depende de estas imágenes en runtime. -->
     <None Update="Recursos\*.jpg;Recursos\*.png;Recursos\*.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

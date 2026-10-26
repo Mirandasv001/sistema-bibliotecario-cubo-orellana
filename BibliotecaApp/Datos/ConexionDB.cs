@@ -576,14 +576,37 @@ namespace BibliotecaApp
         private const string NombreCatalogoCsv =
             "CATÁLOGO BIBLIOTECA CUBO SITIO DEL NIÑO - ORIGINAL-2026 .xlsx - INVENTARIO TOTAL (1).csv";
 
+        // Nombre sin acentos ni ñ: los instaladores suelen descomprimir con otro codepage
+        // y el nombre largo puede no coincidir en la PC de destino.
+        private const string NombreCatalogoAscii = "catalogo_cubo.csv";
+
         private static string? BuscarArchivoCsv()
         {
             if (!string.IsNullOrWhiteSpace(CatalogoCsvPath) && File.Exists(CatalogoCsvPath))
                 return CatalogoCsvPath;
 
-            // C-03: Prioridad 2 - Ruta fija junto al .exe, sin búsquedas ascendentes
-            string ruta = Path.Combine(AppContext.BaseDirectory, NombreCatalogoCsv);
-            return File.Exists(ruta) ? ruta : null;
+            // Ruta fija junto al .exe, sin búsquedas ascendentes
+            string carpeta = AppContext.BaseDirectory;
+
+            foreach (string nombre in new[] { NombreCatalogoAscii, NombreCatalogoCsv })
+            {
+                string ruta = Path.Combine(carpeta, nombre);
+                if (File.Exists(ruta)) return ruta;
+            }
+
+            // Último recurso: si el instalador renombró el fichero, se toma el único CSV
+            // que haya junto al .exe. Con más de uno no se elige ninguno al azar.
+            try
+            {
+                string[] candidatos = Directory.GetFiles(carpeta, "*.csv", SearchOption.TopDirectoryOnly);
+                if (candidatos.Length == 1) return candidatos[0];
+            }
+            catch
+            {
+                // Sin acceso a la carpeta: se omite la importación, la app sigue funcionando.
+            }
+
+            return null;
         }
     }
 }
