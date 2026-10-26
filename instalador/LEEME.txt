@@ -1,0 +1,25 @@
+﻿========================================================
+ Sistema Bibliotecario CUBO - Guía de uso rápido
+========================================================
+
+1. INICIO
+   Ejecute "Biblioteca CUBO" desde el menú Inicio o el escritorio.
+
+2. USUARIOS DE PRIMERA EJECUCIÓN (sólo si la base de datos es nueva)
+   Administrador : AdminCubo / Admin123$
+   Operador      : UserCubo  / 1234$
+   IMPORTANTE: cambie la contraseña del administrador apenas entre
+   (menú Gestión de usuarios).
+
+3. DONDE SE GUARDAN LOS DATOS
+   C:\Users\<usuario>\AppData\Roaming\BibliotecaCUBO\biblioteca.db
+   También puede usar una carpeta propia para pruebas o portabilidad.
+
+4. CATALOGO CSV
+   catalogo_cubo.csv va junto al .exe y sólo se importa en la primera
+   ejecución (si la base de datos está vacía). Si la importación falla,
+   la aplicación arranca igual y el inventario queda bajo su control.
+
+5. DESINSTALACIÓN
+   La desinstalación NO borra la base de datos. Si desea eliminarla
+   también, borre manualmente la carpeta indicada en el punto 3.
