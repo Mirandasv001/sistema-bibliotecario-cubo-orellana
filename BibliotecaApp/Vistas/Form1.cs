@@ -64,7 +64,7 @@ namespace BibliotecaApp
             // Visibilidad de Gestión de Usuarios solo para Admin
             if (_btnGestionUsuarios != null)
             {
-                _btnGestionUsuarios.Visible = SesionGlobal.Rol == "Administrador" || SesionGlobal.Rol == "Admin";
+                _btnGestionUsuarios.Visible = SesionGlobal.EsAdmin;
             }
         }
 

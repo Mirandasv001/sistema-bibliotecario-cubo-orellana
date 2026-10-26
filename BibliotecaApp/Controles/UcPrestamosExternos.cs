@@ -316,24 +316,42 @@ namespace BibliotecaApp
 
         private static string? ObtenerCodigoDisponible(SqliteConnection conexion, string titulo)
         {
+            // Devuelve un código solo si el título identifica UN ejemplar disponible.
             using var cmd = conexion.CreateCommand();
             cmd.CommandText = @"
                 SELECT Codigo FROM Libros
-                WHERE Titulo = $titulo AND Disponibilidad = 'Disponible'
-                LIMIT 1;";
+                WHERE Titulo = $titulo AND Disponibilidad = 'Disponible';";
             cmd.Parameters.AddWithValue("$titulo", titulo);
-            return cmd.ExecuteScalar()?.ToString();
+
+            return SeleccionarCodigoUnico(cmd);
         }
 
         private static string? ObtenerCodigoPrestado(SqliteConnection conexion, string titulo)
         {
+            // Devuelve un código solo si el título identifica UN ejemplar prestado.
             using var cmd = conexion.CreateCommand();
             cmd.CommandText = @"
                 SELECT Codigo FROM Libros
-                WHERE Titulo = $titulo AND Disponibilidad = 'Prestado'
-                LIMIT 1;";
+                WHERE Titulo = $titulo AND Disponibilidad = 'Prestado';";
             cmd.Parameters.AddWithValue("$titulo", titulo);
-            return cmd.ExecuteScalar()?.ToString();
+
+            return SeleccionarCodigoUnico(cmd);
+        }
+
+        // Recorre todos los códigos del título; si hay más de uno devuelve null
+        // para no identificar un ejemplar al azar.
+        private static string? SeleccionarCodigoUnico(SqliteCommand cmd)
+        {
+            string? codigo = null;
+            using var lector = cmd.ExecuteReader();
+            while (lector.Read())
+            {
+                string candidato = lector.GetString(0);
+                if (codigo != null && !string.Equals(codigo, candidato, StringComparison.OrdinalIgnoreCase))
+                    return null;
+                codigo = candidato;
+            }
+            return codigo;
         }
 
         private void CargarPrestamosActivos()
@@ -735,10 +753,7 @@ namespace BibliotecaApp
                 return;
             }
 
-            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
-            {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
-            }
+            if (!FormAutenticacion.SolicitarAdmin(this)) return;
 
             var resultado = MessageBox.Show(
                 "¿Está seguro de que desea ELIMINAR este préstamo definitivamente?\n\nEsta acción no se puede deshacer.",
@@ -764,17 +779,9 @@ namespace BibliotecaApp
                         codigoLibro = obtenerCodigo.ExecuteScalar()?.ToString();
                     }
 
+                    // Préstamos antiguos sin código: solo si el título identifica UN ejemplar
                     if (string.IsNullOrEmpty(codigoLibro))
-                    {
-                        using var obtenerPorTitulo = conexion.CreateCommand();
-                        obtenerPorTitulo.Transaction = transaccion;
-                        obtenerPorTitulo.CommandText = @"
-                            SELECT Codigo FROM Libros
-                            WHERE Titulo = $titulo AND Disponibilidad = 'Prestado'
-                            LIMIT 1;";
-                        obtenerPorTitulo.Parameters.AddWithValue("$titulo", tituloFila);
-                        codigoLibro = obtenerPorTitulo.ExecuteScalar()?.ToString();
-                    }
+                        codigoLibro = ObtenerCodigoPrestado(conexion, tituloFila);
 
                     using (var cmd = conexion.CreateCommand())
                     {
@@ -831,10 +838,7 @@ namespace BibliotecaApp
 
         private void btnLimpiar_Click(object? sender, EventArgs e)
         {
-            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
-            {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
-            }
+            if (!FormAutenticacion.SolicitarAdmin(this)) return;
 
             EliminarPaginaActual();
         }
@@ -862,8 +866,8 @@ namespace BibliotecaApp
             }
 
             DialogResult confirmar = MessageBox.Show(
-                $"Se eliminarán {idsPagina.Count} registro(s) de la página actual.\n" +
-                "Esta acción no se puede deshacer. ¿Continuar?",
+                $"Se eliminarán los préstamos devueltos de la página actual ({idsPagina.Count} en pantalla).\n" +
+                "Los préstamos aún activos NO se eliminan. ¿Continuar?",
                 "Biblioteca CUBO", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
             if (confirmar != DialogResult.Yes) return;
@@ -875,20 +879,79 @@ namespace BibliotecaApp
                 int eliminados;
                 try
                 {
+                    var comandos = new List<(long Id, string? CodigoLibro, string Titulo)>();
+
+                    // Estado y código autoritativos desde la propia BD
+                    using (var leer = conexion.CreateCommand())
+                    {
+                        leer.Transaction = transaccion;
+                        leer.CommandText = @"
+                            SELECT ID, IFNULL(CodigoLibro, ''), IFNULL(TituloLibro, '')
+                            FROM PrestamosExternos
+                            WHERE ID = $id AND IFNULL(EstadoLibro, '') = 'Entregado';";
+                        var parametro = leer.CreateParameter();
+                        parametro.ParameterName = "$id";
+                        leer.Parameters.Add(parametro);
+
+                        foreach (long id in idsPagina)
+                        {
+                            parametro.Value = id;
+                            using var lector = leer.ExecuteReader();
+                            while (lector.Read())
+                            {
+                                comandos.Add((lector.GetInt64(0),
+                                    lector.GetString(1).Trim(), lector.GetString(2)));
+                            }
+                        }
+                    }
+
+                    if (comandos.Count == 0)
+                    {
+                        transaccion.Rollback();
+                        MessageBox.Show(
+                            "Ningún registro de la página está en estado 'Entregado';\n" +
+                            "registre primero las devoluciones.",
+                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
                     // DELETE parametrizado reutilizando un único parámetro
                     using var comando = conexion.CreateCommand();
                     comando.Transaction = transaccion;
-                    comando.CommandText = "DELETE FROM PrestamosExternos WHERE ID = $id;";
+                    comando.CommandText =
+                        "DELETE FROM PrestamosExternos WHERE ID = $id AND EstadoLibro = 'Entregado';";
 
-                    var parametro = comando.CreateParameter();
-                    parametro.ParameterName = "$id";
-                    comando.Parameters.Add(parametro);
+                    var parametroId = comando.CreateParameter();
+                    parametroId.ParameterName = "$id";
+                    comando.Parameters.Add(parametroId);
 
                     eliminados = 0;
-                    foreach (long id in idsPagina)
+                    foreach (var registro in comandos)
                     {
-                        parametro.Value = id;
+                        parametroId.Value = registro.Id;
                         eliminados += comando.ExecuteNonQuery();
+                    }
+
+                    // Ejemplar devuelto: se libera explícitamente por código
+                    foreach (var registro in comandos)
+                    {
+                        string? codigo = registro.CodigoLibro;
+                        if (string.IsNullOrEmpty(codigo))
+                            codigo = ObtenerCodigoPrestado(conexion, registro.Titulo);
+
+                        if (string.IsNullOrEmpty(codigo)) continue;
+
+                        using var liberar = conexion.CreateCommand();
+                        liberar.Transaction = transaccion;
+                        liberar.CommandText = @"
+                            UPDATE Libros SET Disponibilidad = 'Disponible'
+                            WHERE Codigo = $codigo
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM PrestamosExternos
+                                  WHERE CodigoLibro = $codigo
+                                    AND EstadoLibro IN ('Pendiente', 'Renovado'));";
+                        liberar.Parameters.AddWithValue("$codigo", codigo);
+                        liberar.ExecuteNonQuery();
                     }
 
                     transaccion.Commit();
@@ -1385,7 +1448,8 @@ namespace BibliotecaApp
                     PersonalRenovo    = $personalRenovo,
                     EstadoLibro       = 'Renovado',
                     FechaEntrega      = $nuevaFechaEntrega
-                WHERE ID = $id;";
+                WHERE ID = $id
+                  AND EstadoLibro IN ('Pendiente', 'Renovado');";
             cmd.Parameters.AddWithValue("$fechaRenovacion", fechaRenovacion.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("$personalRenovo", personalRenovo);
             cmd.Parameters.AddWithValue("$nuevaFechaEntrega", dtpFechaEntrega.Value.ToString("yyyy-MM-dd"));
@@ -1419,17 +1483,28 @@ namespace BibliotecaApp
             {
                 using var conexion = ConexionDB.ObtenerConexion();
 
-                // Localizar el ejemplar físico por título + estado Prestado.
+                // Identidad del ejemplar: se toma el código registrado en el préstamo
                 string? codigoLibro;
                 using (var obtenerCodigo = conexion.CreateCommand())
                 {
-                    obtenerCodigo.CommandText = "SELECT CodigoLibro FROM PrestamosExternos WHERE ID = $id;";
+                    obtenerCodigo.CommandText =
+                        "SELECT CodigoLibro FROM PrestamosExternos WHERE ID = $id;";
                     obtenerCodigo.Parameters.AddWithValue("$id", id);
                     codigoLibro = obtenerCodigo.ExecuteScalar()?.ToString();
                 }
 
-                // Compatibilidad con préstamos registrados antes de CodigoLibro.
-                codigoLibro ??= ObtenerCodigoPrestado(conexion, titulo ?? "");
+                // Compatibilidad con préstamos antiguos: solo si el título es inequívoco
+                if (string.IsNullOrEmpty(codigoLibro))
+                    codigoLibro = ObtenerCodigoPrestado(conexion, titulo ?? "");
+
+                if (string.IsNullOrEmpty(codigoLibro))
+                {
+                    MessageBox.Show(
+                        "No se pudo identificar el ejemplar por código.\n" +
+                        "Edite el préstamo y asigne el código del libro antes de devolverlo.",
+                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
 
                 using var transaccion = conexion.BeginTransaction();
                 try
@@ -1452,22 +1527,8 @@ namespace BibliotecaApp
                             throw new InvalidOperationException("El préstamo ya fue devuelto o ya no existe.");
                     }
 
-                    if (string.IsNullOrEmpty(codigoLibro))
+                    using (var liberar = conexion.CreateCommand())
                     {
-                        string tituloFila = dgvPrestamos.CurrentRow?.Cells["TituloLibro"]?.Value?.ToString() ?? "";
-                        using var obtenerPorTitulo = conexion.CreateCommand();
-                        obtenerPorTitulo.Transaction = transaccion;
-                        obtenerPorTitulo.CommandText = @"
-                            SELECT Codigo FROM Libros
-                            WHERE Titulo = $titulo AND Disponibilidad = 'Prestado'
-                            LIMIT 1;";
-                        obtenerPorTitulo.Parameters.AddWithValue("$titulo", tituloFila);
-                        codigoLibro = obtenerPorTitulo.ExecuteScalar()?.ToString();
-                    }
-
-                    if (!string.IsNullOrEmpty(codigoLibro))
-                    {
-                        using var liberar = conexion.CreateCommand();
                         liberar.Transaction = transaccion;
                         liberar.CommandText = @"
                             UPDATE Libros SET Disponibilidad = 'Disponible'

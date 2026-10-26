@@ -1,5 +1,4 @@
 ﻿using Microsoft.Data.Sqlite;
-using System.Configuration; // Para ConfigurationManager
 
 namespace BibliotecaApp
 {
@@ -12,12 +11,17 @@ namespace BibliotecaApp
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "BibliotecaCUBO");
 
+        // Carpeta alternativa de datos (portable / pruebas). Si no se indica,
+        // la BD vive siempre en %APPDATA%\BibliotecaCUBO.
+        public static string? CarpetaDatosPersonalizada { get; set; }
+
         public static string RutaBaseDatos
         {
             get
             {
-                Directory.CreateDirectory(CarpetaDatos);
-                return Path.Combine(CarpetaDatos, NombreBaseDatos);
+                string carpeta = CarpetaDatosPersonalizada ?? CarpetaDatos;
+                Directory.CreateDirectory(carpeta);
+                return Path.Combine(carpeta, NombreBaseDatos);
             }
         }
 
@@ -44,9 +48,10 @@ namespace BibliotecaApp
             try
             {
                 CrearTablas(conexion);
+                MigrarEsquemaLibros(conexion);
                 MigrarEsquemaControlSala(conexion, transaccion);
                 MigrarEsquemaPrestamos(conexion);
-                ImportarCatalogoDesdeCsv(conexion, transaccion);
+                MigrarIdentidadEjemplar(conexion);
                 SeedUsuarios(conexion);
                 transaccion.Commit();
             }
@@ -55,6 +60,49 @@ namespace BibliotecaApp
                 transaccion.Rollback();
                 throw;
             }
+
+            // El catálogo CSV se importa en una transacción propia: un archivo
+            // corrupto no debe impedir que la aplicación arranque.
+            try
+            {
+                using var conexionCsv = ObtenerConexion();
+                using var transaccionCsv = conexionCsv.BeginTransaction();
+                try
+                {
+                    ImportarCatalogoDesdeCsv(conexionCsv, transaccionCsv);
+                    transaccionCsv.Commit();
+                }
+                catch
+                {
+                    transaccionCsv.Rollback();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Catálogo CSV omitido: {ex.Message}");
+            }
+        }
+
+        // BD antiguas no traían Disponibilidad: sin este ALTER rompen inventario,
+        // préstamos y sala. La columna nueva arranca como 'Disponible'.
+        private static void MigrarEsquemaLibros(SqliteConnection conexion)
+        {
+            var columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var info = conexion.CreateCommand())
+            {
+                info.CommandText = "PRAGMA table_info(Libros);";
+                using var lector = info.ExecuteReader();
+                while (lector.Read())
+                    columnas.Add(lector.GetString(1));
+            }
+
+            if (columnas.Contains("Disponibilidad")) return;
+
+            using var agregar = conexion.CreateCommand();
+            agregar.CommandText =
+                "ALTER TABLE Libros ADD COLUMN Disponibilidad TEXT DEFAULT 'Disponible';";
+            agregar.ExecuteNonQuery();
         }
 
         private static void SeedUsuarios(SqliteConnection conexion)
@@ -162,16 +210,6 @@ namespace BibliotecaApp
                     using var agregar = conexion.CreateCommand();
                     agregar.CommandText = "ALTER TABLE ControlUsuariosSala ADD COLUMN Estado TEXT DEFAULT 'Pendiente';";
                     agregar.ExecuteNonQuery();
-
-                    using var actualizar = conexion.CreateCommand();
-                    actualizar.CommandText = @"
-                        UPDATE ControlUsuariosSala
-                        SET Estado = CASE
-                            WHEN HoraRecibido = 'En lectura' THEN 'Pendiente'
-                            ELSE 'Entregado'
-                        END
-                        WHERE Estado IS NULL OR Estado = '';";
-                    actualizar.ExecuteNonQuery();
                 }
                 catch (SqliteException)
                 {
@@ -225,6 +263,24 @@ namespace BibliotecaApp
                         renombrar.ExecuteNonQuery();
                     }
                 }
+            }
+
+            // Backfill idempotente: se ejecuta en cada arranque, no solo la primera vez.
+            // Tras el ALTER, las filas antiguas LEEN el DEFAULT ('Pendiente') y no NULL,
+            // por eso hay que reparar también las marcadas 'Pendiente' sin estar en lectura.
+            using (var completar = conexion.CreateCommand())
+            {
+                completar.Transaction = transaccion;
+                completar.CommandText = @"
+                    UPDATE ControlUsuariosSala
+                    SET Estado = CASE
+                        WHEN UPPER(IFNULL(HoraRecibido, '')) = 'EN LECTURA' THEN 'Pendiente'
+                        ELSE 'Entregado'
+                    END
+                    WHERE IFNULL(Estado, '') = ''
+                       OR (Estado = 'Pendiente'
+                           AND UPPER(IFNULL(HoraRecibido, '')) <> 'EN LECTURA');";
+                completar.ExecuteNonQuery();
             }
         }
 
@@ -292,6 +348,53 @@ namespace BibliotecaApp
             using var indice = conexion.CreateCommand();
             indice.CommandText = "CREATE INDEX IF NOT EXISTS IX_Prestamos_CodigoLibro ON PrestamosExternos(CodigoLibro);";
             indice.ExecuteNonQuery();
+        }
+
+        // Añade CodigoLibro a ControlUsuariosSala y completa el código en filas antiguas
+        // solo cuando el título identifica un único ejemplar (sin elegir al azar).
+        private static void MigrarIdentidadEjemplar(SqliteConnection conexion)
+        {
+            var columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var info = conexion.CreateCommand())
+            {
+                info.CommandText = "PRAGMA table_info(ControlUsuariosSala);";
+                using var lector = info.ExecuteReader();
+                while (lector.Read())
+                    columnas.Add(lector.GetString(1));
+            }
+
+            if (!columnas.Contains("CodigoLibro"))
+            {
+                using var agregar = conexion.CreateCommand();
+                agregar.CommandText = "ALTER TABLE ControlUsuariosSala ADD COLUMN CodigoLibro TEXT DEFAULT '';";
+                agregar.ExecuteNonQuery();
+            }
+
+            using (var completarSala = conexion.CreateCommand())
+            {
+                completarSala.CommandText = @"
+                    UPDATE ControlUsuariosSala
+                    SET CodigoLibro = (
+                        SELECT L.Codigo FROM Libros L
+                        WHERE L.Titulo = ControlUsuariosSala.TituloLibro)
+                    WHERE IFNULL(CodigoLibro, '') = ''
+                      AND (SELECT COUNT(*) FROM Libros L
+                           WHERE L.Titulo = ControlUsuariosSala.TituloLibro) = 1;";
+                completarSala.ExecuteNonQuery();
+            }
+
+            using (var completarPrestamos = conexion.CreateCommand())
+            {
+                completarPrestamos.CommandText = @"
+                    UPDATE PrestamosExternos
+                    SET CodigoLibro = (
+                        SELECT L.Codigo FROM Libros L
+                        WHERE L.Titulo = PrestamosExternos.TituloLibro)
+                    WHERE IFNULL(CodigoLibro, '') = ''
+                      AND (SELECT COUNT(*) FROM Libros L
+                           WHERE L.Titulo = PrestamosExternos.TituloLibro) = 1;";
+                completarPrestamos.ExecuteNonQuery();
+            }
         }
 
         private static void CrearTablas(SqliteConnection conexion)
@@ -399,7 +502,15 @@ namespace BibliotecaApp
         public static void MarcarInventarioVaciado(bool vaciado)
         {
             using var conexion = ObtenerConexion();
+            MarcarInventarioVaciado(conexion, null, vaciado);
+        }
+
+        // Sobrecarga transaccional: el flag se marca con la misma transacción del borrado
+        public static void MarcarInventarioVaciado(
+            SqliteConnection conexion, SqliteTransaction? transaccion, bool vaciado)
+        {
             using var cmd = conexion.CreateCommand();
+            cmd.Transaction = transaccion;
             cmd.CommandText = "INSERT OR REPLACE INTO Configuracion (Clave, Valor) VALUES (@clave, @valor);";
             cmd.Parameters.AddWithValue("@clave", ClaveInventarioVaciado);
             cmd.Parameters.AddWithValue("@valor", vaciado ? "1" : "0");

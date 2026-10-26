@@ -14,7 +14,12 @@ namespace BibliotecaApp
             Rol = string.Empty;
         }
 
-        public static bool EsAdmin => Rol == "Administrador";
+        // Única definición de rol administrador en toda la aplicación.
+        public static bool EsRolAdministrador(string? rol) =>
+            string.Equals(rol, "Administrador", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rol, "Admin", StringComparison.OrdinalIgnoreCase);
+
+        public static bool EsAdmin => EsRolAdministrador(Rol);
 
         public static bool EsOperador => Rol == "Operador";
     }

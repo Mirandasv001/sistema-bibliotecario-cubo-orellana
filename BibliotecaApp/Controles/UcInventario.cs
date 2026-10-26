@@ -540,10 +540,7 @@ namespace BibliotecaApp
                 return;
             }
 
-            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
-            {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
-            }
+            if (!FormAutenticacion.SolicitarAdmin(this)) return;
 
             var resultado = MessageBox.Show(
                 $"¿Está seguro de que desea ELIMINAR el libro \"{codigo}\" definitivamente?\n\nEsta acción no se puede deshacer.",
@@ -560,6 +557,54 @@ namespace BibliotecaApp
                 using var transaccion = conexion.BeginTransaction();
                 try
                 {
+                    // Regla de borrado: no se elimina un ejemplar prestado o en sala
+                    using (var validar = conexion.CreateCommand())
+                    {
+                        validar.Transaction = transaccion;
+                        validar.CommandText = @"
+                            SELECT (SELECT COUNT(*) FROM Libros WHERE Codigo = @codigo),
+                                   IFNULL((SELECT UPPER(TRIM(Disponibilidad))
+                                           FROM Libros WHERE Codigo = @codigo), ''),
+                                   (SELECT COUNT(*) FROM PrestamosExternos
+                                    WHERE CodigoLibro = @codigo
+                                      AND UPPER(IFNULL(EstadoLibro, '')) IN ('PENDIENTE','RENOVADO'))
+                                 + (SELECT COUNT(*) FROM ControlUsuariosSala
+                                    WHERE CodigoLibro = @codigo
+                                      AND UPPER(IFNULL(HoraRecibido, '')) = 'EN LECTURA');";
+                        validar.Parameters.AddWithValue("@codigo", codigo);
+
+                        bool existe;
+                        string disponibilidad;
+                        long referencias;
+                        using (var lector = validar.ExecuteReader())
+                        {
+                            lector.Read();
+                            existe = lector.GetInt64(0) > 0;
+                            disponibilidad = lector.GetString(1);
+                            referencias = lector.GetInt64(2);
+                        }
+
+                        if (!existe)
+                        {
+                            transaccion.Rollback();
+                            MessageBox.Show("El libro ya no existe en el inventario.",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            CargarInventario();
+                            return;
+                        }
+
+                        // 'Disponible' o vacío (NULL heredado) se pueden borrar
+                        if (disponibilidad is "PRESTADO" or "EN SALA" || referencias > 0)
+                        {
+                            transaccion.Rollback();
+                            MessageBox.Show(
+                                "No se puede eliminar el libro: está prestado o en sala.\n" +
+                                "Registre primero la devolución del ejemplar.",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+
                     using var cmd = conexion.CreateCommand();
                     cmd.Transaction = transaccion;
                     cmd.CommandText = "DELETE FROM Libros WHERE Codigo = @codigo;";
@@ -845,10 +890,7 @@ namespace BibliotecaApp
 
         private void BtnVaciarInventario_Click(object? sender, EventArgs e)
         {
-            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
-            {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return; // Si cancela o falla auth, salir
-            }
+            if (!FormAutenticacion.SolicitarAdmin(this)) return;
 
             var resultado = MessageBox.Show(
                 "¿Está seguro de que desea ELIMINAR TODOS los libros del inventario?\n\nEsta acción no se puede deshacer.",
@@ -864,14 +906,51 @@ namespace BibliotecaApp
             {
                 using var conexion = ConexionDB.ObtenerConexion();
 
-                // Eliminar todos los libros
-                using (var cmd = conexion.CreateCommand())
+                // DELETE + flag en una sola transacción con rollback si algo falla
+                using var transaccion = conexion.BeginTransaction();
+                try
                 {
-                    cmd.CommandText = "DELETE FROM Libros;";
-                    cmd.ExecuteNonQuery();
-                }
+                    // Regla de borrado: no se vacía el inventario si hay ejemplares ocupados
+                    using (var validar = conexion.CreateCommand())
+                    {
+                        validar.Transaction = transaccion;
+                        validar.CommandText = @"
+                            SELECT
+                                (SELECT COUNT(*) FROM Libros
+                                 WHERE UPPER(IFNULL(Disponibilidad, 'Disponible')) <> 'DISPONIBLE')
+                              + (SELECT COUNT(*) FROM PrestamosExternos
+                                 WHERE UPPER(IFNULL(EstadoLibro, '')) IN ('PENDIENTE','RENOVADO'))
+                              + (SELECT COUNT(*) FROM ControlUsuariosSala
+                                 WHERE UPPER(IFNULL(HoraRecibido, '')) = 'EN LECTURA');";
+                        long ocupados = Convert.ToInt64(validar.ExecuteScalar());
 
-                ConexionDB.MarcarInventarioVaciado(true);
+                        if (ocupados > 0)
+                        {
+                            transaccion.Rollback();
+                            MessageBox.Show(
+                                $"No se puede vaciar el inventario: hay {ocupados} ejemplar(es) prestados, en sala o en lectura.\n" +
+                                "Registre primero las devoluciones.",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+
+                    using (var cmd = conexion.CreateCommand())
+                    {
+                        cmd.Transaction = transaccion;
+                        cmd.CommandText = "DELETE FROM Libros;";
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    ConexionDB.MarcarInventarioVaciado(conexion, transaccion, true);
+
+                    transaccion.Commit();
+                }
+                catch
+                {
+                    transaccion.Rollback();
+                    throw;
+                }
 
                 dgvInventario.DataSource = null;
 
@@ -986,10 +1065,12 @@ namespace BibliotecaApp
                     object? result = checkCmd.ExecuteScalar();
                     if (result != null && result != DBNull.Value)
                     {
+                        // Un ejemplar ocupado no se libera por importar un CSV
                         string disponibilidadActual = result.ToString() ?? "";
-                        if (string.Equals(disponibilidadActual, "Prestado", StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(disponibilidadActual, "Prestado", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(disponibilidadActual, "En Sala", StringComparison.OrdinalIgnoreCase))
                         {
-                            disponibilidadFinal = "Prestado";
+                            disponibilidadFinal = disponibilidadActual;
                         }
                     }
 
@@ -1006,9 +1087,11 @@ namespace BibliotecaApp
                     lineasProcesadas++;
                 }
 
-                transaction.Commit();
+                // El inventario queda bajo control del usuario: no vuelve a
+                // rellenarse con el CSV de arranque en el próximo inicio.
+                ConexionDB.MarcarInventarioVaciado(conexion, transaction, true);
 
-                ConexionDB.MarcarInventarioVaciado(false);
+                transaction.Commit();
 
                 MessageBox.Show(
                     $"Importación completada.\n\nArchivo: {Path.GetFileName(rutaArchivo)}\nLíneas procesadas: {lineasProcesadas}\nLibros insertados: {filasInsertadas}",

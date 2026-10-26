@@ -6,20 +6,24 @@ namespace BibliotecaApp
 {
     public class FormAutenticacion : Form
     {
-        private readonly string _usuarioEsperado;
-        private readonly string _claveEsperada;
         private TextBox _txtUsuario;
         private TextBox _txtClave;
 
         public bool Autenticado { get; private set; }
 
-        public FormAutenticacion(string usuarioEsperado, string claveEsperada)
+        // Diálogo que valida contra la tabla Usuarios (hash PBKDF2) y exige rol Administrador.
+        public FormAutenticacion()
         {
-            _usuarioEsperado = usuarioEsperado;
-            _claveEsperada = claveEsperada;
             InitializeComponent();
 
             if (IconoAplicacion.Obtener() is Icon icoLogo) Icon = icoLogo;
+        }
+
+        // Punto de entrada único para las acciones destructivas.
+        public static bool SolicitarAdmin(IWin32Window? owner)
+        {
+            using var formulario = new FormAutenticacion();
+            return formulario.ShowDialog(owner) == DialogResult.OK && formulario.Autenticado;
         }
 
         private void InitializeComponent()
@@ -83,9 +87,9 @@ namespace BibliotecaApp
 
         private void BtnAceptar_Click(object? sender, EventArgs e)
         {
-            if (_txtUsuario.Text != _usuarioEsperado || _txtClave.Text != _claveEsperada)
+            if (!ValidarAdministrador(_txtUsuario.Text.Trim(), _txtClave.Text))
             {
-                MessageBox.Show("Credenciales incorrectas. Acción cancelada.",
+                MessageBox.Show("Credenciales incorrectas o sin privilegios de Administrador. Acción cancelada.",
                     "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 _txtClave.Clear();
                 _txtClave.Focus();
@@ -93,7 +97,39 @@ namespace BibliotecaApp
             }
             else
             {
+                Autenticado = true;
                 this.DialogResult = DialogResult.OK;
+            }
+        }
+
+        // Comprueba el hash PBKDF2 almacenado en la BD y que el rol sea Administrador.
+        private static bool ValidarAdministrador(string usuario, string clave)
+        {
+            if (usuario.Length == 0 || clave.Length == 0) return false;
+
+            try
+            {
+                using var conexion = ConexionDB.ObtenerConexion();
+                using var cmd = conexion.CreateCommand();
+                cmd.CommandText = "SELECT Contrasena, Rol FROM Usuarios WHERE Usuario = @usuario;";
+                cmd.Parameters.AddWithValue("@usuario", usuario);
+
+                using var lector = cmd.ExecuteReader();
+                if (!lector.Read()) return false;
+
+                string hash = lector.GetString(0);
+                string rol = lector.GetString(1);
+
+                bool claveOk = PasswordHasher.IsLegacyHash(hash)
+                    ? hash == clave
+                    : PasswordHasher.Verify(clave, hash);
+
+                return claveOk && SesionGlobal.EsRolAdministrador(rol);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error validando administrador: {ex.Message}");
+                return false;
             }
         }
 

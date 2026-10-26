@@ -369,6 +369,9 @@ namespace BibliotecaApp
                 return;
             }
 
+            // Borrado masivo: exige contraseña de Administrador
+            if (!FormAutenticacion.SolicitarAdmin(this)) return;
+
             var idsVisibles = new List<int>();
             foreach (DataGridViewRow fila in dgvRegistros.Rows)
             {
@@ -401,9 +404,67 @@ namespace BibliotecaApp
                 {
                     string parametros = string.Join(",", idsVisibles.Select((_, i) => $"@id{i}"));
 
+                    // Regla de borrado: nada se borra si algún ejemplar sigue en lectura
+                    using (var validar = conexion.CreateCommand())
+                    {
+                        validar.Transaction = transaccion;
+                        validar.CommandText = $@"
+                            SELECT COUNT(*) FROM ControlUsuariosSala
+                            WHERE ID IN ({parametros})
+                              AND HoraRecibido = 'En lectura';";
+
+                        for (int i = 0; i < idsVisibles.Count; i++)
+                            validar.Parameters.AddWithValue($"@id{i}", idsVisibles[i]);
+
+                        long enLectura = Convert.ToInt64(validar.ExecuteScalar());
+                        if (enLectura > 0)
+                        {
+                            transaccion.Rollback();
+                            MessageBox.Show(
+                                $"No se puede eliminar la página: {enLectura} registro(s) tienen su ejemplar en lectura.\n" +
+                                "Registre primero las devoluciones.",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+
+                    // Libera por código los ejemplares de los registros que se van a borrar
+                    using (var codigos = conexion.CreateCommand())
+                    {
+                        codigos.Transaction = transaccion;
+                        codigos.CommandText =
+                            $"SELECT ID, IFNULL(CodigoLibro, ''), IFNULL(TituloLibro, '') " +
+                            $"FROM ControlUsuariosSala WHERE ID IN ({parametros});";
+
+                        for (int i = 0; i < idsVisibles.Count; i++)
+                            codigos.Parameters.AddWithValue($"@id{i}", idsVisibles[i]);
+
+                        var pendientes = new List<(int Id, string Titulo)>();
+                        using (var lector = codigos.ExecuteReader())
+                        {
+                            while (lector.Read())
+                            {
+                                string codigo = lector.GetString(1).Trim();
+                                if (codigo.Length > 0)
+                                    LiberarPorCodigo(conexion, transaccion, codigo);
+                                else
+                                    pendientes.Add((lector.GetInt32(0), lector.GetString(2)));
+                            }
+                        }
+
+                        // Registros antiguos sin código: solo se libera si el título es único
+                        foreach (var (id, titulo) in pendientes)
+                        {
+                            string codigo = ResolverCodigoUnicoPorTitulo(conexion, transaccion, titulo);
+                            if (codigo.Length > 0)
+                                LiberarPorCodigo(conexion, transaccion, codigo);
+                        }
+                    }
+
                     using var comando = conexion.CreateCommand();
                     comando.Transaction = transaccion;
-                    comando.CommandText = $"DELETE FROM ControlUsuariosSala WHERE ID IN ({parametros});";
+                    comando.CommandText =
+                        $"DELETE FROM ControlUsuariosSala WHERE ID IN ({parametros}) AND HoraRecibido <> 'En lectura';";
 
                     for (int i = 0; i < idsVisibles.Count; i++)
                         comando.Parameters.AddWithValue($"@id{i}", idsVisibles[i]);
@@ -511,18 +572,104 @@ namespace BibliotecaApp
             idSeleccionado = nuevoId;
         }
 
-        private static void LiberarEjemplarEnSala(SqliteConnection conexion, SqliteTransaction transaccion, string titulo)
+        private static void LiberarEjemplarEnSala(SqliteConnection conexion, SqliteTransaction transaccion, string codigoLibro)
+        {
+            if (string.IsNullOrWhiteSpace(codigoLibro)) return;
+
+            using var cmd = conexion.CreateCommand();
+            cmd.Transaction = transaccion;
+            cmd.CommandText = @"
+                UPDATE Libros SET Disponibilidad = 'Disponible'
+                WHERE Codigo = @codigo
+                  AND Disponibilidad <> 'Disponible'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM ControlUsuariosSala
+                      WHERE CodigoLibro = @codigo AND HoraRecibido = 'En lectura')
+                  AND NOT EXISTS (
+                      SELECT 1 FROM PrestamosExternos
+                      WHERE CodigoLibro = @codigo AND EstadoLibro IN ('Pendiente', 'Renovado'));";
+            cmd.Parameters.AddWithValue("@codigo", codigoLibro);
+            cmd.ExecuteNonQuery();
+        }
+
+        private static void LiberarPorCodigo(SqliteConnection conexion, SqliteTransaction transaccion, string codigoLibro)
         {
             using var cmd = conexion.CreateCommand();
             cmd.Transaction = transaccion;
             cmd.CommandText = @"
                 UPDATE Libros SET Disponibilidad = 'Disponible'
-                WHERE Codigo = (
-                    SELECT Codigo FROM Libros
-                    WHERE Titulo = @titulo AND Disponibilidad = 'En Sala'
-                    LIMIT 1);";
-            cmd.Parameters.AddWithValue("@titulo", titulo);
+                WHERE Codigo = @codigo
+                  AND Disponibilidad <> 'Disponible'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM ControlUsuariosSala
+                      WHERE CodigoLibro = @codigo AND HoraRecibido = 'En lectura')
+                  AND NOT EXISTS (
+                      SELECT 1 FROM PrestamosExternos
+                      WHERE CodigoLibro = @codigo AND EstadoLibro IN ('Pendiente', 'Renovado'));";
+            cmd.Parameters.AddWithValue("@codigo", codigoLibro);
             cmd.ExecuteNonQuery();
+        }
+
+        private static string ResolverCodigoUnicoPorTitulo(SqliteConnection conexion, SqliteTransaction transaccion, string titulo)
+        {
+            if (string.IsNullOrWhiteSpace(titulo)) return string.Empty;
+
+            using var cmd = conexion.CreateCommand();
+            cmd.Transaction = transaccion;
+            cmd.CommandText = "SELECT Codigo FROM Libros WHERE Titulo = $titulo;";
+            cmd.Parameters.AddWithValue("$titulo", titulo);
+
+            string codigo = string.Empty;
+            using var lector = cmd.ExecuteReader();
+            while (lector.Read())
+            {
+                string candidato = lector.GetString(0);
+                if (codigo.Length > 0 && !string.Equals(codigo, candidato, StringComparison.OrdinalIgnoreCase))
+                    return string.Empty; // título ambiguo: no se identifica al azar
+                codigo = candidato;
+            }
+
+            return codigo;
+        }
+
+        // Devuelve el código del ejemplar; si el registro antiguo no lo tiene,
+        // usa el título solo cuando identifica UN ejemplar (sin LIMIT 1).
+        private static string ResolverCodigoDelRegistro(SqliteConnection conexion, SqliteTransaction transaccion, int id)
+        {
+            using var cmd = conexion.CreateCommand();
+            cmd.Transaction = transaccion;
+            cmd.CommandText =
+                "SELECT IFNULL(CodigoLibro, ''), IFNULL(TituloLibro, '') FROM ControlUsuariosSala WHERE ID = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+
+            string codigo = string.Empty;
+            string titulo = string.Empty;
+            using (var lector = cmd.ExecuteReader())
+            {
+                if (lector.Read())
+                {
+                    codigo = lector.GetString(0).Trim();
+                    titulo = lector.GetString(1);
+                }
+            }
+
+            if (codigo.Length > 0 || titulo.Length == 0) return codigo;
+
+            using var cmdTitulo = conexion.CreateCommand();
+            cmdTitulo.Transaction = transaccion;
+            cmdTitulo.CommandText = "SELECT Codigo FROM Libros WHERE Titulo = $titulo;";
+            cmdTitulo.Parameters.AddWithValue("$titulo", titulo);
+
+            using var lectorTitulos = cmdTitulo.ExecuteReader();
+            while (lectorTitulos.Read())
+            {
+                string candidato = lectorTitulos.GetString(0);
+                if (codigo.Length > 0 && !string.Equals(codigo, candidato, StringComparison.OrdinalIgnoreCase))
+                    return string.Empty; // título ambiguo: no se identifica al azar
+                codigo = candidato;
+            }
+
+            return codigo;
         }
 
         private void btnRegistrar_Click(object sender, EventArgs e)
@@ -582,10 +729,10 @@ namespace BibliotecaApp
                         insertar.CommandText = @"
                             INSERT INTO ControlUsuariosSala
                                 (Fecha, NombreUsuario, Genero, Edad, TituloLibro,
-                                 HoraEntrega, HoraRecibido, PersonalTurno, Estado)
+                                 HoraEntrega, HoraRecibido, PersonalTurno, Estado, CodigoLibro)
                             VALUES
                                 ($fecha, $nombre, $genero, $edad, $libro,
-                                 $horaEntrega, $horaRecibido, $personal, $estado);";
+                                 $horaEntrega, $horaRecibido, $personal, $estado, $codigo);";
 
                         insertar.Parameters.AddWithValue("$fecha", dtpFecha.Value.ToString("yyyy-MM-dd"));
                         insertar.Parameters.AddWithValue("$nombre", txtNombre.Text.Trim());
@@ -596,6 +743,7 @@ namespace BibliotecaApp
                         insertar.Parameters.AddWithValue("$horaRecibido", EstadoEnLectura);
                         insertar.Parameters.AddWithValue("$personal", txtPersonal.Text.Trim());
                         insertar.Parameters.AddWithValue("$estado", EstadoPendiente);
+                        insertar.Parameters.AddWithValue("$codigo", codigo ?? string.Empty);
 
                         insertar.ExecuteNonQuery();
                     }
@@ -627,26 +775,45 @@ namespace BibliotecaApp
         {
             if (!HayFilaSeleccionada()) return;
 
-            string estadoActual = dgvRegistros.CurrentRow!
-                .Cells["HoraRecibido"].Value?.ToString() ?? string.Empty;
-
-            if (!estadoActual.Equals(EstadoEnLectura, StringComparison.OrdinalIgnoreCase))
-            {
-                MessageBox.Show("El registro seleccionado ya tiene su devolución registrada.",
-                    "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            string tituloLibro = dgvRegistros.CurrentRow!
-                .Cells["TituloLibro"].Value?.ToString() ?? string.Empty;
-
             try
             {
                 using var conexion = ConexionDB.ObtenerConexion();
                 using var transaccion = conexion.BeginTransaction();
                 int afectados;
+                string codigoLiberado = string.Empty;
                 try
                 {
+                    // Estado y código autoritativos desde la propia BD (no desde la fila pintada)
+                    bool enLectura;
+                    using (var cmdLeer = conexion.CreateCommand())
+                    {
+                        cmdLeer.Transaction = transaccion;
+                        cmdLeer.CommandText =
+                            "SELECT IFNULL(HoraRecibido, '') FROM ControlUsuariosSala WHERE ID = $id;";
+                        cmdLeer.Parameters.AddWithValue("$id", idSeleccionado);
+
+                        object? hora = cmdLeer.ExecuteScalar();
+                        if (hora == null)
+                        {
+                            transaccion.Rollback();
+                            MessageBox.Show("El registro ya no existe en la base de datos.",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            CargarRegistros();
+                            return;
+                        }
+
+                        enLectura = string.Equals(hora.ToString(), EstadoEnLectura,
+                            StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    if (!enLectura)
+                    {
+                        transaccion.Rollback();
+                        MessageBox.Show("El registro seleccionado ya tiene su devolución registrada.",
+                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
                     using (var comando = conexion.CreateCommand())
                     {
                         comando.Transaction = transaccion;
@@ -654,16 +821,22 @@ namespace BibliotecaApp
                             UPDATE ControlUsuariosSala
                             SET HoraRecibido = $hora,
                                 Estado = $estado
-                            WHERE ID = $id;";
+                            WHERE ID = $id
+                              AND HoraRecibido = $enLectura;";
                         comando.Parameters.AddWithValue("$hora", DateTime.Now.ToString("HH:mm:ss"));
                         comando.Parameters.AddWithValue("$estado", EstadoEntregado);
                         comando.Parameters.AddWithValue("$id", idSeleccionado);
+                        comando.Parameters.AddWithValue("$enLectura", EstadoEnLectura);
 
                         afectados = comando.ExecuteNonQuery();
                     }
 
-                    if (afectados > 0 && tituloLibro.Length > 0)
-                        LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
+                    if (afectados > 0)
+                    {
+                        // La liberación se hace por código del ejemplar, nunca por título
+                        codigoLiberado = ResolverCodigoDelRegistro(conexion, transaccion, idSeleccionado);
+                        LiberarEjemplarEnSala(conexion, transaccion, codigoLiberado);
+                    }
 
                     transaccion.Commit();
                 }
@@ -676,8 +849,18 @@ namespace BibliotecaApp
                 if (afectados > 0)
                 {
                     CargarTitulosDeLibros(); // el título liberado vuelve al combo
-                    MessageBox.Show("Devolución registrada correctamente. Estado: " + EstadoEntregado,
-                        "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    if (codigoLiberado.Length == 0)
+                    {
+                        MessageBox.Show(
+                            "Devolución registrada, pero el ejemplar no se pudo identificar por código.\n" +
+                            "Revise el inventario para corregir su disponibilidad.",
+                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Devolución registrada correctamente. Estado: " + EstadoEntregado,
+                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                     CargarRegistros();
                     LimpiarCampos();
                 }
@@ -792,10 +975,7 @@ namespace BibliotecaApp
         {
             if (!HayFilaSeleccionada()) return;
 
-            using (var frmAuth = new FormAutenticacion("AdminCubo", "Admin123$"))
-            {
-                if (frmAuth.ShowDialog(this) != DialogResult.OK) return;
-            }
+            if (!FormAutenticacion.SolicitarAdmin(this)) return;
 
             // Credenciales correctas: ejecutar DELETE sincronizado con el inventario
             try
@@ -805,38 +985,59 @@ namespace BibliotecaApp
                 int afectados;
                 try
                 {
-                    string tituloLibro = string.Empty;
+                    string codigoLibro = string.Empty;
                     bool estabaEnLectura = false;
 
-                    // Estado y título autoritativos desde la propia BD
+                    // Estado y código autoritativos desde la propia BD
                     using (var cmdLeer = conexion.CreateCommand())
                     {
                         cmdLeer.Transaction = transaccion;
                         cmdLeer.CommandText =
-                            "SELECT TituloLibro, HoraRecibido FROM ControlUsuariosSala WHERE ID = $id;";
+                            "SELECT IFNULL(HoraRecibido, '') FROM ControlUsuariosSala WHERE ID = $id;";
                         cmdLeer.Parameters.AddWithValue("$id", idSeleccionado);
 
-                        using var lector = cmdLeer.ExecuteReader();
-                        if (lector.Read())
+                        object? hora = cmdLeer.ExecuteScalar();
+                        if (hora == null)
                         {
-                            tituloLibro = lector["TituloLibro"]?.ToString() ?? string.Empty;
-                            estabaEnLectura = string.Equals(
-                                lector["HoraRecibido"]?.ToString(),
-                                EstadoEnLectura, StringComparison.OrdinalIgnoreCase);
+                            transaccion.Rollback();
+                            MessageBox.Show("No se encontró el registro para eliminar.",
+                                "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            CargarRegistros();
+                            return;
                         }
+
+                        estabaEnLectura = string.Equals(hora.ToString(), EstadoEnLectura,
+                            StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    // Regla de borrado: no se borra un registro cuyo ejemplar sigue en lectura
+                    if (estabaEnLectura)
+                    {
+                        transaccion.Rollback();
+                        MessageBox.Show(
+                            "No se puede eliminar el registro: el ejemplar sigue en lectura.\n" +
+                            "Registre primero la devolución.",
+                            "Biblioteca CUBO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
                     }
 
                     using (var comando = conexion.CreateCommand())
                     {
                         comando.Transaction = transaccion;
-                        comando.CommandText = "DELETE FROM ControlUsuariosSala WHERE ID = $id;";
+                        comando.CommandText =
+                            "DELETE FROM ControlUsuariosSala WHERE ID = $id AND HoraRecibido <> $enLectura;";
                         comando.Parameters.AddWithValue("$id", idSeleccionado);
+                        comando.Parameters.AddWithValue("$enLectura", EstadoEnLectura);
 
                         afectados = comando.ExecuteNonQuery();
                     }
 
-                    if (afectados > 0 && estabaEnLectura && tituloLibro.Length > 0)
-                        LiberarEjemplarEnSala(conexion, transaccion, tituloLibro);
+                    // Ejemplar ya devuelto: se libera explícitamente por código
+                    if (afectados > 0)
+                    {
+                        codigoLibro = ResolverCodigoDelRegistro(conexion, transaccion, idSeleccionado);
+                        LiberarEjemplarEnSala(conexion, transaccion, codigoLibro);
+                    }
 
                     transaccion.Commit();
                 }
